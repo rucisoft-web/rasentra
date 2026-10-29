@@ -4,6 +4,7 @@ namespace App\Domain\Core;
 
 use App\Models\InboxEvent;
 use App\Support\Decimal;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,7 +41,7 @@ final class SalesProjector
                 'gross_amount' => $o['gross_amount'],
                 'discount_amount' => $o['discount_amount'],
                 'net_amount' => $o['net_amount'],
-                'finalized_at' => $o['finalized_at'] ?? $event->created_at,
+                'finalized_at' => $this->time($o['finalized_at'] ?? null, $event),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -98,7 +99,7 @@ final class SalesProjector
                 'gross_amount' => $neg($r['gross_amount']),
                 'discount_amount' => $neg($r['discount_amount']),
                 'net_amount' => $neg($r['net_amount']),
-                'finalized_at' => $r['finalized_at'] ?? $event->created_at,
+                'finalized_at' => $this->time($r['finalized_at'] ?? null, $event),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -133,5 +134,11 @@ final class SalesProjector
         });
 
         return $count;
+    }
+
+    /** Waktu ISO 8601 dari payload outlet, disimpan dalam zona aplikasi agar diterima MySQL. */
+    private function time(?string $value, InboxEvent $event): Carbon
+    {
+        return ($value !== null ? Carbon::parse($value) : Carbon::parse($event->created_at))->setTimezone(config('app.timezone'));
     }
 }

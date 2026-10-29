@@ -48,8 +48,8 @@ class SapMappingController extends Controller
             ->join('hq_orders', 'hq_orders.id', '=', 'hq_order_lines.hq_order_id')
             ->whereIn('hq_orders.outlet_id', $company->outlets()->pluck('id'))
             ->whereNotIn('hq_order_lines.product_id', $mappedProducts->map(fn ($k) => (int) $k))
-            ->groupBy('products.id', 'products.code', 'products.name')->selectRaw('products.id, products.code, products.name, COUNT(*) as lines')
-            ->orderByDesc('lines')->limit(30)->get();
+            ->groupBy('products.id', 'products.code', 'products.name')->selectRaw('products.id, products.code, products.name, COUNT(*) as line_count')
+            ->orderByDesc('line_count')->limit(30)->get();
         $mappedMethods = SapMapping::where('company_db', $companyDb)->where('entity_type', 'payment_method')->pluck('entity_key')->all();
 
         return view('core.sap-mappings.index', [

@@ -125,7 +125,7 @@ final class SalesReport
         return $this->orders()->join('hq_order_lines as l', 'l.hq_order_id', '=', 'o.id')
             ->join('products', 'products.id', '=', 'l.product_id')
             ->groupBy('l.product_id', 'products.code', 'products.name', 'l.uom', 'l.line_type')
-            ->selectRaw('l.product_id, products.code, products.name, l.uom, l.line_type, SUM(l.quantity) as quantity, COUNT(*) as lines, SUM(l.discount_amount) as discount, SUM(l.net_amount) as net')
+            ->selectRaw('l.product_id, products.code, products.name, l.uom, l.line_type, SUM(l.quantity) as quantity, COUNT(*) as line_count, SUM(l.discount_amount) as discount, SUM(l.net_amount) as net')
             ->orderByDesc('net')->limit($limit)->get();
     }
 
@@ -135,7 +135,7 @@ final class SalesReport
             ->leftJoin('promotion_versions as v', 'v.id', '=', 'd.promotion_version_id')
             ->leftJoin('promotions as p', 'p.id', '=', 'v.promotion_id')
             ->groupBy('d.promotion_version_id', 'p.code', 'p.name', 'v.version', 'v.type', 'd.funded_by')
-            ->selectRaw('d.promotion_version_id, p.code, p.name, v.version, v.type, d.funded_by, COUNT(DISTINCT o.id) as orders, COUNT(*) as lines, SUM(d.amount) as discount')
+            ->selectRaw('d.promotion_version_id, p.code, p.name, v.version, v.type, d.funded_by, COUNT(DISTINCT o.id) as orders, COUNT(*) as line_count, SUM(d.amount) as discount')
             ->orderByDesc('discount')->get();
     }
 }

@@ -71,7 +71,7 @@
   <thead><tr><th>Kode</th><th>Produk</th><th>Jenis baris</th><th class="n">Kuantitas</th><th class="n">Baris</th><th class="n">Diskon</th><th class="n">Bersih</th></tr></thead>
   <tbody>
   @forelse ($top as $p)
-    <tr><td class="mono">{{ $p->code }}</td><td>{{ $p->name }}</td><td><span class="b mute">{{ str_replace('_', ' ', $p->line_type) }}</span></td><td class="n">{{ Fmt::qty($p->quantity) }} {{ $p->uom }}</td><td class="n">{{ $p->lines }}</td><td class="n">{{ Fmt::money($p->discount) }}</td><td class="n">{{ Fmt::money($p->net) }}</td></tr>
+    <tr><td class="mono">{{ $p->code }}</td><td>{{ $p->name }}</td><td><span class="b mute">{{ str_replace('_', ' ', $p->line_type) }}</span></td><td class="n">{{ Fmt::qty($p->quantity) }} {{ $p->uom }}</td><td class="n">{{ $p->line_count }}</td><td class="n">{{ Fmt::money($p->discount) }}</td><td class="n">{{ Fmt::money($p->net) }}</td></tr>
   @empty
     <tr><td colspan="7" class="muted">Belum ada penjualan yang tersinkron pada rentang ini.</td></tr>
   @endforelse

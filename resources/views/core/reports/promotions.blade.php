@@ -24,7 +24,7 @@
       <td>{{ str_replace('_', ' ', $p->type ?? '-') }}</td>
       <td><span class="b {{ $p->funded_by === 'supplier' ? 'info' : 'mute' }}">{{ $funders[$p->funded_by] ?? $p->funded_by }}</span></td>
       <td class="n">{{ $p->orders }}</td>
-      <td class="n">{{ $p->lines }}</td>
+      <td class="n">{{ $p->line_count }}</td>
       <td class="n">{{ Fmt::money($p->discount) }}</td>
     </tr>
   @empty

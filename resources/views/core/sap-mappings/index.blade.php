@@ -53,7 +53,7 @@
       @else
         <p class="muted small">Produk yang sudah terjual tetapi belum punya ItemCode. Posting penjualannya tertahan.</p>
         <table class="t"><thead><tr><th>Kode</th><th>Nama</th><th class="n">Baris</th></tr></thead>
-          <tbody>@foreach ($unmappedSold as $p)<tr><td class="mono">{{ $p->code }}</td><td>{{ $p->name }}</td><td class="n">{{ $p->lines }}</td></tr>@endforeach</tbody></table>
+          <tbody>@foreach ($unmappedSold as $p)<tr><td class="mono">{{ $p->code }}</td><td>{{ $p->name }}</td><td class="n">{{ $p->line_count }}</td></tr>@endforeach</tbody></table>
       @endif
     </div>
   </div>
