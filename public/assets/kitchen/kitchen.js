@@ -1,6 +1,7 @@
-// Rasentra Kitchen: papan station/expeditor dan layar antrean pickup. Pembaruan diambil
-// lewat polling ke server outlet (fallback bila WebSocket Reverb tidak tersedia);
-// timer berjalan di klien dan disetel ulang dengan jam server pada setiap respons.
+// Rasentra Kitchen: papan station/expeditor, layar antrean pickup dan analisis waktu saji.
+// Layar memeriksa penanda perubahan (GET version) setiap 1,5 detik dan hanya memuat ulang
+// papan bila berubah, sehingga perubahan tampil < 2 detik tanpa membebani server outlet.
+// Timer berjalan di klien dan disetel ulang dengan jam server pada setiap respons.
 (() => {
   'use strict';
 
@@ -37,16 +38,19 @@
   const DICT = {
     id: { active: 'Aktif', late: 'Terlambat', scan: 'Scan barcode tiket', empty: 'Belum ada tiket.', start: 'Mulai masak', ready: 'Siap', served: 'Disajikan',
       queued: 'Baru', acknowledged: 'Diterima', in_preparation: 'Dimasak', cancelled: 'Batal', complete: 'Lengkap, sajikan', waiting: 'Menunggu station lain',
-      allergy: 'ALERGI', portions: 'porsi', dine_in: 'Dine-in', takeaway: 'Takeaway', pickup: 'Pickup', retail: 'Retail', pack: 'Pack', recall: 'Kembalikan ke Dimasak?', cancel_reason: 'Alasan batal:' },
+      allergy: 'ALERGI', portions: 'porsi', dine_in: 'Dine-in', takeaway: 'Takeaway', pickup: 'Pickup', delivery: 'Delivery', retail: 'Retail', pack: 'Pack', recall: 'Kembalikan ke Dimasak?', cancel_reason: 'Alasan batal:',
+      cancel_requested: 'Minta batal', confirm_cancel: 'Konfirmasi batal', confirm_cancel_q: 'Batalkan item ini? Bahan yang sudah dipakai dicatat sebagai waste.', reason: 'Alasan', new_ticket: 'Tiket baru' },
     en: { active: 'Active', late: 'Late', scan: 'Scan ticket barcode', empty: 'No tickets yet.', start: 'Start cooking', ready: 'Ready', served: 'Served',
       queued: 'New', acknowledged: 'Seen', in_preparation: 'Cooking', cancelled: 'Void', complete: 'Complete, serve', waiting: 'Waiting for other stations',
-      allergy: 'ALLERGY', portions: 'portions', dine_in: 'Dine-in', takeaway: 'Takeaway', pickup: 'Pickup', retail: 'Retail', pack: 'Pack', recall: 'Return to Cooking?', cancel_reason: 'Void reason:' },
+      allergy: 'ALLERGY', portions: 'portions', dine_in: 'Dine-in', takeaway: 'Takeaway', pickup: 'Pickup', delivery: 'Delivery', retail: 'Retail', pack: 'Pack', recall: 'Return to Cooking?', cancel_reason: 'Void reason:',
+      cancel_requested: 'Void request', confirm_cancel: 'Confirm void', confirm_cancel_q: 'Void this item? Ingredients already used are recorded as waste.', reason: 'Reason', new_ticket: 'New ticket' },
   };
   const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* abaikan */ } } };
 
   const board = $('#board');
   if (board) initBoard();
   if (document.body.hasAttribute('data-queue')) initQueue();
+  if (document.body.hasAttribute('data-analytics')) initAnalytics();
 
   function initBoard() {
     const station = document.body.dataset.station;
@@ -105,13 +109,16 @@
             ${expo && i.station ? `<span class="stn">${esc(i.station)}</span>` : ''}
             ${mods(i) ? `<span class="mods">${esc(mods(i))}</span>` : ''}
             ${i.instructions?.allergy ? `<span class="allergy">${esc(t('allergy'))}: ${esc(i.instructions.allergy)}</span>` : ''}
+            ${i.status === 'cancel_requested' || (i.status === 'cancelled' && i.cancel_reason) ? `<span class="void-reason">${esc(t('reason'))}: ${esc(i.cancel_reason || '-')}</span>` : ''}
           </li>`).join('');
         const open = tk.items.filter((i) => ['queued', 'acknowledged', 'in_preparation'].includes(i.status));
-        let action;
+        const voids = tk.items.filter((i) => i.status === 'cancel_requested');
+        let action = '';
         if (expo) action = tk.complete ? `<button class="kbtn go" data-bump-order="${tk.order_id}">${esc(t('complete'))}</button>` : `<button class="kbtn" disabled>${esc(t('waiting'))}</button>`;
-        else action = open.some((i) => i.status !== 'in_preparation') ? `<button class="kbtn" data-bump="${tk.id}">${esc(t('start'))}</button>` : `<button class="kbtn go" data-bump="${tk.id}">${esc(t('ready'))}</button>`;
-        return `<article class="ticket ${level} ${tk.complete ? 'complete' : ''}">
-          <div class="t-head" ${expo ? '' : `data-bump="${tk.id}"`}><b>${esc(tk.label)}</b><span class="t-time">${mmss(elapsed)}</span></div>
+        else if (open.length) action = open.some((i) => i.status !== 'in_preparation') ? `<button class="kbtn" data-bump="${tk.id}">${esc(t('start'))}</button>` : `<button class="kbtn go" data-bump="${tk.id}">${esc(t('ready'))}</button>`;
+        if (!expo && voids.length) action += `<button class="kbtn void" data-confirm-void="${voids.map((i) => i.id).join(',')}">${esc(t('confirm_cancel'))} (${voids.length})</button>`;
+        return `<article class="ticket ${level} ${tk.complete ? 'complete' : ''} ${voids.length ? 'has-void' : ''}">
+          <div class="t-head" ${expo || !open.length ? '' : `data-bump="${tk.id}"`}><b>${esc(tk.label)}</b><span class="t-time">${mmss(elapsed)}</span></div>
           <div class="t-meta"><span>${esc(tk.channel ? t(tk.channel) : '')}</span>${tk.bump_code ? `<span class="mono">#${esc(tk.bump_code)}</span>` : ''}${tk.sequence ? `<span>T${tk.sequence}</span>` : ''}</div>
           <ul class="t-items">${items}</ul>
           <div class="t-foot">${action}</div>
@@ -119,9 +126,14 @@
       }).join('');
     }
 
+    let version = null;
+    let seen = null;
     async function load() {
       try {
         const data = await api('GET', 'board/' + station);
+        const ids = new Set(data.tickets.map((x) => x.id || x.order_id));
+        if (seen && [...ids].some((id) => !seen.has(id))) beep();
+        seen = ids;
         tickets = data.tickets;
         loadedAt = Date.now();
         $('#conn').textContent = 'LIVE';
@@ -152,6 +164,11 @@
     }
 
     board.addEventListener('click', (ev) => {
+      const voidBtn = ev.target.closest('[data-confirm-void]');
+      if (voidBtn) {
+        if (confirm(t('confirm_cancel_q'))) act(() => Promise.all(voidBtn.dataset.confirmVoid.split(',').map((id) => api('POST', `items/${id}/confirm-cancel`))));
+        return;
+      }
       const bump = ev.target.closest('[data-bump]');
       if (bump) return act(() => api('POST', `tickets/${bump.dataset.bump}/bump`));
       const order = ev.target.closest('[data-bump-order]');
@@ -167,6 +184,10 @@
         return;
       }
       if (status === 'cancelled') return;
+      if (status === 'cancel_requested') {
+        if (!expo && confirm(t('confirm_cancel_q'))) act(() => api('POST', `items/${li.dataset.item}/confirm-cancel`));
+        return;
+      }
       act(() => api('POST', `items/${li.dataset.item}/bump`, { expo }));
     });
 
@@ -174,7 +195,7 @@
     let pressTimer;
     board.addEventListener('pointerdown', (ev) => {
       const li = ev.target.closest('[data-item]');
-      if (!li || li.classList.contains('cancelled')) return;
+      if (!li || li.classList.contains('cancelled') || li.classList.contains('cancel_requested')) return;
       pressTimer = setTimeout(() => {
         const reason = prompt(t('cancel_reason'));
         if (reason) act(() => api('POST', `items/${li.dataset.item}/cancel`, { reason }));
@@ -192,10 +213,57 @@
     });
     document.addEventListener('pointerup', (ev) => { if (!ev.target.closest('input, button')) scan.focus({ preventScroll: true }); });
 
-    load();
-    setInterval(load, 4000);
+    // Cek penanda perubahan tiap 1,5 detik; muat ulang penuh tiap 20 detik sebagai jaring pengaman.
+    async function poll() {
+      try {
+        const data = await api('GET', 'version');
+        if (data.v !== version) {
+          version = data.v;
+          await load();
+        }
+      } catch (e) {
+        $('#conn').textContent = 'OFFLINE';
+        $('#conn').classList.add('off');
+      }
+    }
+    poll();
+    setInterval(poll, 1500);
+    setInterval(load, 20000);
     setInterval(render, 1000);
     scan.focus();
+  }
+
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      o.frequency.value = 660;
+      o.connect(ctx.destination);
+      o.start();
+      o.stop(ctx.currentTime + 0.15);
+    } catch (e) { /* tanpa suara */ }
+  }
+
+  function initAnalytics() {
+    const names = window.KDS_STATIONS || {};
+    const dur = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : '-');
+    const head = '<tr><th>{k}</th><th>Item</th><th>Rata-rata</th><th>Median</th><th>P90</th><th>Antre</th><th>Masak</th><th>Target</th><th>Terlambat</th></tr>';
+    const row = (label, r) => `<tr class="${r.late ? 'flag' : ''}"><td>${esc(label)}</td><td>${r.count}</td><td>${dur(r.avg_seconds)}</td><td>${dur(r.p50_seconds)}</td><td>${dur(r.p90_seconds)}</td>
+      <td>${dur(r.avg_wait_seconds)}</td><td>${dur(r.avg_cook_seconds)}</td><td>${r.target_seconds ? dur(r.target_seconds) : '-'}</td>
+      <td>${r.late === null ? '-' : `${r.late} (${r.count ? Math.round((r.late / r.count) * 100) : 0}%)`}</td></tr>`;
+    const empty = '<tr><td colspan="9" class="muted">Belum ada item Siap pada rentang ini.</td></tr>';
+    async function load() {
+      const f = new FormData($('#range'));
+      const data = await api('GET', `analytics?from=${f.get('from')}&to=${f.get('to')}`);
+      const o = data.overall;
+      $('#tiles').innerHTML = [['Item disajikan', o.count], ['Rata-rata', dur(o.avg_seconds)], ['Median', dur(o.p50_seconds)], ['P90', dur(o.p90_seconds)]]
+        .map(([k, v]) => `<div class="tile"><span>${k}</span><b>${v}</b></div>`).join('');
+      $('#by-station').innerHTML = head.replace('{k}', 'Station') + (data.by_station.map((r) => row(names[r.station] || r.station, r)).join('') || empty);
+      $('#by-product').innerHTML = head.replace('{k}', 'Menu') + (data.by_product.map((r) => row(r.product, r)).join('') || empty);
+      $('#by-hour').innerHTML = head.replace('{k}', 'Jam') + (data.by_hour.map((r) => row(`${String(r.hour).padStart(2, '0')}.00`, r)).join('') || empty);
+    }
+    $('#range').addEventListener('submit', (ev) => { ev.preventDefault(); load(); });
+    load();
   }
 
   function initQueue() {
@@ -223,6 +291,6 @@
       } catch (e) { /* tanpa suara */ }
     }
     load();
-    setInterval(load, 3000);
+    setInterval(load, 2000);
   }
 })();

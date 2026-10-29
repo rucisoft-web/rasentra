@@ -80,6 +80,8 @@ Route::middleware('auth')->group(function () {
         Route::get('kitchen', 'home')->name('kitchen');
         Route::get('kitchen/queue', 'queueScreen')->name('kitchen.queue');
         Route::get('kitchen/s/{station}', 'screen')->name('kitchen.screen');
+        Route::get('kitchen/analytics', 'analyticsScreen')->name('kitchen.analytics');
+        Route::get('kitchen/print/{order}', 'printTickets')->name('kitchen.print');
 
         Route::prefix('kitchen/api')->group(function () {
             Route::get('board/{station}', 'data');
@@ -87,6 +89,8 @@ Route::middleware('auth')->group(function () {
             Route::post('items/{item}/bump', 'bumpItem');
             Route::post('items/{item}/recall', 'recall');
             Route::post('items/{item}/cancel', 'cancel');
+            Route::post('items/{item}/confirm-cancel', 'confirmCancel');
+            Route::get('version', 'version');
             Route::post('scan', 'scan');
             Route::get('queue', 'queue');
             Route::get('analytics', 'analytics');

@@ -5,6 +5,7 @@ namespace App\Domain\Sales;
 use App\Domain\Audit\Audit;
 use App\Domain\Catalog\PriceResolver;
 use App\Domain\Inventory\StockLedger;
+use App\Domain\Kitchen\KitchenService;
 use App\Domain\Promotion\ActivePromotions;
 use App\Domain\Promotion\PromotionEngine;
 use App\Domain\Sync\Outbox;
@@ -220,6 +221,9 @@ final class OrderService
             }
 
             $line->update(['status' => 'voided', 'revision' => $line->revision + 1]);
+            if ($order->status === 'confirmed') {
+                app(KitchenService::class)->lineVoided($line, $actor, $reason);
+            }
             Audit::record('line.void', $line, $actor->id, reason: $reason, approverId: $approver?->id, outletId: $order->outlet_id, amount: $line->net_amount);
             $this->recalculate($order);
         });

@@ -21,6 +21,7 @@
     @endforeach
     <a class="pick expo" href="{{ route('kitchen.screen', 'expo') }}"><b>Expeditor</b><span>Semua station per pesanan</span></a>
     <a class="pick queue" href="{{ route('kitchen.queue') }}"><b>Layar antrean</b><span>Nomor pickup untuk pelanggan</span></a>
+    <a class="pick" href="{{ route('kitchen.analytics') }}"><b>Analisis waktu saji</b><span>Per station, per menu dan per jam</span></a>
   </div>
 </main>
 </body>

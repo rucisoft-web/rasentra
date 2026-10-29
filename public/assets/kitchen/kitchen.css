@@ -55,6 +55,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .t-items li.ready .n, .t-items li.cancelled .n { opacity: .55; }
 .t-items li.cancelled .n { text-decoration: line-through; }
 .t-items li.cancelled .st { background: var(--late); color: #fff; }
+.t-items li.cancel_requested { background: #3a1513; }
+.t-items .st.cancel_requested { background: var(--late); color: #fff; }
+.t-items .void-reason { grid-column: 1 / -1; color: #ffb2ab; font-size: .85rem; }
+.ticket.has-void { outline: 3px dashed var(--late); }
+.t-foot .kbtn.void { background: var(--late); color: #fff; margin-top: 8px; }
 .t-items .stn { font-size: .75rem; color: var(--muted); text-transform: uppercase; }
 .t-foot { display: grid; grid-template-columns: 1fr; padding: 10px; }
 .t-foot .kbtn { min-height: 64px; font-size: 1.15rem; border: 0; background: #2c3a33; }
@@ -89,6 +94,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ready .qnums span.fresh { animation: flash 1s ease-in-out 4; }
 .ready .qnums span.served { opacity: .45; }
 @keyframes flash { 50% { background: var(--accent); color: #1b1300; } }
+
+/* Analisis waktu saji */
+.report { user-select: text; height: auto; }
+.analytics { padding: 20px 24px 40px; max-width: 1200px; margin: 0 auto; }
+.analytics h2 { margin: 26px 0 10px; font-size: 1.2rem; }
+.range { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.range label { display: grid; gap: 4px; color: var(--muted); font-size: .9rem; }
+.range input { min-height: 48px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); color: var(--ink); padding: 0 10px; font: inherit; color-scheme: dark; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 14px; }
+.tile { background: var(--card); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; }
+.tile span { color: var(--muted); font-size: .9rem; }
+.tile b { font-family: var(--mono); font-size: 1.8rem; }
+.tbl { overflow-x: auto; }
+.analytics table { width: 100%; border-collapse: collapse; font-size: .95rem; background: var(--card); border-radius: 12px; overflow: hidden; }
+.analytics th, .analytics td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.analytics th:first-child, .analytics td:first-child { text-align: left; white-space: normal; }
+.analytics th { color: var(--muted); font-weight: 600; }
+.analytics tr.flag td { background: #3a2a0a; }
 
 @media (max-width: 760px) {
   .kbar { flex-wrap: wrap; }

@@ -48,7 +48,7 @@ class PosController extends Controller
 
         return response()->json([
             'user' => $user->only(['id', 'name', 'role']),
-            'outlet' => $outlet->only(['id', 'code', 'name', 'has_restaurant', 'has_cooking_fee']) + ['region' => $outlet->region->name],
+            'outlet' => $outlet->only(['id', 'code', 'name', 'has_restaurant', 'has_cooking_fee']) + ['region' => $outlet->region->name, 'print_kitchen_tickets' => (bool) config('rasentra.kitchen.print_tickets')],
             'shift' => Shift::where('user_id', $user->id)->where('status', 'open')->first(),
             'categories' => Product::where('is_active', true)->whereNotNull('category')
                 ->whereIn('id', PriceItem::query()->join('price_versions as v', 'v.id', '=', 'price_items.price_version_id')

@@ -793,6 +793,7 @@
       const data = await api('POST', `orders/${state.order.id}/kitchen`);
       applyOrder(data);
       toast(data.tickets ? `${data.tickets} tiket dikirim ke dapur.` : 'Tidak ada item baru untuk dapur.', 'ok');
+      if (data.tickets && state.boot?.outlet.print_kitchen_tickets) printDoc(`/kitchen/print/${state.order.id}`);
     } catch (e) {
       fail(e);
     }

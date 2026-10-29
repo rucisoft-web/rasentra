@@ -3,8 +3,10 @@
 namespace App\Domain\Kitchen;
 
 use App\Domain\Audit\Audit;
+use App\Domain\Inventory\StockAdjustmentService;
 use App\Domain\Recipe\RecipeService;
 use App\Events\KitchenUpdated;
+use App\Models\ConsumptionEvent;
 use App\Models\CookingFeeRule;
 use App\Models\CookingJob;
 use App\Models\KitchenTicket;
@@ -13,6 +15,7 @@ use App\Models\OrderLine;
 use App\Models\RecipeVersion;
 use App\Models\TicketItem;
 use App\Models\User;
+use App\Support\Decimal;
 use App\Support\DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -33,8 +36,17 @@ final class KitchenService
                 ->whereIn('line_type', ['restaurant_menu', 'cooking_service', 'add_on'])
                 ->with('product')->get();
 
-            $pending = $lines->filter(fn (OrderLine $l) => ! TicketItem::where('order_line_id', $l->id)->where('revision', $l->revision)->exists()
-                && $l->product->kitchen_station !== null);
+            // Delta: baris yang direvisi (qty ditambah) hanya mengirim tambahannya; revisi tanpa
+            // tambahan qty (mis. ubah harga) tidak dikirim lagi ke dapur.
+            $pending = $lines->filter(fn (OrderLine $l) => $l->product->kitchen_station !== null
+                && ! TicketItem::where('order_line_id', $l->id)->where('revision', $l->revision)->exists())
+                ->map(function (OrderLine $l) {
+                    $sent = TicketItem::where('order_line_id', $l->id)->where('status', '!=', 'cancelled')->pluck('quantity');
+                    $l->setAttribute('kitchen_delta', Decimal::qty(Decimal::of($l->quantity)->minus(Decimal::sum($sent->all()))));
+
+                    return $l;
+                })
+                ->filter(fn (OrderLine $l) => Decimal::of($l->kitchen_delta)->isPositive());
 
             $tickets = [];
             foreach ($pending->groupBy(fn ($l) => $l->product->kitchen_station) as $station => $stationLines) {
@@ -50,7 +62,7 @@ final class KitchenService
                     $ticket->items()->create([
                         'order_line_id' => $line->id,
                         'revision' => $line->revision,
-                        'quantity' => $line->quantity,
+                        'quantity' => $line->kitchen_delta,
                         'instructions' => array_filter([
                             'product' => $line->product->name,
                             'modifiers' => $line->modifiers,
@@ -99,7 +111,7 @@ final class KitchenService
     /** Mulai memasak: konsumsi bahan sesuai versi resep dicatat sekali untuk item ini. */
     public function start(TicketItem $item, User $user): TicketItem
     {
-        return DB::transaction(function () use ($item, $user) {
+        return DB::transaction(function () use ($item) {
             $item = TicketItem::lockForUpdate()->findOrFail($item->id);
             if (in_array($item->status, ['in_preparation', 'ready', 'served'], true)) {
                 return $item;
@@ -145,22 +157,82 @@ final class KitchenService
 
     /**
      * Batal. Sebelum dimasak: tidak ada konsumsi. Sesudah dimasak: bahan yang terpakai
-     * menjadi waste dan tidak kembali ke stok.
+     * menjadi waste, tidak kembali ke stok, dan dicatat sebagai dokumen waste untuk SAP.
      */
     public function cancel(TicketItem $item, User $user, string $reason): TicketItem
     {
-        return DB::transaction(function () use ($item, $user, $reason) {
+        $item = DB::transaction(function () use ($item, $user, $reason) {
             $item = TicketItem::lockForUpdate()->findOrFail($item->id);
-            $afterCook = in_array($item->status, ['in_preparation', 'ready', 'served'], true);
-            if ($afterCook) {
-                DB::table('consumption_events')->where('source_type', 'ticket_item')->where('source_id', $item->id)
-                    ->update(['reason' => 'waste']);
+            if ($item->status === 'cancelled') {
+                return $item;
             }
-            $item->update(['status' => 'cancelled']);
+            $afterCook = $item->started_at !== null || in_array($item->status, ['in_preparation', 'ready', 'served'], true);
+            if ($afterCook) {
+                $this->wasteConsumption($item, $user, $reason);
+            }
+            $item->update(['status' => 'cancelled', 'cancel_reason' => $item->cancel_reason ?? $reason]);
             Audit::record($afterCook ? 'kitchen.cancel_after_cook' : 'kitchen.cancel_before_cook', $item, $user->id, reason: $reason);
 
             return $item;
         });
+        $this->broadcast($item);
+
+        return $item;
+    }
+
+    /**
+     * Kasir mem-void baris yang sudah dikirim ke dapur. Item yang belum dimasak langsung batal;
+     * item yang sedang dimasak atau sudah siap menjadi "minta batal" dan harus dikonfirmasi
+     * station, karena bahannya sudah terpakai dan akan dicatat sebagai waste.
+     */
+    public function lineVoided(OrderLine $line, User $actor, ?string $reason): void
+    {
+        $items = TicketItem::where('order_line_id', $line->id)->whereIn('status', ['queued', 'acknowledged', 'in_preparation', 'ready'])->get();
+        foreach ($items as $item) {
+            if ($item->started_at === null && in_array($item->status, ['queued', 'acknowledged'], true)) {
+                $item->update(['status' => 'cancelled', 'cancel_reason' => $reason ?? 'Void kasir']);
+                Audit::record('kitchen.cancel_before_cook', $item, $actor->id, reason: $reason ?? 'Void kasir');
+            } else {
+                $item->update(['status' => 'cancel_requested', 'cancel_reason' => $reason ?? 'Void kasir']);
+                Audit::record('kitchen.cancel_requested', $item, $actor->id, reason: $reason ?? 'Void kasir');
+            }
+            $this->broadcast($item);
+        }
+    }
+
+    /** Station mengonfirmasi permintaan batal dari kasir. */
+    public function confirmCancel(TicketItem $item, User $user): TicketItem
+    {
+        if ($item->status !== 'cancel_requested') {
+            throw DomainException::conflict('no_cancel_request', 'Item ini tidak sedang diminta batal.');
+        }
+
+        return $this->cancel($item, $user, $item->cancel_reason ?? 'Void kasir');
+    }
+
+    /** Bahan yang sudah dikonsumsi resep berubah menjadi waste dan dicatat sebagai dokumen penyesuaian. */
+    private function wasteConsumption(TicketItem $item, User $user, string $reason): void
+    {
+        $events = ConsumptionEvent::where('source_type', 'ticket_item')->where('source_id', $item->id)->where('reason', '!=', 'waste')->get();
+        if ($events->isEmpty()) {
+            return;
+        }
+        ConsumptionEvent::whereKey($events->pluck('id'))->update(['reason' => 'waste']);
+        $outletId = KitchenTicket::whereKey($item->kitchen_ticket_id)->value('outlet_id');
+        // Stok sudah keluar saat konsumsi; dokumen ini hanya memindahkan pencatatannya ke waste.
+        app(StockAdjustmentService::class)->record('waste', $outletId, $user, null, 'Batal setelah dimasak: '.$reason,
+            $events->map(fn (ConsumptionEvent $e) => [
+                'product_id' => $e->product_id, 'pack_id' => null, 'quantity' => (string) $e->quantity, 'uom' => $e->uom_code,
+                'from_state' => 'available', 'to_state' => null,
+            ])->values()->all(), 'ticket_item', $item->id);
+    }
+
+    private function broadcast(TicketItem $item): void
+    {
+        $ticket = KitchenTicket::find($item->kitchen_ticket_id);
+        if ($ticket?->outlet_id !== null) {
+            event(new KitchenUpdated($ticket->outlet_id, $ticket->station, $ticket->id));
+        }
     }
 
     /** Kode numerik pendek untuk barcode tiket cetak; dipindai di layar station untuk bump. */
@@ -182,7 +254,7 @@ final class KitchenService
         return ((int) $last % 999) + 1;
     }
 
-        private function versionFor(OrderLine $line): ?RecipeVersion
+    private function versionFor(OrderLine $line): ?RecipeVersion
     {
         if ($line->line_type === 'cooking_service' && $line->cooking_job_id) {
             // Resep jasa hanya memuat bahan tambahan (butter, bumbu, saus). Daging pelanggan tidak dipotong lagi.

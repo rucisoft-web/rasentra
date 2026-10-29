@@ -80,5 +80,7 @@ return [
         // Tiket siap tetap tampil di layar antrean pickup selama N menit setelah disajikan.
         'queue_linger_minutes' => 3,
         'pickup_channels' => ['takeaway', 'pickup', 'delivery'],
+        // Cetak tiket dapur (dengan barcode kode bump) di printer station setiap kirim ke dapur.
+        'print_tickets' => (bool) env('RASENTRA_KITCHEN_PRINT', true),
     ],
 ];

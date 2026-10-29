@@ -101,16 +101,16 @@ class KitchenBoardTest extends AcceptanceTestCase
 
     public function test_recall_cancel_and_serving_time_analytics(): void
     {
-        Date::setTestNow('2026-10-29 18:00:00');
+        Date::setTestNow('2026-10-29 11:00:00');
         $order = $this->newOrder('dine_in');
         $this->orders()->addSku($order, $this->product('0700701'), '1');
         app(KitchenService::class)->send($order);
         $item = TicketItem::firstOrFail();
         $board = app(KitchenBoard::class);
 
-        Date::setTestNow('2026-10-29 18:03:00');
+        Date::setTestNow('2026-10-29 11:03:00');
         $board->bumpItem($item, $this->chef());
-        Date::setTestNow('2026-10-29 18:13:00');
+        Date::setTestNow('2026-10-29 11:13:00');
         $board->bumpItem($item->fresh(), $this->chef());
         $this->assertSame('ready', $item->fresh()->status);
 

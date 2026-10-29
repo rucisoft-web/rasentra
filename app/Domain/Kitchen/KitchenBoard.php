@@ -21,7 +21,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class KitchenBoard
 {
-    public const ACTIVE = ['queued', 'acknowledged', 'in_preparation', 'ready'];
+    public const ACTIVE = ['queued', 'acknowledged', 'in_preparation', 'ready', 'cancel_requested'];
+
+    /** Status yang tampil di papan station: item yang masih dikerjakan dan permintaan batal. */
+    public const STATION = ['queued', 'acknowledged', 'in_preparation', 'cancel_requested'];
 
     public function __construct(private readonly KitchenService $kitchen) {}
 
@@ -34,7 +37,7 @@ final class KitchenBoard
         $tickets = KitchenTicket::query()
             ->where('outlet_id', $outletId)
             ->when($station, fn ($q) => $q->where('station', $station))
-            ->whereHas('items', fn ($q) => $q->whereIn('status', $station ? ['queued', 'acknowledged', 'in_preparation'] : self::ACTIVE))
+            ->whereHas('items', fn ($q) => $q->whereIn('status', $station ? self::STATION : self::ACTIVE))
             ->with(['items' => fn ($q) => $q->orderBy('created_at'), 'order:id,doc_no,channel,queue_no,visit_id,status'])
             ->orderBy('created_at')
             ->limit(80)
@@ -64,7 +67,8 @@ final class KitchenBoard
                     'elapsed' => $group->max('elapsed'),
                     'level' => $group->contains('level', 'late') ? 'late' : ($group->contains('level', 'warn') ? 'warn' : 'ok'),
                     'items' => $items->values(),
-                    'complete' => $items->every(fn ($i) => $i['status'] === 'ready'),
+                    // Item yang diminta batal tidak ditunggu; pesanan lengkap bila sisanya Siap.
+                    'complete' => $items->contains('status', 'ready') && $items->every(fn ($i) => in_array($i['status'], ['ready', 'cancel_requested'], true)),
                 ];
             })->values();
         }
@@ -100,7 +104,7 @@ final class KitchenBoard
     public function bumpTicket(KitchenTicket $ticket, User $user, bool $expeditor = false): KitchenTicket
     {
         DB::transaction(function () use ($ticket, $user, $expeditor) {
-            $items = $ticket->items()->whereIn('status', $expeditor ? self::ACTIVE : ['queued', 'acknowledged', 'in_preparation'])->get();
+            $items = $ticket->items()->whereIn('status', $expeditor ? ['queued', 'acknowledged', 'in_preparation', 'ready'] : ['queued', 'acknowledged', 'in_preparation'])->get();
             if ($items->isEmpty()) {
                 throw DomainException::conflict('ticket_done', 'Tiket ini sudah selesai di station.');
             }
@@ -144,6 +148,22 @@ final class KitchenBoard
     }
 
     /**
+     * Penanda perubahan papan yang murah dihitung. Layar memeriksanya setiap 1,5 detik dan
+     * hanya memuat ulang papan bila berubah, sehingga perubahan tampil dalam < 2 detik.
+     */
+    public function version(int $outletId): string
+    {
+        $row = TicketItem::query()
+            ->join('kitchen_tickets', 'kitchen_tickets.id', '=', 'ticket_items.kitchen_ticket_id')
+            ->where('kitchen_tickets.outlet_id', $outletId)
+            ->where('kitchen_tickets.created_at', '>=', now()->subHours(12))
+            ->selectRaw('count(*) as n, max(ticket_items.updated_at) as u, sum(length(ticket_items.status)) as s')
+            ->first();
+
+        return substr(sha1(($row->n ?? 0).'|'.($row->u ?? '').'|'.($row->s ?? 0)), 0, 12);
+    }
+
+    /**
      * Layar antrean pickup untuk takeaway dan kiosk. Status pesanan dihitung otomatis dari
      * item dapurnya: Disiapkan selama ada item belum Siap, Siap diambil saat semua Siap.
      */
@@ -159,7 +179,7 @@ final class KitchenBoard
         $items = TicketItem::query()
             ->join('kitchen_tickets', 'kitchen_tickets.id', '=', 'ticket_items.kitchen_ticket_id')
             ->whereIn('kitchen_tickets.order_id', $orders->pluck('id'))
-            ->where('ticket_items.status', '!=', 'cancelled')
+            ->whereNotIn('ticket_items.status', ['cancelled', 'cancel_requested'])
             ->get(['kitchen_tickets.order_id', 'ticket_items.status', 'ticket_items.ready_at', 'ticket_items.served_at'])
             ->groupBy('order_id');
 
@@ -208,7 +228,7 @@ final class KitchenBoard
                 return [
                     'station' => $r->station,
                     'product' => $r->instructions['product'] ?? '-',
-                    'hour' => (int) $created->format('G'),
+                    'hour' => (int) $created->copy()->timezone(config('rasentra.display_timezone'))->format('G'),
                     'total' => max(0, $created->diffInSeconds($ready)),
                     'wait' => $started ? max(0, $created->diffInSeconds($started)) : null,
                     'cook' => $started ? max(0, $started->diffInSeconds($ready)) : null,
@@ -252,7 +272,9 @@ final class KitchenBoard
         $label = match (true) {
             $table !== null => 'Meja '.$table,
             $order?->queue_no !== null => 'No. '.$order->queue_no,
-            default => $order?->doc_no ?? '#'.$t->sequence,
+            $order?->doc_no !== null => $order->doc_no,
+            $order !== null => 'Pesanan '.strtoupper(substr($order->id, -6)),
+            default => '#'.$t->sequence,
         };
 
         return [
@@ -268,12 +290,13 @@ final class KitchenBoard
             'target' => $target,
             'level' => $ratio >= 1 ? 'late' : ($ratio >= (float) config('rasentra.kitchen.warn_ratio') ? 'warn' : 'ok'),
             'items' => $t->items
-                ->filter(fn ($i) => in_array($i->status, $stationView ? ['queued', 'acknowledged', 'in_preparation', 'ready', 'cancelled'] : self::ACTIVE, true))
+                ->filter(fn ($i) => in_array($i->status, $stationView ? [...self::STATION, 'ready', 'cancelled'] : self::ACTIVE, true))
                 ->map(fn (TicketItem $i) => [
                     'id' => $i->id,
                     'status' => $i->status,
                     'quantity' => (string) $i->quantity,
                     'instructions' => $i->instructions,
+                    'cancel_reason' => $i->cancel_reason,
                 ])->values(),
         ];
     }

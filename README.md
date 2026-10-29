@@ -40,7 +40,7 @@ php artisan migrate:fresh --seed
 php artisan serve
 ```
 
-Data demo memutar satu hari operasional relatif terhadap jam saat seeder dijalankan, jadi timer dapur dan antrean terlihat "hidup". Jalankan ulang `migrate:fresh --seed` untuk menyegarkan. Untuk produksi gunakan MySQL 8.4, Redis untuk antrean dan Laravel Reverb untuk layar dapur. Scheduler (`php artisan schedule:work`) mengirim outbox tiap 5 detik di profil lokal dan memposting ke SAP di profil central.
+Data demo memutar satu hari operasional relatif terhadap jam saat seeder dijalankan, jadi timer dapur dan antrean terlihat "hidup". Jalankan ulang `migrate:fresh --seed` untuk menyegarkan. Untuk produksi gunakan MySQL 8.4 dan Redis untuk antrean. Scheduler (`php artisan schedule:work`) mengirim outbox tiap 5 detik di profil lokal dan memposting ke SAP di profil central.
 
 Koneksi SAP diatur di `.env` server Central. `SAP_SL_URL`, `SAP_USERNAME` dan `SAP_PASSWORD` adalah nilai bawaan. Nilai `SAP_SOLO_*` dan `SAP_LOMBOK_*` menimpanya bila kedua instance berada di server berbeda atau memakai pengguna berbeda. Nama database (`sap_solo`, `sap_lombok`) diatur per perusahaan di Rasentra Core → Perusahaan & outlet. Selama URL belum diisi, posting memakai SAP tiruan.
 
@@ -129,6 +129,19 @@ Satu kolom scan untuk empat tab: Terima, Opname, Karantina dan Cek stok.
 Setiap keputusan menjadi dokumen penyesuaian stok: `SLO-W…` untuk waste, `SLO-RL…` untuk lepas karantina, dan `SLO-OP…` untuk selisih opname yang disetujui (batal masak setelah dimasak juga tercatat sebagai waste). Dokumen ini dikirim ke Rasentra Central sebagai event `stock.adjusted` dan tampil di laporan Opname & waste di Core.
 
 Di SAP, barang yang keluar dari stok (waste, opname kurang) diposting sebagai Goods Issue (`InventoryGenExits`), dan opname lebih sebagai Goods Receipt (`InventoryGenEntries`). Akun lawannya diatur lewat mapping SAP jenis "Penyesuaian stok → Akun", dengan kunci `waste` atau `count`. Lepas karantina tidak membuat dokumen SAP.
+
+## Rasentra Kitchen (layar dapur)
+
+Buka `/kitchen` lalu pilih layar untuk perangkat ini: station (grill, hot, cold, bar, pastry, packing), Expeditor, Layar antrean, atau Analisis waktu saji.
+
+- **Hanya delta.** Station menerima baris baru saja. Bila kasir menambah porsi pada baris yang sudah dikirim, dapur hanya menerima tambahannya. Ubah harga tidak mengirim ulang apa pun. Tiket cetak susulan ditandai TAMBAHAN.
+- **Status item.** Baru, Diterima (otomatis saat tampil di layar), Dimasak, Siap, Disajikan, Minta batal, Batal. Bahan resep dipotong sekali saat Mulai masak.
+- **Minta batal.** Bila kasir mem-void baris yang sudah dikirim, item yang belum dimasak langsung batal. Item yang sudah dimasak menjadi Minta batal beserta alasannya, dan station harus menekan Konfirmasi batal. Bahan yang sudah terpakai dicatat sebagai dokumen waste dan diposting ke SAP sebagai Goods Issue.
+- **Tiket cetak.** Setiap Kirim dapur mencetak satu tiket per station di printer 80 mm, lengkap dengan barcode kode bump (Code 128). Scan barcode di layar station memajukan tiket. Matikan dengan `RASENTRA_KITCHEN_PRINT=false`.
+- **Timer.** Hijau, kuning mulai 75% target, merah setelah lewat target. Target per station diatur di `config/rasentra.php`.
+- **Pembaruan.** Layar memeriksa penanda perubahan tiap 1,5 detik dan hanya memuat ulang papan bila ada perubahan, jadi perubahan tampil di layar lain dalam kurang dari 2 detik. Tiket baru membunyikan nada pendek.
+- **Expeditor dan antrean.** Expeditor mengelompokkan item per meja atau pesanan dan baru bisa menyajikan setelah semua station Siap. Layar antrean menampilkan nomor takeaway, pickup dan delivery; nomor yang sudah diambil hilang setelah 3 menit.
+- **Analisis waktu saji.** Rata-rata, median, P90, waktu antre dan waktu masak per station, per menu dan per jam (zona waktu outlet), beserta jumlah yang terlambat.
 
 ## Rasentra Core (admin kantor pusat)
 
@@ -230,6 +243,7 @@ Uji mencakup skenario UAT spesifikasi:
 - Impor XML MSI/MSR.
 - Shift dan selisih kas.
 - Alur HTTP POS, papan dapur dan antrean.
+- Dapur: kiriman delta saat porsi ditambah, void kasir menjadi Minta batal lalu waste, tiket cetak dengan barcode Code 128, penanda perubahan papan, dan analisis per zona waktu outlet.
 - Retur penjualan: PIN kepala outlet, pack ke karantina, barang kembali ke stok, kas shift berkurang, batas sisa retur, refund per metode; retur sampai laporan Central, rekonsiliasi tutup hari dan A/R Credit Memo SAP (termasuk menunggu invoice asal); riwayat, cetak ulang SALINAN, laporan tutup shift, dan data pemesan pickup/delivery.
 - Penerimaan barang dan opname.
 - Karantina dan waste: lepas pack dengan PIN kepala outlet lalu jual lagi, waste dari stok jual dengan cek saldo, tahan pack hampir kedaluwarsa, dan dokumen penyesuaian sampai laporan Central serta Goods Issue/Receipt SAP.
