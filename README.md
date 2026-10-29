@@ -43,6 +43,8 @@ Data demo memutar satu hari operasional relatif terhadap jam saat seeder dijalan
 
 Koneksi SAP diatur di `.env` server Central. `SAP_SL_URL`, `SAP_USERNAME` dan `SAP_PASSWORD` adalah nilai bawaan. Nilai `SAP_SOLO_*` dan `SAP_LOMBOK_*` menimpanya bila kedua instance berada di server berbeda atau memakai pengguna berbeda. Nama database (`sap_solo`, `sap_lombok`) diatur per perusahaan di Rasentra Central → Rasentra Core → Perusahaan & outlet. Selama URL belum diisi, posting memakai SAP tiruan.
 
+Untuk hosting cPanel (zip siap-upload berisi `vendor`, instalasi lewat Terminal) lihat [docs/INSTALL-CPANEL.md](docs/INSTALL-CPANEL.md).
+
 ## Demo utama: outlet Solo (Meatshop & Grocery dan R&B Solo)
 
 Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan ke aplikasinya.
