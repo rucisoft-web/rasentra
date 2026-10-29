@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Integration\Sap\FakeSapClient;
 use App\Domain\Integration\Sap\SapClient;
 use App\Domain\Integration\Sap\SapClientFactory;
+use App\Domain\Lokal\LokalSettings;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -18,5 +19,13 @@ class RasentraServiceProvider extends ServiceProvider
         // Klien bawaan saat instance SAP belum dikonfigurasi (pengembangan dan uji).
         $this->app->singleton(SapClient::class, fn () => new FakeSapClient);
         $this->app->singleton(SapClientFactory::class, fn () => new SapClientFactory);
+    }
+
+    public function boot(): void
+    {
+        // Rasentra Lokal: pairing yang diisi dari layar Pemasangan menimpa .env.
+        if (config('rasentra.profile') === 'lokal' && ! $this->app->runningUnitTests()) {
+            LokalSettings::apply();
+        }
     }
 }

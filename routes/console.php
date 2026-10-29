@@ -4,6 +4,7 @@ use App\Domain\Core\SalesProjector;
 use App\Domain\Integration\Sap\SapHealth;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Integration\Xml\NmexmlImporter;
+use App\Domain\Lokal\Backup;
 use App\Domain\Sync\ChangePuller;
 use App\Domain\Sync\DayCloser;
 use App\Domain\Sync\DayReconciler;
@@ -20,11 +21,13 @@ $lokal = fn () => config('rasentra.profile') === 'lokal';
 $central = fn () => config('rasentra.profile') === 'central';
 
 // Rasentra Lokal (server outlet): kirim outbox ke Rasentra Central setiap 5 detik, tarik publikasi
-// harga/promo/resep/master setiap 30 detik, heartbeat setiap menit, tutup hari kemarin pukul 04.00.
+// harga/promo/resep/master setiap 30 detik, heartbeat setiap menit, backup pukul 02.00 dan
+// tutup hari kemarin pukul 04.00.
 Schedule::job(new DispatchOutbox)->everyFiveSeconds()->when($lokal);
 Schedule::command('rasentra:pull')->everyThirtySeconds()->withoutOverlapping()->when($lokal);
 Schedule::command('rasentra:heartbeat')->everyMinute()->when($lokal);
 Schedule::command('rasentra:close-day')->dailyAt('04:00')->timezone(config('rasentra.display_timezone'))->when($lokal);
+Schedule::command('rasentra:backup')->dailyAt('02:00')->timezone(config('rasentra.display_timezone'))->when($lokal);
 
 // Rasentra Central: posting penjualan yang sudah diterima ke SAP B1 dan cek koneksi tiap instance.
 Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->when($central);
@@ -103,3 +106,8 @@ Artisan::command('rasentra:import-xml {file} {kind : MSI atau MSR}', function (N
 Artisan::command('rasentra:rebuild-sales', function (SalesProjector $projector) {
     $this->info('Proyeksi penjualan dibangun ulang dari '.$projector->rebuild().' event inbox.');
 })->purpose('Bangun ulang tabel laporan penjualan Rasentra Core dari inbox');
+
+Artisan::command('rasentra:backup', function (Backup $backup) {
+    $result = $backup->run();
+    $this->info("Backup {$result['file']} ({$result['bytes']} byte) di storage/app/backups.");
+})->purpose('Rasentra Lokal: cadangkan database outlet');

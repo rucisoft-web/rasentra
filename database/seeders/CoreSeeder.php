@@ -431,6 +431,19 @@ class CoreSeeder extends Seeder
             }
         }
 
+        // Sisi Rasentra Lokal Solo (demo memakai satu database): heartbeat dan riwayat tarik publikasi.
+        $max = (int) $publications->max('id');
+        SystemState::put('sync:cursor', $max);
+        SystemState::put('sync:last_heartbeat', ['ok' => true, 'clock_skew_seconds' => 2, 'central_cursor' => $max, 'at' => $this->now->copy()->subSeconds(35)->toIso8601ZuluString()]);
+        SystemState::put('sync:last_ok_heartbeat', $this->now->copy()->subSeconds(35)->toIso8601ZuluString());
+        $log = [
+            ['at' => $this->now->copy()->subMinutes(50), 'applied' => 1, 'cursor' => $max, 'error' => null, 'types' => ['promotion_version' => 1]],
+            ['at' => $this->now->copy()->subHours(5), 'applied' => 3, 'cursor' => $max - 1, 'error' => null, 'types' => ['product' => 2, 'user' => 1]],
+            ['at' => $this->now->copy()->subDays(1)->setTime(1, 0), 'applied' => 0, 'cursor' => $max - 1, 'error' => 'cURL error 6: Could not resolve host: central.indoguna.local', 'types' => []],
+        ];
+        SystemState::put('sync:pull_log', array_map(fn ($l) => ['at' => $l['at']->toIso8601ZuluString()] + $l, $log));
+        SystemState::put('sync:last_pull', ['at' => $this->now->copy()->subSeconds(20)->toIso8601ZuluString(), 'applied' => 0, 'cursor' => $max, 'error' => null, 'types' => []]);
+
         app(SapHealth::class)->checkAll();
         SystemState::ran('sap-check', ['ok' => BusinessUnit::whereNotNull('sap_company_db')->count(), 'failed' => 0]);
         SystemState::ran('post-sap', ['posted' => DB::table('sap_documents')->where('status', 'posted')->count()]);

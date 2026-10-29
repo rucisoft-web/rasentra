@@ -297,6 +297,8 @@ Semua API berversi (`/api/v1`), memakai JSON, HTTPS dan token perangkat yang dib
 | `POST /production` | Catat produksi batch, yield, waste | Neraca berat divalidasi |
 | `POST /shifts` / `/shifts/{id}/close` | Buka/tutup shift, cash in/out | Selisih di atas ambang perlu approval |
 
+Konsol server outlet (`/lokal`, kepala outlet): status koneksi ke Central dan antrean outbox, publikasi yang berlaku, tutup hari dengan pratinjau, pairing (token server outlet disimpan terenkripsi) dan snapshot, backup harian. `GET /lokal/health` untuk pemantauan, `GET /pos/api/sync-status` untuk indikator offline di POS.
+
 ### API sinkronisasi (profil central)
 
 | Metode & path | Fungsi |

@@ -23,11 +23,9 @@ use App\Models\Shift;
 use App\Models\User;
 use App\Support\SystemState;
 use Illuminate\Database\Connection;
-use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
 
 /**
  * Rasentra Central dan pasangannya di outlet: heartbeat, snapshot dan publikasi ke Rasentra
@@ -35,6 +33,8 @@ use Illuminate\Support\Facades\Http;
  */
 class CentralTest extends AcceptanceTestCase
 {
+    use RoutesHttpToCentral;
+
     private const TOKEN = 'token-server-uji';
 
     private Device $server;
@@ -221,19 +221,6 @@ class CentralTest extends AcceptanceTestCase
         $this->actingAs($admin)->post(route('core.central.sap-check'))->assertSessionHas('error');
         $this->assertFalse(SystemState::get('sap:sap_lombok')['ok']);
         $this->artisan('rasentra:sap-check')->assertFailed();
-    }
-
-    /** Semua panggilan HTTP Rasentra Lokal ke Central diteruskan ke aplikasi ini sendiri. */
-    private function routeHttpToCentral(): void
-    {
-        Http::fake(function (HttpRequest $request) {
-            $url = parse_url($request->url());
-            $path = $url['path'].(isset($url['query']) ? '?'.$url['query'] : '');
-            $token = str_replace('Bearer ', '', $request->header('Authorization')[0] ?? '');
-            $response = $this->withToken($token)->json($request->method(), $path, $request->method() === 'GET' ? [] : $request->data());
-
-            return Http::response($response->getContent(), $response->getStatusCode(), ['Content-Type' => 'application/json']);
-        });
     }
 
     /** Database Rasentra Lokal yang kosong, terpisah dari database Central uji. */

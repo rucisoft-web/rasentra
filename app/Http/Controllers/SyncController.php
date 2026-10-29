@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Sync\InboxReceiver;
 use App\Domain\Sync\Publications;
 use App\Models\Device;
+use App\Models\Outlet;
 use App\Models\OutletSyncState;
 use App\Models\PromotionTarget;
 use App\Models\PublicationVersion;
@@ -137,6 +138,8 @@ class SyncController extends Controller
         return response()->json([
             'server_time' => $now->toIso8601ZuluString(),
             'central_cursor' => (int) PublicationVersion::max('id'),
+            // Identitas token ini, dipakai layar Pemasangan Rasentra Lokal untuk mengisi kode outlet.
+            'device' => ['code' => $device->code, 'app' => $device->app, 'outlet_code' => Outlet::whereKey($device->outlet_id)->value('code')],
         ]);
     }
 

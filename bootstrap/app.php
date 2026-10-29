@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateDevice;
 use App\Http\Middleware\EnsureCoreAccess;
+use App\Http\Middleware\EnsureLokalAccess;
 use App\Support\DomainException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['device' => AuthenticateDevice::class, 'core' => EnsureCoreAccess::class]);
+        $middleware->alias(['device' => AuthenticateDevice::class, 'core' => EnsureCoreAccess::class, 'lokal' => EnsureLokalAccess::class]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('core', 'core/*') ? route('core.login') : route('pos.login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -26,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Pelanggaran aturan bisnis dikembalikan dengan kode stabil agar layar POS bisa bereaksi.
         $exceptions->render(function (DomainException $e, Request $request) {
             // Rasentra Core memakai formulir HTML: kembali ke halaman sebelumnya dengan pesan.
-            if ($request->is('core', 'core/*') && ! $request->expectsJson()) {
+            if ($request->is('core', 'core/*', 'lokal', 'lokal/*') && ! $request->expectsJson()) {
                 return back()->withInput()->with('error', $e->getMessage());
             }
 

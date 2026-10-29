@@ -18,35 +18,40 @@ use Ramsey\Uuid\Uuid;
  */
 final class DayCloser
 {
+    /** Ringkasan hari bisnis seperti yang akan dikirim, untuk pratinjau sebelum ditutup. */
+    public function summary(Outlet $outlet, string $businessDate): array
+    {
+        $orders = DB::table('orders')->where('outlet_id', $outlet->id)->whereDate('business_date', $businessDate)
+            ->whereNotNull('doc_no')->whereNotNull('finalized_at')->orderBy('doc_no')
+            ->get(['id', 'doc_no', 'channel', 'net_amount', 'gross_amount', 'discount_amount']);
+        $shifts = Shift::where('outlet_id', $outlet->id)->whereDate('business_date', $businessDate)->get();
+        $payments = Payment::whereIn('order_id', $orders->pluck('id'))->where('status', 'succeeded')->get(['method', 'amount']);
+
+        return [
+            'outlet_code' => $outlet->code,
+            'business_date' => $businessDate,
+            'closed_at' => now()->toIso8601ZuluString(),
+            'orders' => $orders->count(),
+            'gross_amount' => Decimal::money(Decimal::sum($orders->pluck('gross_amount'))),
+            'discount_amount' => Decimal::money(Decimal::sum($orders->pluck('discount_amount'))),
+            'net_amount' => Decimal::money(Decimal::sum($orders->pluck('net_amount'))),
+            'by_channel' => $orders->groupBy('channel')->map(fn ($g) => ['orders' => $g->count(), 'net_amount' => Decimal::money(Decimal::sum($g->pluck('net_amount')))])->all(),
+            'payments' => $payments->groupBy('method')->map(fn ($g) => Decimal::money(Decimal::sum($g->pluck('amount'))))->all(),
+            'doc_nos' => $orders->pluck('doc_no')->all(),
+            'shifts' => $shifts->map(fn (Shift $s) => [
+                'id' => $s->id, 'user_id' => $s->user_id, 'status' => $s->status,
+                'cash_difference' => $s->cash_difference !== null ? Decimal::money((string) $s->cash_difference) : null,
+            ])->values()->all(),
+            'cash_difference' => Decimal::money(Decimal::sum($shifts->pluck('cash_difference')->filter(fn ($v) => $v !== null))),
+            'open_shifts' => $shifts->where('status', 'open')->count(),
+        ];
+    }
+
     public function close(Outlet $outlet, string $businessDate, ?int $userId = null): OutboxEvent
     {
         return DB::transaction(function () use ($outlet, $businessDate, $userId) {
-            $orders = DB::table('orders')->where('outlet_id', $outlet->id)->whereDate('business_date', $businessDate)
-                ->whereNotNull('doc_no')->whereNotNull('finalized_at')->orderBy('doc_no')
-                ->get(['id', 'doc_no', 'channel', 'net_amount', 'gross_amount', 'discount_amount']);
-            $shifts = Shift::where('outlet_id', $outlet->id)->whereDate('business_date', $businessDate)->get();
-            $payments = Payment::whereIn('order_id', $orders->pluck('id'))->where('status', 'succeeded')->get(['method', 'amount']);
-
-            $payload = [
-                'outlet_code' => $outlet->code,
-                'business_date' => $businessDate,
-                'closed_at' => now()->toIso8601ZuluString(),
-                'orders' => $orders->count(),
-                'gross_amount' => Decimal::money(Decimal::sum($orders->pluck('gross_amount'))),
-                'discount_amount' => Decimal::money(Decimal::sum($orders->pluck('discount_amount'))),
-                'net_amount' => Decimal::money(Decimal::sum($orders->pluck('net_amount'))),
-                'by_channel' => $orders->groupBy('channel')->map(fn ($g) => ['orders' => $g->count(), 'net_amount' => Decimal::money(Decimal::sum($g->pluck('net_amount')))])->all(),
-                'payments' => $payments->groupBy('method')->map(fn ($g) => Decimal::money(Decimal::sum($g->pluck('amount'))))->all(),
-                'doc_nos' => $orders->pluck('doc_no')->all(),
-                'shifts' => $shifts->map(fn (Shift $s) => [
-                    'id' => $s->id, 'user_id' => $s->user_id, 'status' => $s->status,
-                    'cash_difference' => $s->cash_difference !== null ? Decimal::money((string) $s->cash_difference) : null,
-                ])->values()->all(),
-                'cash_difference' => Decimal::money(Decimal::sum($shifts->pluck('cash_difference')->filter(fn ($v) => $v !== null))),
-                'open_shifts' => $shifts->where('status', 'open')->count(),
-            ];
-
-            $entityId = Uuid::uuid5(Uuid::NAMESPACE_URL, "rasentra:business_day:{$outlet->code}:{$businessDate}")->toString();
+            $payload = $this->summary($outlet, $businessDate);
+            $entityId = self::entityId($outlet, $businessDate);
             $version = OutboxEvent::where('entity_type', 'business_day')->where('entity_id', $entityId)->max('entity_version') + 1;
             $event = Outbox::record($outlet->id, 'business_day', $entityId, $version, 'business_day.closed', $payload, $businessDate);
             Audit::record('business_day.closed', "business_day:{$outlet->code}:{$businessDate}", $userId, outletId: $outlet->id, amount: $payload['net_amount'],
@@ -54,5 +59,10 @@ final class DayCloser
 
             return $event;
         });
+    }
+
+    public static function entityId(Outlet $outlet, string $businessDate): string
+    {
+        return Uuid::uuid5(Uuid::NAMESPACE_URL, "rasentra:business_day:{$outlet->code}:{$businessDate}")->toString();
     }
 }

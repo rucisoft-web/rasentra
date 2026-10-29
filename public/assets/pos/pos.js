@@ -93,6 +93,22 @@
     el.style.color = ok ? '' : 'var(--red)';
   }
 
+  // Koneksi server outlet ke Rasentra Central. Terputus tidak menghentikan kasir: transaksi
+  // tersimpan di Rasentra Lokal dan terkirim otomatis saat koneksi kembali.
+  async function refreshCentral() {
+    const el = $('#central-status');
+    try {
+      const s = await api('GET', 'sync-status');
+      el.hidden = false;
+      const online = s.central === 'online';
+      el.textContent = online ? (s.queued ? `Central · ${s.queued} antre` : 'Central') : `Offline · ${s.queued} antre`;
+      el.classList.toggle('off', !online || s.parked > 0);
+      el.title = online ? 'Terhubung ke Rasentra Central' : 'Rasentra Central tidak terhubung. Transaksi tetap aman dan dikirim nanti.';
+    } catch (e) {
+      el.hidden = true;
+    }
+  }
+
   let sheetClose = null;
   function openSheet(title, html, onClose) {
     $('#sheet-title').textContent = title;
@@ -190,6 +206,8 @@
     loadCatalog();
     if (!b.shift) openShiftSheet();
     focusScan();
+    refreshCentral();
+    setInterval(refreshCentral, 30000);
   }
 
   function renderCategories() {

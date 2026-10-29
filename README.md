@@ -135,6 +135,20 @@ Login di `/core/login` dengan email dan kata sandi `password`:
 
 Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbox menerima `order.finalized`. Jalankan `php artisan rasentra:rebuild-sales` untuk membangun ulang proyeksi.
 
+## Rasentra Lokal (server outlet)
+
+Rasentra Lokal adalah instalasi `RASENTRA_PROFILE=lokal` di setiap outlet. Server ini melayani Rasentra POS, Mobile Terminal, Kitchen dan Inventory lewat LAN, tetap berjalan saat internet putus, dan menyinkronkan data dengan Rasentra Central.
+
+Konsol server ada di `/lokal`, khusus kepala outlet (masuk dengan PIN di layar login; di demo Solo: Hendra, PIN `9999`). Kepala outlet juga melihat tombol **Server outlet** di Rasentra POS.
+
+- **Status server.** Koneksi ke Central, antrean kirim, cursor publikasi, penjualan hari ini, shift yang buka, ruang disk, ukuran database dan backup.
+- **Antrean kirim.** Event yang belum diterima Central beserta error terakhir. Kepala outlet bisa kirim sekarang atau mengantrekan ulang event yang berhenti dicoba.
+- **Harga, promo & resep.** Versi harga, promo aktif dan mendatang, cooking fee, serta riwayat tarik publikasi.
+- **Tutup hari.** Pratinjau struk, penjualan, pembayaran dan selisih kas per shift, lalu kirim ringkasannya ke Central. Ada peringatan bila masih ada shift yang buka.
+- **Pemasangan.** Tempel alamat Central dan token `outlet_server` dari Rasentra Core. Server memeriksa token itu, mengambil kode outlet dan identitas server darinya, lalu menyimpannya terenkripsi. Setelah itu tekan **Ambil snapshot**. Selama server belum punya petugas, halaman ini terbuka tanpa login, jadi lakukan pemasangan segera setelah instalasi.
+
+Rasentra POS menampilkan status **Central · N antre** atau **Offline · N antre**, sehingga kasir tahu transaksinya aman walau internet putus. `GET /lokal/health` mengembalikan status JSON tanpa data sensitif untuk alat pemantau. Backup harian (`rasentra:backup`) berjalan pukul 02.00 dan menyimpan 14 berkas terakhir di `storage/app/backups`.
+
 ## Rasentra Central
 
 Rasentra Central adalah instalasi `RASENTRA_PROFILE=central` di kantor pusat. API-nya ada di `/api/v1/sync` dan memakai token perangkat (server outlet):
@@ -149,19 +163,19 @@ Rasentra Central adalah instalasi `RASENTRA_PROFILE=central` di kantor pusat. AP
 
 Perubahan master di Rasentra Core (produk, pengguna outlet, outlet, lokasi) otomatis diterbitkan ke cursor publikasi. Akun kantor pusat tidak pernah dikirim ke outlet.
 
-**Di server Rasentra Lokal** (isi `RASENTRA_CENTRAL_URL`, `RASENTRA_CENTRAL_TOKEN`, `RASENTRA_OUTLET_CODE`, `RASENTRA_SOURCE_ID`):
+**Di server Rasentra Lokal** (pairing bisa lewat `/lokal/setup` atau `.env`: `RASENTRA_CENTRAL_URL`, `RASENTRA_CENTRAL_TOKEN`, `RASENTRA_OUTLET_CODE`, `RASENTRA_SOURCE_ID`):
 
 ```bash
 php artisan migrate
 php artisan rasentra:bootstrap-lokal   # snapshot awal dari Central
-php artisan schedule:work              # outbox 5 detik, tarik publikasi 30 detik, heartbeat 1 menit, tutup hari 04.00
+php artisan schedule:work              # outbox 5 detik, tarik publikasi 30 detik, heartbeat 1 menit, backup 02.00, tutup hari 04.00
 ```
 
 Publikasi diterapkan idempoten per baris. Bila satu publikasi gagal (misalnya produk rujukannya belum ada), cursor berhenti tepat sebelumnya dan Central menampilkan error-nya di halaman Rasentra Central.
 
 **Di server Rasentra Central** cukup `php artisan schedule:work`: posting SAP tiap menit, cek koneksi SAP tiap 15 menit, rekonsiliasi ulang tiap jam.
 
-Perintah lain: `rasentra:pull`, `rasentra:heartbeat`, `rasentra:close-day {tanggal?}` (Lokal); `rasentra:sap-check`, `rasentra:reconcile {tanggal?}`, `rasentra:post-sap` (Central).
+Perintah lain: `rasentra:pull`, `rasentra:heartbeat`, `rasentra:close-day {tanggal?}`, `rasentra:backup` (Lokal); `rasentra:sap-check`, `rasentra:reconcile {tanggal?}`, `rasentra:post-sap` (Central).
 
 ## Coba alurnya
 
@@ -191,6 +205,7 @@ Uji mencakup skenario UAT spesifikasi:
 - Seeder demo Indoguna Group dan seluruh halaman Rasentra Core.
 - Posting ke instance SAP milik tiap perusahaan, koneksi per instance, dan tanggal bisnis WITA untuk Lombok.
 - Rasentra Core: hak akses per peran, maker-checker harga dan promo, proyeksi penjualan, dan token perangkat.
+- Rasentra Lokal: akses kepala outlet, pairing dengan pemeriksaan token, pemasangan tanpa login hanya saat server kosong, antrean kirim, tutup hari dari layar, indikator di POS.
 - Rasentra Central: heartbeat dan selisih jam, snapshot ke database Lokal terpisah lalu publikasi berikutnya, cursor yang tertahan saat publikasi gagal, tutup hari dan rekonsiliasi (struk tertunda lalu cocok), serta cek koneksi SAP per instance.
 
 ## Struktur kode
@@ -208,10 +223,11 @@ app/Domain/
   Sync/           Outbox, OutboxDispatcher, InboxReceiver, Publications (Central), ChangePuller,
                   PublicationApplier, HeartbeatSender, DayCloser (Lokal), DayReconciler (Central)
   Integration/    Sap/* (Service Layer per instance, SapHealth), Xml/* (NMEXML)
+  Lokal/          LokalSettings (pairing), LokalStatus, Backup
   Core/           CoreAccess (peran pusat), SalesProjector, SalesReport
   Catalog/        PricePublisher (maker-checker versi harga)
   Promotion/      PromotionDesigner (simulasi, terbit, hentikan)
-app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (Rasentra Core)
+app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (Rasentra Core), Lokal/* (konsol server outlet)
 database/seeders/      OutletSeeder (dua CV), SoloSeeder (demo lengkap), LombokSeeder, CoreSeeder (data pusat), DemoSeeder (outlet UJI untuk uji)
 public/assets/         pos, kitchen, inventory, core (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
 ```

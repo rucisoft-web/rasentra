@@ -44,18 +44,21 @@ final class HeartbeatSender
         ];
     }
 
-    /** @return array{ok:bool, clock_skew_seconds?:int, error?:string} */
+    /** @return array{ok:bool, clock_skew_seconds?:int, central_cursor?:int, device?:array, error?:string} */
     public function send(): array
     {
         try {
             $payload = $this->payload();
             $response = $this->central->request(10)->post('heartbeat', $payload)->throw()->json();
             $skew = (int) round(Carbon::parse($payload['sent_at'])->diffInSeconds(Carbon::parse($response['server_time']), false) * -1);
-            $result = ['ok' => true, 'clock_skew_seconds' => $skew, 'central_cursor' => $response['central_cursor'] ?? null];
+            $result = ['ok' => true, 'clock_skew_seconds' => $skew, 'central_cursor' => $response['central_cursor'] ?? null, 'device' => $response['device'] ?? null];
         } catch (Throwable $e) {
             $result = ['ok' => false, 'error' => mb_substr($e->getMessage(), 0, 500)];
         }
         SystemState::put('sync:last_heartbeat', $result + ['at' => now()->toIso8601ZuluString()]);
+        if ($result['ok']) {
+            SystemState::put('sync:last_ok_heartbeat', now()->toIso8601ZuluString());
+        }
 
         return $result;
     }

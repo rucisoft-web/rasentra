@@ -13,6 +13,9 @@ use Throwable;
  */
 final class ChangePuller
 {
+    /** @var array<string, int> jumlah publikasi yang diterapkan per jenis pada putaran ini */
+    private array $types = [];
+
     public function __construct(
         private readonly CentralClient $central,
         private readonly PublicationApplier $applier,
@@ -76,6 +79,7 @@ final class ChangePuller
                 return [$acks, "{$change['entity_type']} {$change['entity_key']}: {$error}", $reached];
             }
             $acks[] = ['entity_type' => $change['entity_type'], 'entity_key' => (string) $change['entity_key'], 'status' => 'applied'];
+            $this->types[$change['entity_type']] = ($this->types[$change['entity_type']] ?? 0) + 1;
             $reached = max($reached, (int) ($change['id'] ?? 0));
         }
 
@@ -93,7 +97,13 @@ final class ChangePuller
 
     private function done(int $applied, int $cursor, ?string $error = null): array
     {
-        SystemState::put('sync:last_pull', ['at' => now()->toIso8601ZuluString(), 'applied' => $applied, 'cursor' => $cursor, 'error' => $error]);
+        $entry = ['at' => now()->toIso8601ZuluString(), 'applied' => $applied, 'cursor' => $cursor, 'error' => $error, 'types' => $this->types];
+        SystemState::put('sync:last_pull', $entry);
+        if ($applied > 0 || $error !== null) {
+            // Riwayat singkat untuk layar Publikasi di Rasentra Lokal.
+            SystemState::put('sync:pull_log', array_slice([$entry, ...SystemState::get('sync:pull_log', [])], 0, 30));
+        }
+        $this->types = [];
 
         return ['applied' => $applied, 'cursor' => $cursor] + ($error ? ['error' => $error] : []);
     }

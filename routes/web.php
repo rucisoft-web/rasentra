@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\KitchenController;
+use App\Http\Controllers\Lokal\LokalController;
+use App\Http\Controllers\Lokal\SetupController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
@@ -14,8 +16,31 @@ Route::get('/pos/login', [PosAuthController::class, 'show'])->name('pos.login');
 Route::post('/pos/login', [PosAuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
 
+// Rasentra Lokal: konsol server outlet. Pemasangan terbuka tanpa login hanya selama server
+// belum punya petugas (lihat SetupController); health check untuk pemantauan.
+Route::get('/lokal/health', [LokalController::class, 'health'])->name('lokal.health');
+Route::prefix('lokal/setup')->name('lokal.setup')->controller(SetupController::class)->group(function () {
+    Route::get('/', 'show');
+    Route::post('/', 'store')->middleware('throttle:10,1')->name('.store');
+    Route::post('bootstrap', 'bootstrap')->name('.bootstrap');
+});
+Route::middleware(['auth', 'lokal'])->prefix('lokal')->name('lokal.')->controller(LokalController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('sync/push', 'push')->name('push');
+    Route::post('sync/pull', 'pull')->name('pull');
+    Route::post('sync/heartbeat', 'heartbeat')->name('heartbeat');
+    Route::get('outbox', 'outbox')->name('outbox');
+    Route::post('outbox/retry', 'retryAll')->name('outbox.retry-all');
+    Route::post('outbox/{event}/retry', 'retry')->name('outbox.retry');
+    Route::get('publications', 'publications')->name('publications');
+    Route::get('close-day', 'closeDay')->name('close-day');
+    Route::post('close-day', 'storeCloseDay')->name('close-day.store');
+    Route::post('backup', 'backup')->name('backup');
+});
+
 Route::middleware('auth')->group(function () {
     Route::view('/pos', 'pos.app')->name('pos');
+    Route::get('pos/api/sync-status', [LokalController::class, 'posStatus']);
 
     Route::prefix('pos/api')->controller(PosController::class)->group(function () {
         Route::get('bootstrap', 'bootstrap');
