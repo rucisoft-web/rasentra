@@ -1,0 +1,49 @@
+/* Rasentra Mobile: handheld potret dengan scanner bawaan. Tombol besar di bawah layar,
+   satu tangan, kontras tinggi untuk gudang dan chiller. */
+:root { --bg: #f1f4f2; --s: #fff; --ink: #14241c; --muted: #5a6b62; --line: #d5dfd9; --green: #1f5a40; --soft: #e1eee7; --amber: #e3a21a; --red: #b3352f; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: "Segoe UI", "Noto Sans", Roboto, system-ui, sans-serif; font-size: 17px; padding-bottom: 76px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.muted { color: var(--muted); font-size: .92rem; }
+.mbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--green); color: #fff; }
+.mbar .muted { color: #cfe3d8; margin-left: auto; }
+.mbar .link { background: none; border: 0; color: #fff; text-decoration: underline; min-height: 44px; }
+.brand { font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.brand i { width: 12px; height: 12px; background: var(--amber); transform: rotate(45deg); border-radius: 2px; display: inline-block; }
+.scanrow { display: flex; gap: 8px; padding: 10px 14px; background: var(--s); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 3; }
+.scanrow input { flex: 1; min-height: 52px; border: 2px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; }
+.scanrow button, .btn { min-height: 52px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--green); color: #fff; font-weight: 700; }
+main { padding: 4px 14px; }
+h2 { margin: 12px 0 4px; font-size: 1.25rem; }
+h3 { margin: 18px 0 8px; font-size: 1rem; }
+.badge { background: var(--amber); color: #2b1d00; border-radius: 999px; padding: 1px 8px; font-size: .8rem; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--line); border-radius: 12px; padding: 3px; margin: 10px 0; }
+.seg button { min-height: 48px; border: 0; background: transparent; border-radius: 10px; font-weight: 700; }
+.seg button.on { background: var(--s); }
+.seg button[data-mode="reject"].on { background: var(--red); color: #fff; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.list li { background: var(--s); border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; gap: 10px; border: 1px solid var(--line); }
+.list li b { font-family: ui-monospace, Menlo, monospace; }
+.card { background: var(--s); border-radius: 14px; padding: 14px; border: 1px solid var(--line); margin: 10px 0; }
+.card.ok { border-left: 6px solid var(--green); }
+.card.err { border-left: 6px solid var(--red); }
+.card dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; }
+.card dt { color: var(--muted); }
+.card dd { margin: 0; font-weight: 600; text-align: right; }
+.locs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+.locs button { min-height: 60px; border-radius: 12px; border: 2px solid var(--line); background: var(--s); font-weight: 800; display: grid; }
+.locs button small { font-weight: 400; color: var(--muted); font-size: .8rem; }
+.locs button.on { border-color: var(--green); background: var(--soft); }
+.qty { display: grid; gap: 4px; margin: 8px 0; }
+.qty input { min-height: 52px; border: 2px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; font-size: 1.3rem; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; background: var(--s); border-radius: 12px; overflow: hidden; margin-top: 10px; }
+td, th { padding: 8px; border-bottom: 1px solid var(--line); text-align: right; }
+td:first-child, th:first-child { text-align: left; }
+tr.flag td { background: #fff3d6; }
+.tabs { position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(3, 1fr); background: var(--s); border-top: 1px solid var(--line); }
+.tabs button { min-height: 68px; border: 0; background: none; font-weight: 700; color: var(--muted); }
+.tabs button.on { color: var(--green); box-shadow: inset 0 4px 0 var(--green); }
+.toast { position: fixed; left: 14px; right: 14px; bottom: 84px; background: var(--ink); color: #fff; padding: 14px; border-radius: 12px; font-weight: 600; z-index: 9; }
+.toast.err { background: var(--red); }
+.toast.ok { background: var(--green); }

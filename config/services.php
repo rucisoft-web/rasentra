@@ -28,6 +28,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // SAP Business One Service Layer. Hanya diisi pada profil central.
+    'sap' => [
+        'url' => env('SAP_SL_URL'),
+        'company_db' => env('SAP_COMPANY_DB'),
+        'username' => env('SAP_USERNAME'),
+        'password' => env('SAP_PASSWORD'),
+        'verify' => env('SAP_SL_VERIFY_TLS', true),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

@@ -1,0 +1,318 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Domain\Cash\ShiftService;
+use App\Domain\CookingService\CookingService;
+use App\Domain\Kitchen\KitchenService;
+use App\Domain\Sales\OrderService;
+use App\Domain\Sales\PaymentService;
+use App\Models\CookingJob;
+use App\Models\Order;
+use App\Models\OrderLine;
+use App\Models\Outlet;
+use App\Models\Pack;
+use App\Models\Payment;
+use App\Models\Product;
+use App\Models\Shift;
+use App\Support\DomainException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * API lokal untuk layar sentuh Rasentra POS. Berjalan di server outlet melalui LAN dengan
+ * sesi login petugas. Semua aturan bisnis ada di layanan domain, controller hanya memetakan.
+ */
+class PosController extends Controller
+{
+    public function __construct(
+        private readonly OrderService $orders,
+        private readonly PaymentService $payments,
+        private readonly ShiftService $shifts,
+        private readonly CookingService $cooking,
+        private readonly KitchenService $kitchen,
+    ) {}
+
+    public function bootstrap(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $outlet = Outlet::with('region')->findOrFail($user->outlet_id);
+
+        return response()->json([
+            'user' => $user->only(['id', 'name', 'role']),
+            'outlet' => $outlet->only(['id', 'code', 'name', 'has_restaurant', 'has_cooking_fee']) + ['region' => $outlet->region->name],
+            'shift' => Shift::where('user_id', $user->id)->where('status', 'open')->first(),
+            'categories' => Product::where('is_active', true)->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'),
+            'held' => Order::where('outlet_id', $outlet->id)->where('status', 'held')->latest()->limit(20)->get(['id', 'net_amount', 'created_at', 'channel']),
+            'approvers' => \App\Models\User::where('outlet_id', $outlet->id)->where('is_active', true)
+                ->whereIn('role', \App\Domain\Sales\Approval::APPROVER_ROLES)->where('id', '!=', $user->id)->get(['id', 'name']),
+        ]);
+    }
+
+    public function catalog(Request $request): JsonResponse
+    {
+        $outletId = $request->user()->outlet_id;
+        $products = Product::query()
+            ->where('is_active', true)
+            ->whereIn('type', ['retail', 'menu', 'weighed'])
+            ->when($request->query('category'), fn ($q, $c) => $q->where('category', $c))
+            ->when($request->query('q'), fn ($q, $s) => $q->where(fn ($w) => $w->where('name', 'like', "%{$s}%")->orWhere('code', 'like', "{$s}%")->orWhere('barcode', $s)))
+            ->orderBy('name')->limit(60)->get();
+
+        $prices = app(\App\Domain\Catalog\PriceResolver::class);
+
+        return response()->json($products->map(function (Product $p) use ($prices, $outletId) {
+            try {
+                $price = $prices->resolve($p->id, $outletId)['unit_price'];
+            } catch (DomainException) {
+                $price = null;
+            }
+
+            return $p->only(['id', 'code', 'name', 'type', 'uom_code', 'is_weighed', 'category']) + [
+                'price' => $price,
+                'available_packs' => $p->is_weighed ? Pack::where('product_id', $p->id)->where('outlet_id', $outletId)->where('status', 'received')->count() : null,
+            ];
+        }));
+    }
+
+    public function createOrder(Request $request): JsonResponse
+    {
+        $data = $request->validate(['channel' => ['nullable', 'in:retail,dine_in,takeaway,pickup']]);
+        $user = $request->user();
+        $shift = Shift::where('user_id', $user->id)->where('status', 'open')->first();
+        if ($shift === null) {
+            throw new DomainException('shift_required', 'Buka shift terlebih dahulu.');
+        }
+        $order = $this->orders->create($user, $user->outlet_id, $data['channel'] ?? 'retail', ['shift_id' => $shift->id]);
+
+        return $this->orderResponse($order, 201);
+    }
+
+    public function showOrder(Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+
+        return $this->orderResponse($order);
+    }
+
+    /** Satu kolom scan untuk barcode SKU dan Pack ID. */
+    public function scan(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $data = $request->validate(['code' => ['required', 'string', 'max:64'], 'approval' => ['nullable', 'array']]);
+        $code = trim($data['code']);
+
+        if (Pack::where('pack_code', $code)->exists()) {
+            $this->orders->addPack($order, $code, $request->user(), $data['approval'] ?? null);
+        } else {
+            $product = Product::where('barcode', $code)->orWhere('code', $code)->first();
+            if ($product === null) {
+                throw new DomainException('code_unknown', "Kode {$code} tidak dikenal.", 404);
+            }
+            $this->orders->addSku($order, $product);
+        }
+
+        return $this->orderResponse($order);
+    }
+
+    public function addItem(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $data = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+            'quantity' => ['nullable', 'numeric', 'gt:0'],
+            'modifiers' => ['nullable', 'array'],
+            'note' => ['nullable', 'string', 'max:200'],
+            'course' => ['nullable', 'in:starter,main,dessert'],
+        ]);
+        $this->orders->addSku($order, Product::findOrFail($data['product_id']), (string) ($data['quantity'] ?? '1'), array_filter([
+            'modifiers' => $data['modifiers'] ?? null, 'note' => $data['note'] ?? null, 'course' => $data['course'] ?? null,
+        ]));
+
+        return $this->orderResponse($order);
+    }
+
+    public function voidLine(Request $request, OrderLine $line): JsonResponse
+    {
+        $this->authorizeOutlet($line->order);
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:200'], 'approval' => ['nullable', 'array']]);
+        $this->orders->voidLine($line, $request->user(), $data['reason'] ?? null, $data['approval'] ?? null);
+
+        return $this->orderResponse($line->order);
+    }
+
+    public function overridePrice(Request $request, OrderLine $line): JsonResponse
+    {
+        $this->authorizeOutlet($line->order);
+        $data = $request->validate(['unit_price' => ['required', 'numeric', 'gte:0'], 'reason' => ['required', 'string', 'max:200'], 'approval' => ['required', 'array']]);
+        $this->orders->overridePrice($line, (string) $data['unit_price'], $data['reason'], $request->user(), $data['approval']);
+
+        return $this->orderResponse($line->order);
+    }
+
+    public function hold(Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $this->orders->hold($order);
+
+        return $this->orderResponse($order);
+    }
+
+    public function resume(Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $this->orders->resume($order);
+
+        return $this->orderResponse($order);
+    }
+
+    public function pay(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $data = $request->validate([
+            'method' => ['required', 'string'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'tendered' => ['nullable', 'numeric', 'gt:0'],
+            'provider_ref' => ['nullable', 'string', 'max:80'],
+        ]);
+        $this->payments->add($order, $data['method'], (string) $data['amount'], [
+            'tendered' => isset($data['tendered']) ? (string) $data['tendered'] : null,
+            'provider_ref' => $data['provider_ref'] ?? null,
+            'provider' => $data['method'] === 'edc_manual' ? 'edc_manual' : null,
+        ]);
+
+        return $this->orderResponse($order);
+    }
+
+    /** Cek status pembayaran yang belum pasti. Di produksi memanggil adapter provider. */
+    public function paymentStatus(Payment $payment): JsonResponse
+    {
+        $this->authorizeOutlet(Order::findOrFail($payment->order_id));
+
+        return response()->json($payment->fresh());
+    }
+
+    public function finalize(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $order = $this->orders->finalize($order, $request->user());
+
+        return $this->orderResponse($order);
+    }
+
+    public function cooking(Request $request, OrderLine $line): JsonResponse
+    {
+        $this->authorizeOutlet($line->order);
+        $data = $request->validate([
+            'portions' => ['nullable', 'integer', 'min:1', 'max:20'],
+            'method' => ['nullable', 'string', 'max:30'],
+            'doneness' => ['nullable', 'string', 'max:20'],
+            'sauce' => ['nullable', 'string', 'max:40'],
+            'allergy_note' => ['nullable', 'string', 'max:200'],
+        ]);
+        $this->cooking->requestForPackLine($line, $request->user(), $data);
+
+        return $this->orderResponse($line->order);
+    }
+
+    public function cookingFromReceipt(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $data = $request->validate([
+            'receipt_no' => ['required', 'string'],
+            'pack_code' => ['required', 'string'],
+            'portions' => ['nullable', 'integer', 'min:1'],
+            'doneness' => ['nullable', 'string'],
+            'sauce' => ['nullable', 'string'],
+            'allergy_note' => ['nullable', 'string'],
+        ]);
+        $this->cooking->requestFromReceipt($order, $data['receipt_no'], $data['pack_code'], $request->user(), $data);
+
+        return $this->orderResponse($order);
+    }
+
+    public function sendToKitchen(Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $tickets = $this->kitchen->send($order);
+
+        return response()->json(['tickets' => count($tickets)] + $this->orderPayload($order->fresh()));
+    }
+
+    public function openShift(Request $request): JsonResponse
+    {
+        $data = $request->validate(['opening_cash' => ['required', 'numeric', 'gte:0']]);
+        $shift = $this->shifts->open($request->user(), $request->user()->outlet_id, (string) $data['opening_cash']);
+
+        return response()->json($shift, 201);
+    }
+
+    public function cashMovement(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'type' => ['required', 'in:cash_in,cash_out,no_sale_open'],
+            'amount' => ['nullable', 'numeric', 'gte:0'],
+            'reason' => ['required', 'string', 'max:200'],
+        ]);
+        $shift = Shift::where('user_id', $request->user()->id)->where('status', 'open')->firstOrFail();
+        $this->shifts->cashMovement($shift, $request->user(), $data['type'], (string) ($data['amount'] ?? '0'), $data['reason']);
+
+        return response()->json(['expected' => $this->shifts->expected($shift)]);
+    }
+
+    public function shiftSummary(Request $request): JsonResponse
+    {
+        $shift = Shift::where('user_id', $request->user()->id)->where('status', 'open')->firstOrFail();
+
+        return response()->json(['shift' => $shift, 'expected' => $this->shifts->expected($shift)]);
+    }
+
+    public function closeShift(Request $request): JsonResponse
+    {
+        $data = $request->validate(['counts' => ['required', 'array'], 'approval' => ['nullable', 'array']]);
+        $shift = Shift::where('user_id', $request->user()->id)->where('status', 'open')->firstOrFail();
+
+        return response()->json($this->shifts->close($shift, $request->user(), $data['counts'], $data['approval'] ?? null));
+    }
+
+    private function authorizeOutlet(Order $order): void
+    {
+        if ((int) $order->outlet_id !== (int) request()->user()->outlet_id) {
+            throw new DomainException('outlet_forbidden', 'Transaksi ini milik outlet lain.', 403);
+        }
+    }
+
+    private function orderResponse(Order $order, int $status = 200): JsonResponse
+    {
+        return response()->json($this->orderPayload($order->fresh()), $status);
+    }
+
+    private function orderPayload(Order $order): array
+    {
+        $order->load(['lines' => fn ($q) => $q->where('status', 'active')->with(['product:id,name,uom_code', 'pack:id,pack_code']), 'payments']);
+        $jobs = CookingJob::where('order_id', $order->id)->get()->keyBy('id');
+        $paid = \App\Support\Decimal::sum($order->payments->where('status', 'succeeded')->pluck('amount'));
+
+        return [
+            'order' => $order->only(['id', 'doc_no', 'channel', 'status', 'payment_status', 'gross_amount', 'discount_amount', 'net_amount', 'finalized_at']),
+            'lines' => $order->lines->map(fn (OrderLine $l) => [
+                'id' => $l->id,
+                'line_type' => $l->line_type,
+                'name' => $l->product->name,
+                'pack_code' => $l->pack?->pack_code,
+                'quantity' => (string) $l->quantity,
+                'uom' => $l->uom_code,
+                'unit_price' => (string) $l->unit_price,
+                'gross_amount' => (string) $l->gross_amount,
+                'discount_amount' => (string) $l->discount_amount,
+                'net_amount' => (string) $l->net_amount,
+                'note' => $l->note,
+                'cooking' => $l->cooking_job_id && $jobs->has($l->cooking_job_id) ? $jobs[$l->cooking_job_id]->only(['status', 'portions', 'doneness']) : null,
+            ])->values(),
+            'payments' => $order->payments->map->only(['id', 'method', 'amount', 'tendered', 'change_amount', 'status'])->values(),
+            'paid' => \App\Support\Decimal::money($paid),
+            'remaining' => \App\Support\Decimal::money(\App\Support\Decimal::of($order->net_amount)->minus($paid)),
+        ];
+    }
+}

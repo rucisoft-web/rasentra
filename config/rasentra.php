@@ -1,0 +1,59 @@
+<?php
+
+return [
+
+    /*
+    | Profil instalasi. "outlet" untuk server lokal di setiap outlet (Rasentra POS,
+    | Mobile Terminal, Kitchen), "central" untuk Rasentra Central di pusat.
+    */
+    'profile' => env('RASENTRA_PROFILE', 'outlet'),
+
+    // Identitas instalasi; dipakai sebagai source_id pada event sinkronisasi.
+    'source_id' => env('RASENTRA_SOURCE_ID', 'dev-local'),
+
+    // Kode outlet yang dilayani server ini (profil outlet).
+    'outlet_code' => env('RASENTRA_OUTLET_CODE'),
+
+    'central' => [
+        'url' => env('RASENTRA_CENTRAL_URL'),
+        'token' => env('RASENTRA_CENTRAL_TOKEN'),
+        'batch_size' => (int) env('RASENTRA_SYNC_BATCH', 500),
+    ],
+
+    'money' => [
+        // Skala rupiah yang disimpan dan metode pembulatan. Nilai final ditetapkan Finance.
+        'scale' => 2,
+        'rounding' => env('RASENTRA_ROUNDING', 'HALF_UP'),
+    ],
+
+    'quantity_scale' => 6,
+
+    'sync' => [
+        // Backoff eksponensial (detik) dengan jitter agar 20 outlet tidak retry serentak.
+        'backoff_base' => 5,
+        'backoff_max' => 900,
+        'max_attempts' => 20,
+    ],
+
+    'xml' => [
+        'max_bytes' => 20 * 1024 * 1024,
+        'max_elements' => 500_000,
+    ],
+
+    // Rasentra Kitchen: station, target waktu saji (menit) dan ambang warna timer.
+    'kitchen' => [
+        'stations' => [
+            'grill' => ['name' => 'Grill', 'target_minutes' => 15],
+            'hot' => ['name' => 'Hot kitchen', 'target_minutes' => 10],
+            'cold' => ['name' => 'Cold kitchen', 'target_minutes' => 8],
+            'bar' => ['name' => 'Bar', 'target_minutes' => 5],
+            'pastry' => ['name' => 'Pastry', 'target_minutes' => 10],
+            'packing' => ['name' => 'Packing', 'target_minutes' => 5],
+        ],
+        // Timer kuning saat waktu berjalan >= 75% target, merah saat melewati target.
+        'warn_ratio' => 0.75,
+        // Tiket siap tetap tampil di layar antrean pickup selama N menit setelah disajikan.
+        'queue_linger_minutes' => 3,
+        'pickup_channels' => ['takeaway', 'pickup'],
+    ],
+];
