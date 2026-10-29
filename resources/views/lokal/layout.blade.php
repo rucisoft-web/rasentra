@@ -60,5 +60,6 @@
     </div>
   </div>
 </div>
+@include('partials.demo-bar')
 </body>
 </html>

@@ -12,6 +12,42 @@ return [
     */
     'profile' => env('RASENTRA_PROFILE', 'lokal'),
 
+    /*
+    | Mode demo: tombol "Coba sebagai tamu" di landing page masuk langsung ke tiap aplikasi
+    | dengan akun data contoh. Hanya untuk server demo; jangan aktifkan di server produksi.
+    | Data contoh dibangun ulang setiap hari pada jam reset_at (zona tampilan).
+    */
+    'demo' => [
+        'enabled' => (bool) env('RASENTRA_DEMO', false),
+        'reset_at' => env('RASENTRA_DEMO_RESET_AT', '03:00'),
+        // Aksi yang ditolak untuk tamu agar demo tetap utuh untuk pengunjung berikutnya.
+        'blocked_routes' => [
+            'core.users.store', 'core.users.update', 'core.companies.update', 'core.outlets.update',
+            'core.outlets.locations.store', 'core.outlets.locations.toggle',
+            'lokal.backup', 'lokal.setup', 'lokal.setup.store', 'lokal.setup.bootstrap',
+        ],
+        'accounts' => [
+            'central' => ['email' => 'admin@rasentra.test', 'app' => 'Rasentra Central', 'role' => 'Admin kantor pusat', 'home' => '/core',
+                'note' => 'Dashboard grup, sinkronisasi outlet, posting SAP, master, harga, promo dan laporan.'],
+            'finance' => ['email' => 'finance@rasentra.test', 'app' => 'Rasentra Central', 'role' => 'Keuangan', 'home' => '/core',
+                'note' => 'Rekonsiliasi tutup hari, dokumen SAP dan laporan penjualan.'],
+            'merch' => ['email' => 'merch@rasentra.test', 'app' => 'Rasentra Central', 'role' => 'Merchandising', 'home' => '/core',
+                'note' => 'Produk, versi harga, Promotion Designer dan resep.'],
+            'pos-retail' => ['email' => 'kasir@solo.test', 'app' => 'Rasentra POS', 'role' => 'Kasir meatshop & grocery', 'home' => '/pos',
+                'note' => 'Scan label timbangan, promo, pembayaran, struk, retur dan tutup shift.'],
+            'pos-resto' => ['email' => 'kasir2@solo.test', 'app' => 'Rasentra POS', 'role' => 'Kasir restoran', 'home' => '/pos',
+                'note' => 'Ambil tagihan meja, cooking fee, kirim dapur dan delivery.'],
+            'mobile' => ['email' => 'pelayan@solo.test', 'app' => 'Rasentra Mobile Terminal', 'role' => 'Pelayan', 'home' => '/mobile',
+                'note' => 'Peta meja, catat pesanan dengan modifier, kirim dapur, antar hidangan.'],
+            'kitchen' => ['email' => 'chef@solo.test', 'app' => 'Rasentra Kitchen', 'role' => 'Chef', 'home' => '/kitchen',
+                'note' => 'Layar station, expeditor, antrean pickup dan analisis waktu saji.'],
+            'inventory' => ['email' => 'gudang@solo.test', 'app' => 'Rasentra Inventory', 'role' => 'Petugas gudang', 'home' => '/inventory',
+                'note' => 'Penerimaan barang, stok opname, karantina dan cek stok.'],
+            'lokal' => ['email' => 'kepala@solo.test', 'app' => 'Rasentra Lokal', 'role' => 'Kepala outlet', 'home' => '/lokal',
+                'note' => 'Konsol server outlet: antrean sinkronisasi, publikasi, tutup hari.'],
+        ],
+    ],
+
     // Versi aplikasi yang dilaporkan Rasentra Lokal lewat heartbeat.
     'version' => env('RASENTRA_VERSION', '1.0.0'),
 

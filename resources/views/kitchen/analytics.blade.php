@@ -31,5 +31,6 @@
 </main>
 <script>window.KDS_STATIONS = @json(collect($stations)->map(fn ($s) => $s['name']));</script>
 <script src="{{ asset('assets/kitchen/kitchen.js') }}" defer></script>
+@include('partials.demo-bar')
 </body>
 </html>

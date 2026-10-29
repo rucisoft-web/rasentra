@@ -49,6 +49,8 @@ nav.menu{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;align-items:center
 nav.menu > a, nav.menu summary{font-weight:600;font-size:.95rem;color:var(--ink);text-decoration:none;padding:8px 12px;border-radius:6px;cursor:pointer;list-style:none}
 nav.menu > a:hover, nav.menu summary:hover{background:var(--green-soft)}
 nav.menu summary::-webkit-details-marker{display:none}
+nav.menu > a.nav-demo{background:var(--green);color:var(--surface);margin-left:8px;padding:8px 16px}
+nav.menu > a.nav-demo:hover{background:var(--green);filter:brightness(1.1)}
 nav.menu summary::after{content:"▾";margin-left:6px;font-size:.8em;color:var(--muted)}
 details.sub{position:relative}
 details.sub .drop{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:250px;box-shadow:0 10px 30px rgba(0,0,0,.12);display:grid;gap:2px}
@@ -163,6 +165,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       </details>
       <a href="#panduan">Panduan</a>
       <a href="#arsitektur">Arsitektur</a>
+@endverbatim
+      @if (config('rasentra.demo.enabled'))<a class="btn primary nav-demo" href="{{ route('demo') }}">Coba demo</a>@endif
+@verbatim
     </nav>
   </div>
 </header>
@@ -175,7 +180,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <h1>Setiap kemasan daging <em>tercatat sampai gram</em>, setiap outlet tetap jualan walau internet putus.</h1>
       <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk Indoguna Group: CV Solo Kulina Utama (Meatshop & Grocery dan restoran R&amp;B Solo) dan CV Lombok Kulina Utama (Meatshop dan restoran El Primo), masing-masing dengan SAP Business One sendiri. Rasentra Lokal, server di setiap outlet, melayani Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Inventory di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Di kantor pusat, Rasentra Central menjadi pusat POS dengan tiga modul: Sinkronisasi menerima transaksi semua outlet, Posting SAP memposting ke SAP Business One tiap CV, dan Rasentra Core tempat admin mengatur master, harga, promo dan resep.</p>
       <div class="cta">
-        <a class="btn primary" href="#alur-retail">Lihat alur kerja</a>
+@endverbatim
+        @if (config('rasentra.demo.enabled'))<a class="btn primary" href="{{ route('demo') }}">Coba sebagai tamu</a>@endif
+        <a class="btn {{ config('rasentra.demo.enabled') ? 'ghost' : 'primary' }}" href="#alur-retail">Lihat alur kerja</a>
+@verbatim
         <a class="btn ghost" href="#panduan">Panduan penggunaan</a>
       </div>
       <div class="facts">

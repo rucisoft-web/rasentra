@@ -45,6 +45,8 @@ Koneksi SAP diatur di `.env` server Central. `SAP_SL_URL`, `SAP_USERNAME` dan `S
 
 Untuk hosting cPanel (zip siap-upload berisi `vendor`, instalasi lewat Terminal) lihat [docs/INSTALL-CPANEL.md](docs/INSTALL-CPANEL.md).
 
+Mode demo untuk tamu: set `RASENTRA_DEMO=true`, jalankan `php artisan rasentra:demo-reset --force`, lalu landing page menampilkan tombol **Coba sebagai tamu** menuju `/demo`. Di sana setiap aplikasi bisa dibuka dengan satu klik memakai akun data contoh. Tamu tidak bisa mengubah pengguna, outlet atau pemasangan server, dan data contoh dibangun ulang setiap hari pukul `RASENTRA_DEMO_RESET_AT`.
+
 ## Demo utama: outlet Solo (Meatshop & Grocery dan R&B Solo)
 
 Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan ke aplikasinya.

@@ -73,5 +73,6 @@
 
 <div class="toast" id="toast" hidden></div>
 <script src="{{ asset('assets/pos/pos.js') }}" defer></script>
+@include('partials.demo-bar')
 </body>
 </html>

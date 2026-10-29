@@ -26,5 +26,6 @@
     <a class="pick" href="{{ route('kitchen.analytics') }}"><b>Analisis waktu saji</b><span>Per station, per menu dan per jam</span></a>
   </div>
 </main>
+@include('partials.demo-bar')
 </body>
 </html>

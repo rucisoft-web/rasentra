@@ -14,6 +14,10 @@ use App\Jobs\DispatchOutbox;
 use App\Models\DailyReconciliation;
 use App\Models\Outlet;
 use App\Support\SystemState;
+use Database\Seeders\CoreSeeder;
+use Database\Seeders\LombokSeeder;
+use Database\Seeders\OutletSeeder;
+use Database\Seeders\SoloSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -34,6 +38,10 @@ Schedule::command('rasentra:backup')->dailyAt('02:00')->timezone(config('rasentr
 Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->when($central);
 Schedule::command('rasentra:sap-check')->everyFifteenMinutes()->when($central);
 Schedule::command('rasentra:reconcile')->hourly()->when($central);
+
+// Server demo: data contoh dibangun ulang setiap hari agar tamu berikutnya mulai dari kondisi bersih.
+Schedule::command('rasentra:demo-reset --force')->dailyAt(config('rasentra.demo.reset_at'))
+    ->timezone(config('rasentra.display_timezone'))->when(fn () => config('rasentra.demo.enabled'));
 
 Artisan::command('rasentra:post-sap {--limit=200}', function (SapPostingService $sap) {
     $summary = $sap->postInbox((int) $this->option('limit'));
@@ -113,3 +121,21 @@ Artisan::command('rasentra:backup', function (Backup $backup) {
     $result = $backup->run();
     $this->info("Backup {$result['file']} ({$result['bytes']} byte) di storage/app/backups.");
 })->purpose('Rasentra Lokal: cadangkan database outlet');
+
+Artisan::command('rasentra:demo-reset {--force : Jalankan tanpa konfirmasi}', function () {
+    if (! config('rasentra.demo.enabled')) {
+        $this->error('Mode demo tidak aktif (RASENTRA_DEMO=false). Database tidak diubah.');
+
+        return 1;
+    }
+    if (! $this->option('force') && ! $this->confirm('Semua data akan dihapus dan diganti data contoh. Lanjutkan?')) {
+        return 1;
+    }
+    $this->call('migrate:fresh', ['--force' => true]);
+    foreach ([OutletSeeder::class, SoloSeeder::class, LombokSeeder::class, CoreSeeder::class] as $seeder) {
+        $this->call('db:seed', ['--class' => $seeder, '--force' => true]);
+    }
+    $this->info('Data contoh demo siap.');
+
+    return 0;
+})->purpose('Server demo: hapus semua data dan muat ulang data contoh');

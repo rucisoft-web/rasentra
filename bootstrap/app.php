@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuthenticateDevice;
 use App\Http\Middleware\EnsureCoreAccess;
 use App\Http\Middleware\EnsureLokalAccess;
+use App\Http\Middleware\GuardDemoSession;
 use App\Support\DomainException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['device' => AuthenticateDevice::class, 'core' => EnsureCoreAccess::class, 'lokal' => EnsureLokalAccess::class]);
+        $middleware->web(append: [GuardDemoSession::class]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('core', 'core/*') ? route('core.login') : route('pos.login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {

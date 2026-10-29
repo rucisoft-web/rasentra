@@ -54,5 +54,6 @@
 <div class="dialog" id="dialog" hidden><div class="dialog-body" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" hidden></div>
 <script src="{{ asset('assets/mobile/mobile.js') }}" defer></script>
+@include('partials.demo-bar')
 </body>
 </html>

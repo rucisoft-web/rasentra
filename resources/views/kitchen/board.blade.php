@@ -24,5 +24,6 @@
 <main class="board" id="board"><p class="empty" data-i18n="empty">Belum ada tiket.</p></main>
 <div class="toast" id="toast" hidden></div>
 <script src="{{ asset('assets/kitchen/kitchen.js') }}" defer></script>
+@include('partials.demo-bar')
 </body>
 </html>

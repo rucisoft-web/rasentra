@@ -59,16 +59,26 @@ php artisan storage:link              # abaikan jika hosting melarang symlink
 php artisan optimize
 ```
 
-Data demo (opsional, untuk uji coba, berisi user, produk dan transaksi contoh):
+### Server demo untuk tamu
+
+Templat `.env.cpanel.example` menyalakan mode demo (`RASENTRA_DEMO=true`): landing page menampilkan
+tombol **Coba sebagai tamu** yang membuka halaman `/demo`. Dari sana tamu masuk ke Central, POS,
+Mobile Terminal, Kitchen, Inventory dan Lokal dengan akun contoh, tanpa kata sandi atau PIN.
+Muat data contohnya sekali:
 
 ```sh
-php artisan db:seed --class=SoloSeeder --force
-php artisan db:seed --class=LombokSeeder --force
-php artisan db:seed --class=CoreSeeder --force
+php artisan rasentra:demo-reset --force
 ```
 
-Login demo: Central `admin@rasentra.test` / `password`; POS outlet Solo pilih nama lalu PIN
-(Hendra 9999, Tono 1212, Lusi 3333).
+Cron di langkah 6 membangun ulang data contoh setiap hari pukul `RASENTRA_DEMO_RESET_AT` (bawaan 03:00 WIB).
+Tamu tidak bisa mengubah pengguna, outlet atau pemasangan server.
+
+Untuk server produksi dengan data sungguhan, set `RASENTRA_DEMO=false` sebelum langkah 4 dan
+lewati perintah di atas. **Jangan** jalankan `rasentra:demo-reset` di server produksi: perintah itu
+menghapus seluruh database (perintah menolak berjalan bila mode demo mati).
+
+Login manual tetap tersedia: Central `admin@rasentra.test` / `password`; POS outlet Solo pilih nama
+lalu PIN (Hendra 9999, Tono 1212, Lusi 3333).
 
 ## 5. Arahkan domain ke folder `public`
 
