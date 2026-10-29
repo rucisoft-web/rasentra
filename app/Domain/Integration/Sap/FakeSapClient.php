@@ -37,4 +37,15 @@ final class FakeSapClient implements SapClient
 
         return $doc;
     }
+
+    public bool $unreachable = false;
+
+    public function ping(): array
+    {
+        if ($this->unreachable) {
+            throw new \RuntimeException('Service Layer tidak dapat dihubungi');
+        }
+
+        return ['mode' => 'simulasi'];
+    }
 }

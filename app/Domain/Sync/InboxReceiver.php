@@ -15,7 +15,10 @@ use Illuminate\Support\Str;
  */
 final class InboxReceiver
 {
-    public function __construct(private readonly SalesProjector $sales) {}
+    public function __construct(
+        private readonly SalesProjector $sales,
+        private readonly DayReconciler $days,
+    ) {}
 
     public const REQUIRED = ['event_id', 'source_id', 'outlet_id', 'entity_type', 'entity_id', 'entity_version', 'event_type', 'payload', 'checksum'];
 
@@ -64,7 +67,10 @@ final class InboxReceiver
                 'checksum' => $event['checksum'],
                 'ack_ref' => 'ACK-'.Str::upper(Str::random(20)),
                 'status' => 'accepted',
-            ]), fn (InboxEvent $e) => $this->sales->project($e)));
+            ]), function (InboxEvent $e) {
+                $this->sales->project($e);
+                $this->days->handle($e);
+            }));
         } catch (UniqueConstraintViolationException) {
             // Dua worker mengirim event sama bersamaan: yang kalah membaca ack milik pemenang.
             $inbox = InboxEvent::where('source_id', $sourceId)->where('event_id', $eventId)->firstOrFail();

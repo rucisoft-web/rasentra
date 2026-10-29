@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Core;
 
 use App\Domain\Audit\Audit;
 use App\Domain\Core\CoreAccess;
+use App\Domain\Sync\Publications;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use App\Models\User;
@@ -55,6 +56,7 @@ class UserController extends Controller
         $data = $this->validated($request, null);
         $user = User::create($data);
         Audit::record('user.created', $user, $request->user()->id, after: $this->snapshot($user), outletId: $user->outlet_id);
+        app(Publications::class)->master('user', $user->id);
 
         return redirect()->route('core.users.edit', $user)->with('ok', "Pengguna {$user->name} dibuat.");
     }
@@ -71,7 +73,10 @@ class UserController extends Controller
             return back()->with('error', 'Anda tidak dapat menonaktifkan atau mengubah peran akun sendiri.');
         }
         $before = $this->snapshot($user);
+        $oldOutlet = $user->outlet_id;
         $user->update($data);
+        // Petugas yang pindah outlet ikut dikirim ke outlet lama agar datanya di sana diperbarui.
+        app(Publications::class)->master('user', $user->id, $oldOutlet && $oldOutlet !== $user->outlet_id ? [$oldOutlet] : []);
         Audit::record('user.updated', $user, $request->user()->id, before: $before, after: $this->snapshot($user->fresh()), outletId: $user->outlet_id);
 
         return back()->with('ok', 'Perubahan disimpan.');

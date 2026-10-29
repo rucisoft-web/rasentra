@@ -122,7 +122,7 @@ Login di `/core/login` dengan email dan kata sandi `password`:
   - Versi harga: draft, ubah harga, lalu terbitkan oleh orang lain (maker-checker).
   - Promotion Designer: susun aturan, simulasikan pada keranjang contoh, lalu terbitkan oleh orang lain ke semua outlet, wilayah atau outlet tertentu.
   - Resep berversi dan aturan cooking fee berversi.
-- **Monitoring.** Antrean sinkronisasi per outlet, posting SAP per instance (perlu review, gagal, parsial, posting ulang), masalah integrasi, mapping SAP per instance, impor XML NMEXML.
+- **Monitoring.** Halaman Rasentra Central (heartbeat tiap Rasentra Lokal, publikasi yang belum diterapkan, cek koneksi SAP per instance, job terjadwal), rekonsiliasi tutup hari, antrean sinkronisasi per outlet, posting SAP per instance (perlu review, gagal, parsial, posting ulang), masalah integrasi, mapping SAP per instance, impor XML NMEXML.
 - **Laporan.** Penjualan per perusahaan dan outlet (unduh CSV), promo per penanggung biaya, waktu saji dapur, opname dan waste, serta audit log.
 
 **Data demo pusat:**
@@ -131,7 +131,37 @@ Login di `/core/login` dengan email dan kata sandi `password`:
 - Posting ke SAP tiruan per instance. Di `sap_solo` ada satu dokumen perlu review, satu pembayaran gagal, satu invoice gagal, dan tiga struk tertahan karena Kepiting Bakau belum dimapping. `sap_lombok` memakai akun kas/bank sendiri dan terposting semua.
 - Laras sudah menyiapkan promo kambing (draft), promo salmon yang ditanggung supplier (sudah disimulasikan), dan versi harga November. Masuk sebagai Rahman untuk menyetujui dan menerbitkannya.
 
+- Server Lokal Solo melaporkan satu event antre dan satu gagal kirim; server Lombok masih versi 0.9.8 dan tertinggal dua publikasi. Tutup hari 6 hari terakhir sudah cocok, kecuali Lombok tanggal kemarin lusa yang masih menunggu satu struk sore.
+
 Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbox menerima `order.finalized`. Jalankan `php artisan rasentra:rebuild-sales` untuk membangun ulang proyeksi.
+
+## Rasentra Central
+
+Rasentra Central adalah instalasi `RASENTRA_PROFILE=central` di kantor pusat. API-nya ada di `/api/v1/sync` dan memakai token perangkat (server outlet):
+
+| Endpoint | Fungsi |
+| --- | --- |
+| `POST events` | Terima event outbox dari Lokal secara idempoten (`order.finalized`, `business_day.closed`). |
+| `GET changes?cursor=` | Publikasi sejak cursor: harga, promo, resep, cooking fee, serta master produk, outlet, lokasi, meja dan petugas. |
+| `GET snapshot` | Data lengkap untuk Rasentra Lokal baru, khusus server outlet karena berisi hash PIN petugas. |
+| `POST ack` | Lokal melaporkan publikasi yang diterapkan atau gagal beserta cursor terakhir. |
+| `POST heartbeat` | Antrean outbox, versi aplikasi, jam perangkat, cursor yang diterapkan dan shift yang masih buka. |
+
+Perubahan master di Rasentra Core (produk, pengguna outlet, outlet, lokasi) otomatis diterbitkan ke cursor publikasi. Akun kantor pusat tidak pernah dikirim ke outlet.
+
+**Di server Rasentra Lokal** (isi `RASENTRA_CENTRAL_URL`, `RASENTRA_CENTRAL_TOKEN`, `RASENTRA_OUTLET_CODE`, `RASENTRA_SOURCE_ID`):
+
+```bash
+php artisan migrate
+php artisan rasentra:bootstrap-lokal   # snapshot awal dari Central
+php artisan schedule:work              # outbox 5 detik, tarik publikasi 30 detik, heartbeat 1 menit, tutup hari 04.00
+```
+
+Publikasi diterapkan idempoten per baris. Bila satu publikasi gagal (misalnya produk rujukannya belum ada), cursor berhenti tepat sebelumnya dan Central menampilkan error-nya di halaman Rasentra Central.
+
+**Di server Rasentra Central** cukup `php artisan schedule:work`: posting SAP tiap menit, cek koneksi SAP tiap 15 menit, rekonsiliasi ulang tiap jam.
+
+Perintah lain: `rasentra:pull`, `rasentra:heartbeat`, `rasentra:close-day {tanggal?}` (Lokal); `rasentra:sap-check`, `rasentra:reconcile {tanggal?}`, `rasentra:post-sap` (Central).
 
 ## Coba alurnya
 
@@ -161,6 +191,7 @@ Uji mencakup skenario UAT spesifikasi:
 - Seeder demo Indoguna Group dan seluruh halaman Rasentra Core.
 - Posting ke instance SAP milik tiap perusahaan, koneksi per instance, dan tanggal bisnis WITA untuk Lombok.
 - Rasentra Core: hak akses per peran, maker-checker harga dan promo, proyeksi penjualan, dan token perangkat.
+- Rasentra Central: heartbeat dan selisih jam, snapshot ke database Lokal terpisah lalu publikasi berikutnya, cursor yang tertahan saat publikasi gagal, tutup hari dan rekonsiliasi (struk tertunda lalu cocok), serta cek koneksi SAP per instance.
 
 ## Struktur kode
 
@@ -174,8 +205,9 @@ app/Domain/
   Kitchen/        KitchenService (delta ke station), KitchenBoard (KDS, expeditor, antrean, analisis)
   CookingService/ CookingService
   Cash/           ShiftService
-  Sync/           Outbox, OutboxDispatcher, InboxReceiver
-  Integration/    Sap/* (Service Layer per instance), Xml/* (NMEXML)
+  Sync/           Outbox, OutboxDispatcher, InboxReceiver, Publications (Central), ChangePuller,
+                  PublicationApplier, HeartbeatSender, DayCloser (Lokal), DayReconciler (Central)
+  Integration/    Sap/* (Service Layer per instance, SapHealth), Xml/* (NMEXML)
   Core/           CoreAccess (peran pusat), SalesProjector, SalesReport
   Catalog/        PricePublisher (maker-checker versi harga)
   Promotion/      PromotionDesigner (simulasi, terbit, hentikan)

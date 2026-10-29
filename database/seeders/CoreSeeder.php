@@ -5,25 +5,33 @@ namespace Database\Seeders;
 use App\Domain\Catalog\PricePublisher;
 use App\Domain\Integration\Sap\FakeSapClient;
 use App\Domain\Integration\Sap\SapClientFactory;
+use App\Domain\Integration\Sap\SapHealth;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Promotion\PromotionDesigner;
 use App\Domain\Sync\InboxReceiver;
 use App\Models\BusinessUnit;
+use App\Models\CookingFeeRule;
+use App\Models\DailyReconciliation;
 use App\Models\Device;
 use App\Models\InboxEvent;
 use App\Models\OutboxEvent;
 use App\Models\Outlet;
+use App\Models\OutletSyncState;
 use App\Models\PriceItem;
 use App\Models\PriceVersion;
 use App\Models\Product;
 use App\Models\PromotionVersion;
+use App\Models\PublicationVersion;
+use App\Models\RecipeVersion;
 use App\Models\SapMapping;
 use App\Models\User;
 use App\Support\Decimal;
+use App\Support\SystemState;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -64,6 +72,7 @@ class CoreSeeder extends Seeder
         $this->sapMappings();
         $this->postToSap();
         $this->pendingApprovals();
+        $this->centralState();
     }
 
     private function users(): void
@@ -354,5 +363,97 @@ class CoreSeeder extends Seeder
         $publisher->setItems($draft, $laras, array_filter([
             $ids['2101002'] ?? null => '345000', $ids['2101003'] ?? null => '305000', $ids['2101004'] ?? null => '795000',
         ], fn ($v, $k) => $k !== '', ARRAY_FILTER_USE_BOTH));
+    }
+
+    /**
+     * Kondisi Rasentra Central untuk demo: heartbeat kedua server Lokal (Lombok tertinggal dua
+     * publikasi), tutup hari 6 hari terakhir (satu hari Lombok masih menunggu struk), cek SAP
+     * dan jejak job terjadwal.
+     */
+    private function centralState(): void
+    {
+        $this->publishCurrent();
+        $publications = PublicationVersion::orderBy('id')->get(['id', 'outlet_ids']);
+        foreach (Outlet::whereIn('code', ['SLO', 'LBK'])->get() as $outlet) {
+            $server = Device::where('outlet_id', $outlet->id)->where('app', 'outlet_server')->first();
+            $mine = $publications->filter(fn ($p) => $p->outlet_ids === null || in_array($outlet->id, $p->outlet_ids, true))->pluck('id')->values();
+            $solo = $outlet->code === 'SLO';
+            $queue = OutboxEvent::where('outlet_id', $outlet->id)->whereIn('status', ['pending', 'failed']);
+            OutletSyncState::create([
+                'device_id' => $server->id, 'outlet_id' => $outlet->id,
+                'last_heartbeat_at' => $this->now->copy()->subSeconds($solo ? 35 : 50),
+                'last_pull_at' => $this->now->copy()->subSeconds($solo ? 20 : 25),
+                'applied_cursor' => $solo || $mine->count() < 3 ? (int) $publications->max('id') : $mine[$mine->count() - 3],
+                'outbox_pending' => (clone $queue)->where('status', 'pending')->count(),
+                'outbox_failed' => (clone $queue)->where('status', 'failed')->count(),
+                'outbox_oldest_at' => (clone $queue)->min('occurred_at'),
+                'last_sent_at' => $this->now->copy()->subMinutes($solo ? 4 : 2),
+                'app_version' => $solo ? '1.0.0' : '0.9.8',
+                'clock_skew_seconds' => $solo ? 2 : -1,
+                'open_business_date' => Outlet::businessDate($outlet->id),
+                'open_shifts' => $solo ? 2 : 1,
+            ]);
+            $server->update(['last_seen_at' => $this->now->copy()->subSeconds($solo ? 35 : 50)]);
+
+            $today = Outlet::businessDate($outlet->id);
+            for ($d = 6; $d >= 1; $d--) {
+                $date = Carbon::parse($today)->subDays($d)->toDateString();
+                $orders = DB::table('hq_orders')->where('outlet_id', $outlet->id)->whereDate('business_date', $date)->orderBy('doc_no')->get();
+                if ($orders->isEmpty()) {
+                    continue;
+                }
+                $docs = $orders->pluck('doc_no')->all();
+                $net = Decimal::sum($orders->pluck('net_amount'));
+                // Lombok dua hari lalu: satu struk sore masih tertahan di server outlet.
+                $late = ! $solo && $d === 2;
+                if ($late) {
+                    $docs[] = $outlet->code.'-'.str_replace('-', '', substr($date, 2)).'-LATE1';
+                    $net = $net->plus('187500');
+                }
+                $cash = ($solo ? ['0', '-2000', '5000', '0', '-500', '0'] : ['-1500', '0', '0', '2500', '0', '-1000'])[$d - 1];
+                $payments = DB::table('hq_order_payments')->whereIn('hq_order_id', $orders->pluck('id'))->get()->groupBy('method')
+                    ->map(fn ($g) => Decimal::money(Decimal::sum($g->pluck('amount'))))->all();
+                DailyReconciliation::create([
+                    'outlet_id' => $outlet->id, 'business_date' => $date, 'closing_version' => 1,
+                    'closed_at' => Carbon::parse($date, $outlet->timezone)->addDay()->setTime(4, 0)->utc(),
+                    'local_orders' => count($docs), 'local_net' => Decimal::money($net),
+                    'central_orders' => $orders->count(), 'central_net' => Decimal::money(Decimal::sum($orders->pluck('net_amount'))),
+                    'cash_difference' => $cash, 'shifts' => 2, 'open_shifts' => 0,
+                    'status' => $late ? 'waiting' : 'matched',
+                    'missing_doc_nos' => $late ? [end($docs)] : [], 'extra_doc_nos' => [],
+                    'local_summary' => [
+                        'outlet_code' => $outlet->code, 'business_date' => $date, 'orders' => count($docs), 'net_amount' => Decimal::money($net),
+                        'by_channel' => $orders->groupBy('channel')->map(fn ($g) => ['orders' => $g->count(), 'net_amount' => Decimal::money(Decimal::sum($g->pluck('net_amount')))])->all(),
+                        'payments' => $payments, 'doc_nos' => $docs, 'cash_difference' => $cash,
+                    ],
+                    'checked_at' => $this->now->copy()->subMinutes(20),
+                ]);
+            }
+        }
+
+        app(SapHealth::class)->checkAll();
+        SystemState::ran('sap-check', ['ok' => BusinessUnit::whereNotNull('sap_company_db')->count(), 'failed' => 0]);
+        SystemState::ran('post-sap', ['posted' => DB::table('sap_documents')->where('status', 'posted')->count()]);
+        SystemState::ran('reconcile', ['checked' => 1]);
+    }
+
+    /** Riwayat cursor publikasi untuk harga, promo, resep dan cooking fee yang sudah berlaku. */
+    private function publishCurrent(): void
+    {
+        if (PublicationVersion::exists()) {
+            return;
+        }
+        $items = collect();
+        PriceVersion::where('status', 'published')->get()->each(fn ($v) => $items->push([$v->published_at ?? $v->effective_from, 'price_version', $v->id,
+            $v->toArray() + ['items' => $v->items()->get(['product_id', 'unit_price'])->toArray()], $v->outlet_id ? [$v->outlet_id] : null]));
+        PromotionVersion::where('status', 'published')->get()->each(fn ($v) => $items->push([$v->published_at ?? $v->starts_at, 'promotion_version', $v->id,
+            $v->toArray(), $v->targets()->pluck('outlet_id')->all()]));
+        RecipeVersion::with('lines')->where('status', 'approved')->get()->each(fn ($v) => $items->push([$v->effective_from ?? $v->created_at, 'recipe_version', $v->id,
+            $v->toArray(), $v->outlet_ids]));
+        CookingFeeRule::all()->each(fn ($r) => $items->push([$r->effective_from ?? $r->created_at, 'cooking_fee_rule', $r->id, $r->toArray(), $r->outlet_id ? [$r->outlet_id] : null]));
+
+        foreach ($items->sortBy(fn ($i) => Carbon::parse($i[0])->getTimestamp()) as [$at, $type, $id, $payload, $outlets]) {
+            PublicationVersion::create(['entity_type' => $type, 'entity_key' => (string) $id, 'payload' => $payload, 'outlet_ids' => $outlets]);
+        }
     }
 }

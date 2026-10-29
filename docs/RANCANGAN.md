@@ -303,9 +303,11 @@ Semua API berversi (`/api/v1`), memakai JSON, HTTPS dan token perangkat yang dib
 | --- | --- |
 | `POST /sync/events` | Outlet mengirim batch event (maks. 500); respons per item: `accepted`, `duplicate` (dengan `ack_ref` sama), `deferred_dependency`, `rejected` |
 | `GET /sync/changes?cursor=&types=` | Outlet menarik delta versi master/harga/promo/resep/konfigurasi; cursor monoton milik pusat |
-| `POST /sync/ack` | Outlet mengonfirmasi `received` lalu `applied` per versi publikasi |
-| `GET /sync/snapshot/{type}` | Bootstrap outlet baru atau server cadangan |
-| `POST /sync/heartbeat` | Versi aplikasi, umur antrean, disk, status layanan |
+| `POST /sync/ack` | Outlet mengonfirmasi `applied` atau `failed` per publikasi beserta cursor terakhir yang diterapkan |
+| `GET /sync/snapshot` | Bootstrap Rasentra Lokal baru: outlet, perusahaan, produk, lokasi, meja, petugas (hash PIN), harga, promo, resep dan cooking fee aktif. Khusus token server outlet |
+| `POST /sync/heartbeat` | Versi aplikasi, antrean outbox (pending/gagal/parked, umur tertua), jam perangkat, cursor yang diterapkan, shift yang masih buka |
+
+Implementasi (Rasentra Central): publikasi berisi baris utuh dan induk yang dibutuhkan foreign key (`_parents`), sehingga Lokal menerapkannya idempoten per id dalam satu transaksi. Bila satu publikasi gagal, cursor Lokal berhenti tepat sebelumnya dan error-nya tampil di halaman Rasentra Central. Tutup hari (`business_day.closed`, otomatis pukul 04.00) membawa jumlah struk, nilai bersih per kanal dan metode bayar, daftar nomor struk dan selisih kas shift; Central mencocokkannya dengan `hq_orders` menjadi `matched`, `waiting` (struk belum sampai, diperiksa ulang tiap struk masuk) atau `mismatch`.
 
 ### Alur outbox ke inbox
 

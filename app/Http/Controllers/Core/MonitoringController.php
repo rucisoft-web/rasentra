@@ -11,6 +11,7 @@ use App\Models\InboxEvent;
 use App\Models\IntegrationException;
 use App\Models\OutboxEvent;
 use App\Models\Outlet;
+use App\Models\OutletSyncState;
 use App\Models\PromotionTarget;
 use App\Models\SapDocument;
 use Illuminate\Http\RedirectResponse;
@@ -42,9 +43,8 @@ class MonitoringController extends Controller
         $inbox = DB::table('inbox_events')->groupBy('outlet_id')
             ->selectRaw("outlet_id, MAX(created_at) as last_at, SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as day_count, SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected, SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as waiting", [$since])
             ->get()->keyBy('outlet_id');
-        $outbox = DB::table('outbox_events')->whereIn('status', ['pending', 'sending', 'failed', 'parked'])->groupBy('outlet_id')
-            ->selectRaw("outlet_id, SUM(CASE WHEN status IN ('pending','sending') THEN 1 ELSE 0 END) as pending, SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed, SUM(CASE WHEN status = 'parked' THEN 1 ELSE 0 END) as parked, MIN(occurred_at) as oldest")
-            ->get()->keyBy('outlet_id');
+        // Antrean outbox tiap outlet dilaporkan Rasentra Lokal lewat heartbeat.
+        $states = OutletSyncState::all()->keyBy('outlet_id');
         $servers = Device::where('app', 'outlet_server')->get()->keyBy('outlet_id');
         $receipts = PromotionTarget::where('ack_status', 'pending')->groupBy('outlet_id')->selectRaw('outlet_id, COUNT(*) as n')->pluck('n', 'outlet_id');
 
@@ -52,7 +52,7 @@ class MonitoringController extends Controller
             'title' => 'Sinkronisasi outlet',
             'outlets' => Outlet::where('is_active', true)->orderBy('code')->get(),
             'inbox' => $inbox,
-            'outbox' => $outbox,
+            'states' => $states,
             'servers' => $servers,
             'receipts' => $receipts,
             'problems' => OutboxEvent::whereIn('status', ['failed', 'parked'])->orderByDesc('updated_at')->limit(50)->get(),

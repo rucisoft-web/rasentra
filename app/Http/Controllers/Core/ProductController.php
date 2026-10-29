@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Core;
 
 use App\Domain\Audit\Audit;
+use App\Domain\Sync\Publications;
 use App\Http\Controllers\Controller;
 use App\Models\PriceItem;
 use App\Models\Product;
@@ -60,6 +61,7 @@ class ProductController extends Controller
     {
         $product = Product::create($this->validated($request, null));
         Audit::record('product.created', $product, $request->user()->id, after: $product->only(['code', 'name', 'type']));
+        app(Publications::class)->master('product', $product->id);
 
         return redirect()->route('core.products.edit', $product)->with('ok', "Produk {$product->code} dibuat. Tambahkan harganya di Versi harga.");
     }
@@ -70,6 +72,7 @@ class ProductController extends Controller
         $before = $product->only(array_keys($data));
         $product->update($data);
         Audit::record('product.updated', $product, $request->user()->id, before: $before, after: $product->only(array_keys($data)));
+        app(Publications::class)->master('product', $product->id);
 
         return back()->with('ok', 'Produk disimpan.');
     }

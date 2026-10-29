@@ -30,6 +30,13 @@ final class ServiceLayerClient implements SapClient
         return ['DocEntry' => (int) $response['DocEntry'], 'DocNum' => (int) $response['DocNum']];
     }
 
+    public function ping(): array
+    {
+        $this->http()->timeout(15)->get($this->url('Warehouses'), ['$top' => 1, '$select' => 'WarehouseCode'])->throw();
+
+        return ['mode' => 'service_layer'];
+    }
+
     private function http(): PendingRequest
     {
         $session = Cache::remember('sap.b1session.'.$this->config['company_db'], 25 * 60, function () {

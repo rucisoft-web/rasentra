@@ -9,4 +9,11 @@ interface SapClient
 
     /** @return array{DocEntry:int, DocNum:int} */
     public function create(string $object, array $payload): array;
+
+    /**
+     * Cek koneksi ringan (login dan satu baca) untuk halaman kesehatan Rasentra Central.
+     *
+     * @return array{mode:string}
+     */
+    public function ping(): array;
 }

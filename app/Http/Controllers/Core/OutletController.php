@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Core;
 
 use App\Domain\Audit\Audit;
+use App\Domain\Sync\Publications;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessUnit;
 use App\Models\Device;
@@ -41,6 +42,7 @@ class OutletController extends Controller
         ]);
         $before = $company->only(array_keys($data));
         $company->update($data + ['legal_name' => $data['name']]);
+        $company->outlets()->pluck('id')->each(fn ($id) => app(Publications::class)->master('outlet', $id));
         Audit::record('company.updated', $company, $request->user()->id, before: $before, after: $company->only(array_keys($data)));
 
         return back()->with('ok', "Data {$company->name} disimpan. Pastikan kredensial Service Layer untuk {$company->sap_company_db} sudah diisi di server Central.");
@@ -73,6 +75,7 @@ class OutletController extends Controller
         }
         $before = $outlet->only(array_keys($data));
         $outlet->update($data);
+        app(Publications::class)->master('outlet', $outlet->id);
         Audit::record('outlet.updated', $outlet, $request->user()->id, before: $before, after: $outlet->only(array_keys($data)), outletId: $outlet->id);
 
         return redirect()->route('core.outlets.edit', $outlet)->with('ok', 'Data outlet disimpan.');
@@ -86,6 +89,7 @@ class OutletController extends Controller
             'type' => ['required', Rule::in(array_keys(self::LOCATION_TYPES))],
         ]);
         $location = $outlet->locations()->create(['code' => strtoupper($data['code'])] + $data);
+        app(Publications::class)->master('location', $location->id);
         Audit::record('location.created', $location, $request->user()->id, after: $location->only(['code', 'name', 'type']), outletId: $outlet->id);
 
         return back()->with('ok', "Lokasi {$location->code} ditambahkan. QR lokasi siap dicetak untuk Rasentra Inventory.");
@@ -94,6 +98,7 @@ class OutletController extends Controller
     public function toggleLocation(Request $request, Location $location): RedirectResponse
     {
         $location->update(['is_active' => ! $location->is_active]);
+        app(Publications::class)->master('location', $location->id);
         Audit::record($location->is_active ? 'location.activated' : 'location.deactivated', $location, $request->user()->id, outletId: $location->outlet_id);
 
         return back()->with('ok', "Lokasi {$location->code} ".($location->is_active ? 'diaktifkan.' : 'dinonaktifkan.'));

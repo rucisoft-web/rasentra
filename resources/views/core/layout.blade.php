@@ -18,7 +18,9 @@
             ['recipes', 'core.cooking-fees.index', 'Cooking fee'],
         ],
         'Monitoring' => [
+            ['monitoring', 'core.central', 'Rasentra Central'],
             ['monitoring', 'core.monitor.sync', 'Sinkronisasi outlet'],
+            ['monitoring', 'core.reconciliation', 'Rekonsiliasi harian'],
             ['monitoring', 'core.monitor.sap', 'Posting SAP'],
             ['monitoring', 'core.monitor.exceptions', 'Masalah integrasi'],
             ['monitoring', 'core.sap-mappings.index', 'Mapping SAP'],

@@ -2,13 +2,13 @@
 @use('App\Support\Fmt')
 @use('App\Http\Controllers\Core\MonitoringController', 'M')
 @section('content')
-<p class="muted">Setiap Rasentra Lokal mengirim transaksi lewat outbox; Rasentra Central menerimanya di inbox secara idempoten. Kolom antrean outbox hanya terisi bila Central dan Lokal berbagi database (instalasi demo). Cursor publikasi pusat saat ini: <b>{{ $cursor ?? 0 }}</b>.</p>
+<p class="muted">Setiap Rasentra Lokal mengirim transaksi lewat outbox; Rasentra Central menerimanya di inbox secara idempoten. Kolom antrean berasal dari heartbeat server outlet. Cursor publikasi pusat saat ini: <b>{{ $cursor ?? 0 }}</b>. Kesehatan lengkap per outlet ada di <a href="{{ route('core.central') }}">Rasentra Central</a>.</p>
 <div class="tablewrap">
 <table class="t">
   <thead><tr><th>Outlet</th><th>Server Lokal</th><th>Event terakhir diterima</th><th class="n">Event 24 jam</th><th class="n">Menunggu posting</th><th class="n">Ditolak</th><th class="n">Antre / gagal / parked</th><th class="n">Promo belum diterima</th></tr></thead>
   <tbody>
   @foreach ($outlets as $o)
-    @php $in = $inbox[$o->id] ?? null; $out = $outbox[$o->id] ?? null; $srv = $servers[$o->id] ?? null; @endphp
+    @php $in = $inbox[$o->id] ?? null; $st = $states[$o->id] ?? null; $srv = $servers[$o->id] ?? null; @endphp
     <tr>
       <td><b>{{ $o->code }}</b> {{ $o->name }}</td>
       <td>@if($srv)<span class="mono">{{ $srv->code }}</span><div class="muted small">terlihat {{ M::ago($srv->last_seen_at) }}</div>@else<span class="muted">belum terdaftar</span>@endif</td>
@@ -16,8 +16,8 @@
       <td class="n">{{ $in->day_count ?? 0 }}</td>
       <td class="n">{{ $in->waiting ?? 0 }}</td>
       <td class="n">@if(($in->rejected ?? 0) > 0)<span class="b err">{{ $in->rejected }}</span>@else 0 @endif</td>
-      <td class="n">{{ $out->pending ?? 0 }} / {{ $out->failed ?? 0 }} / @if(($out->parked ?? 0) > 0)<span class="b err">{{ $out->parked }}</span>@else 0 @endif
-        @if($out?->oldest)<div class="muted small">tertua {{ M::ago($out->oldest) }}</div>@endif</td>
+      <td class="n">@if($st){{ $st->outbox_pending }} / {{ $st->outbox_failed }} / @if($st->outbox_parked > 0)<span class="b err">{{ $st->outbox_parked }}</span>@else 0 @endif
+        <div class="muted small">@if($st->outbox_oldest_at)tertua {{ M::ago($st->outbox_oldest_at) }} · @endif heartbeat {{ M::ago($st->last_heartbeat_at) }}</div>@else<span class="muted">belum ada heartbeat</span>@endif</td>
       <td class="n">{{ $receipts[$o->id] ?? 0 }}</td>
     </tr>
   @endforeach
@@ -25,7 +25,7 @@
 </table>
 </div>
 
-<h2>Event gagal kirim</h2>
+<h2>Event gagal kirim di instalasi ini</h2>
 <div class="tablewrap">
 <table class="t">
   <thead><tr><th>Waktu</th><th>Outlet</th><th>Event</th><th>Status</th><th class="n">Percobaan</th><th>Error terakhir</th><th></th></tr></thead>

@@ -12,6 +12,9 @@ return [
     */
     'profile' => env('RASENTRA_PROFILE', 'lokal'),
 
+    // Versi aplikasi yang dilaporkan Rasentra Lokal lewat heartbeat.
+    'version' => env('RASENTRA_VERSION', '1.0.0'),
+
     // Nama grup usaha yang membawahi semua CV (business unit).
     'group_name' => env('RASENTRA_GROUP_NAME', 'Indoguna Group'),
 

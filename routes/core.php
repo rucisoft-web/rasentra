@@ -73,6 +73,10 @@ Route::prefix('core')->name('core.')->group(function () {
         });
 
         Route::middleware('core:monitoring')->group(function () {
+            Route::get('central', [Core\CentralController::class, 'index'])->name('central');
+            Route::post('central/sap-check', [Core\CentralController::class, 'sapCheck'])->name('central.sap-check');
+            Route::get('reconciliation', [Core\ReconciliationController::class, 'index'])->name('reconciliation');
+            Route::post('reconciliation/{reconciliation}/recheck', [Core\ReconciliationController::class, 'recheck'])->name('reconciliation.recheck');
             Route::get('monitor/sync', [Core\MonitoringController::class, 'sync'])->name('monitor.sync');
             Route::post('monitor/outbox/{event}/retry', [Core\MonitoringController::class, 'retryOutbox'])->name('monitor.outbox.retry');
             Route::get('monitor/sap', [Core\MonitoringController::class, 'sap'])->name('monitor.sap');
