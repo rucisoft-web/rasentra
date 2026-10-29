@@ -131,6 +131,8 @@ section.block{padding-block:72px;border-top:1px solid var(--line)}
 .role ol{margin:0;padding-left:20px;display:grid;gap:6px;font-size:.96rem}
 .role .tip{font-size:.9rem;background:var(--green-soft);border-radius:8px;padding:10px 12px}
 @media (max-width:760px){.roles{grid-template-columns:1fr}}
+.guide-cta{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin:28px 0 0}
+.guide-cta span{color:var(--muted)}
 
 /* arsitektur */
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
@@ -167,6 +169,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <a href="#panduan">Panduan</a>
       <a href="#arsitektur">Arsitektur</a>
 @endverbatim
+      <a href="{{ route('panduan') }}">Panduan Peran</a>
       @if (config('rasentra.demo.enabled'))<a class="btn primary nav-demo" href="{{ route('demo') }}">Coba demo</a>@endif
 @verbatim
     </nav>
@@ -185,7 +188,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         @if (config('rasentra.demo.enabled'))<a class="btn primary" href="{{ route('demo') }}">Coba sebagai tamu</a>@endif
         <a class="btn {{ config('rasentra.demo.enabled') ? 'ghost' : 'primary' }}" href="#alur-retail">Lihat alur kerja</a>
 @verbatim
-        <a class="btn ghost" href="#panduan">Panduan penggunaan</a>
+@endverbatim
+        <a class="btn ghost" href="{{ route('panduan') }}">Panduan per peran</a>
+@verbatim
       </div>
       <div class="facts">
         <div><b class="mono">20</b><span>kapasitas outlet</span></div>
@@ -558,6 +563,9 @@ flowchart TD
         <ol><li>Kelola outlet, perangkat, pengguna dan peran.</li><li>Susun harga, promo dan resep; simulasi lalu publikasi.</li><li>Pantau heartbeat dan umur antrean tiap outlet.</li><li>Finance memeriksa rekonsiliasi harian dan dokumen SAP.</li><li>Tangani antrean pengecualian mapping.</li></ol>
         <p class="tip">Perubahan pusat baru berlaku di outlet setelah outlet mengonfirmasi penerimaan versi.</p></article>
     </div>
+@endverbatim
+    <p class="guide-cta"><a class="btn primary" href="{{ route('panduan') }}">Buka panduan lengkap per peran</a><span>Langkah demi langkah untuk 9 peran, lengkap dengan gambar layar dan diagram arsitektur.</span></p>
+@verbatim
   </div>
 </section>
 

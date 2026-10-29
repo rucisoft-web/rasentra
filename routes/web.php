@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DemoController;
+use App\Http\Controllers\GuideController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\Lokal\LokalController;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 
 // Landing page Rasentra: fitur, alur kerja retail/resto, panduan.
 Route::view('/', 'landing')->name('landing');
+Route::get('/panduan', [GuideController::class, 'show'])->name('panduan');
 
 // Mode demo (RASENTRA_DEMO=true): tamu masuk ke tiap aplikasi dengan akun data contoh.
 Route::get('/demo', [DemoController::class, 'index'])->name('demo');
