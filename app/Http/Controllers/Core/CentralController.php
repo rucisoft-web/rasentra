@@ -56,7 +56,7 @@ class CentralController extends Controller
         ]);
 
         return view('core.central.index', [
-            'title' => 'Rasentra Central',
+            'title' => 'Status Central',
             'profile' => config('rasentra.profile'),
             'cursor' => $cursor,
             'outlets' => $outlets,

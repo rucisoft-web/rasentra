@@ -3,7 +3,10 @@
 use App\Http\Controllers\Core;
 use Illuminate\Support\Facades\Route;
 
-// Rasentra Core: aplikasi admin kantor pusat, berjalan di instalasi Rasentra Central.
+// Konsol web Rasentra Central (kantor pusat). Central terdiri dari tiga modul: Sinkronisasi
+// (API /api/v1/sync dan pemantauannya), Posting SAP, dan Rasentra Core (master, harga, promo,
+// resep, laporan). Seluruh halaman memakai awalan /core; /central mengarah ke sana.
+Route::redirect('central', '/core');
 Route::prefix('core')->name('core.')->group(function () {
     Route::get('login', [Core\AuthController::class, 'show'])->name('login');
     Route::post('login', [Core\AuthController::class, 'login'])->middleware('throttle:10,1');

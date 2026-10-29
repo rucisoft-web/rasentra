@@ -14,14 +14,13 @@ Platform POS untuk Indoguna Group: meatshop, grocery dan restoran dalam satu cod
 | Rasentra Kitchen | Layar dapur per station, expeditor, layar antrean pickup | `/kitchen` |
 | Rasentra Inventory | Handheld: penerimaan barang, stok opname, karantina dan waste, cek stok | `/inventory` |
 | Rasentra Lokal | Server lokal di setiap outlet untuk semua perangkat di atas; tetap jalan saat internet putus | profil `lokal` |
-| Rasentra Central | Pusat POS di kantor pusat: menerima sinkronisasi semua outlet, menyebarkan harga/promo/resep, posting ke instance SAP tiap CV | profil `central` |
-| Rasentra Core | Aplikasi admin kantor pusat grup: master perusahaan/outlet/produk/pengguna, harga, Promotion Designer, monitoring, laporan | `/core`, berjalan di instalasi `central` |
+| Rasentra Central | Pusat POS di kantor pusat, terdiri dari tiga modul: **Sinkronisasi** (terima transaksi semua outlet, sebar harga/promo/resep/master), **Posting SAP** (ke instance SAP B1 tiap CV) dan **Rasentra Core** (admin: master, harga, Promotion Designer, resep, laporan) | profil `central`, konsol `/core` |
 
 Spesifikasi lengkap v2.0 ada di [Spesifikasi Lengkap Rasentra v2.0](https://claude.ai/artifact/MidWQUchfyxN2rsywyT8aw); rancangan teknis awal di [docs/RANCANGAN.md](docs/RANCANGAN.md). Landing page dengan penjelasan fitur dan diagram alur kerja retail/resto ada di `/`.
 
 ## Arsitektur singkat
 
-- **Satu codebase, dua profil.** `RASENTRA_PROFILE=lokal` menjalankan Rasentra Lokal di tiap outlet (Solo dan Lombok). `RASENTRA_PROFILE=central` menjalankan Rasentra Central beserta Rasentra Core di kantor pusat Indoguna Group.
+- **Satu codebase, dua profil.** `RASENTRA_PROFILE=lokal` menjalankan Rasentra Lokal di tiap outlet (Solo dan Lombok). `RASENTRA_PROFILE=central` menjalankan Rasentra Central di kantor pusat Indoguna Group, dengan tiga modul: Sinkronisasi, Posting SAP dan Rasentra Core.
 - **Multi-perusahaan.** Setiap CV (`business_units`) menyimpan nama database SAP-nya (`sap_company_db`). Penjualan outlet diposting ke instance milik CV pemiliknya, dengan mapping item, gudang dan akun sendiri. Tanggal bisnis mengikuti zona waktu outlet, jadi Lombok berganti hari pada pukul 00.00 WITA.
 - **Offline-first.** Semua transaksi inti berjalan di Rasentra Lokal. Data dikirim ke Rasentra Central lewat outbox/inbox yang idempoten (unik per `source_id` + `event_id`), dengan backoff eksponensial.
 - **Pack ID.** Setiap kemasan daging atau ikan punya berat aktual (DECIMAL 18,6). `packs.sold_order_line_id` UNIQUE plus `lockForUpdate` menjamin satu pack hanya terjual sekali, walau dua kasir memindai bersamaan.
@@ -42,7 +41,7 @@ php artisan serve
 
 Data demo memutar satu hari operasional relatif terhadap jam saat seeder dijalankan, jadi timer dapur dan antrean terlihat "hidup". Jalankan ulang `migrate:fresh --seed` untuk menyegarkan. Untuk produksi gunakan MySQL 8.4 dan Redis untuk antrean. Scheduler (`php artisan schedule:work`) mengirim outbox tiap 5 detik di profil lokal dan memposting ke SAP di profil central.
 
-Koneksi SAP diatur di `.env` server Central. `SAP_SL_URL`, `SAP_USERNAME` dan `SAP_PASSWORD` adalah nilai bawaan. Nilai `SAP_SOLO_*` dan `SAP_LOMBOK_*` menimpanya bila kedua instance berada di server berbeda atau memakai pengguna berbeda. Nama database (`sap_solo`, `sap_lombok`) diatur per perusahaan di Rasentra Core → Perusahaan & outlet. Selama URL belum diisi, posting memakai SAP tiruan.
+Koneksi SAP diatur di `.env` server Central. `SAP_SL_URL`, `SAP_USERNAME` dan `SAP_PASSWORD` adalah nilai bawaan. Nilai `SAP_SOLO_*` dan `SAP_LOMBOK_*` menimpanya bila kedua instance berada di server berbeda atau memakai pengguna berbeda. Nama database (`sap_solo`, `sap_lombok`) diatur per perusahaan di Rasentra Central → Rasentra Core → Perusahaan & outlet. Selama URL belum diisi, posting memakai SAP tiruan.
 
 ## Demo utama: outlet Solo (Meatshop & Grocery dan R&B Solo)
 
@@ -143,38 +142,6 @@ Buka `/kitchen` lalu pilih layar untuk perangkat ini: station (grill, hot, cold,
 - **Expeditor dan antrean.** Expeditor mengelompokkan item per meja atau pesanan dan baru bisa menyajikan setelah semua station Siap. Layar antrean menampilkan nomor takeaway, pickup dan delivery; nomor yang sudah diambil hilang setelah 3 menit.
 - **Analisis waktu saji.** Rata-rata, median, P90, waktu antre dan waktu masak per station, per menu dan per jam (zona waktu outlet), beserta jumlah yang terlambat.
 
-## Rasentra Core (admin kantor pusat)
-
-Login di `/core/login` dengan email dan kata sandi `password`:
-
-| Pengguna | Peran | Email | Akses |
-| --- | --- | --- | --- |
-| Rahman Hidayat | Admin pusat | `admin@rasentra.test` | Semua menu |
-| Laras Wulandari | Merchandising | `merch@rasentra.test` | Dashboard, produk, harga, promo, resep, laporan |
-| Fajar Nugroho | Keuangan | `finance@rasentra.test` | Dashboard, monitoring sinkronisasi dan SAP, laporan, audit |
-
-**Menu:**
-
-- **Dashboard.** Ringkasan per perusahaan (penjualan dan status SAP), penjualan 7 hari, kesehatan sinkronisasi tiap outlet, dan pekerjaan yang menunggu tindakan.
-- **Master.** Perusahaan dan database SAP-nya, outlet (nama usaha retail dan restoran, zona waktu) dan lokasi (QR rak), pengguna outlet (PIN, limit approval) dan pusat, perangkat dengan token yang hanya tampil sekali dan bisa dicabut.
-- **Katalog.**
-  - Produk.
-  - Versi harga: draft, ubah harga, lalu terbitkan oleh orang lain (maker-checker).
-  - Promotion Designer: susun aturan, simulasikan pada keranjang contoh, lalu terbitkan oleh orang lain ke semua outlet, wilayah atau outlet tertentu.
-  - Resep berversi dan aturan cooking fee berversi.
-- **Monitoring.** Halaman Rasentra Central (heartbeat tiap Rasentra Lokal, publikasi yang belum diterapkan, cek koneksi SAP per instance, job terjadwal), rekonsiliasi tutup hari, antrean sinkronisasi per outlet, posting SAP per instance (perlu review, gagal, parsial, posting ulang), masalah integrasi, mapping SAP per instance, impor XML NMEXML.
-- **Laporan.** Penjualan per perusahaan dan outlet (unduh CSV), promo per penanggung biaya, waktu saji dapur, opname dan waste, serta audit log.
-
-**Data demo pusat:**
-
-- Riwayat penjualan 7 hari dari Solo dan Lombok, dikirim lewat inbox seperti event sinkronisasi asli. Dua event Solo masih antre (satu gagal kirim).
-- Posting ke SAP tiruan per instance. Di `sap_solo` ada satu dokumen perlu review, satu pembayaran gagal, satu invoice gagal, dan tiga struk tertahan karena Kepiting Bakau belum dimapping. `sap_lombok` memakai akun kas/bank sendiri dan terposting semua.
-- Laras sudah menyiapkan promo kambing (draft), promo salmon yang ditanggung supplier (sudah disimulasikan), dan versi harga November. Masuk sebagai Rahman untuk menyetujui dan menerbitkannya.
-
-- Server Lokal Solo melaporkan satu event antre dan satu gagal kirim; server Lombok masih versi 0.9.8 dan tertinggal dua publikasi. Tutup hari 6 hari terakhir sudah cocok, kecuali Lombok tanggal kemarin lusa yang masih menunggu satu struk sore.
-
-Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbox menerima `order.finalized`. Jalankan `php artisan rasentra:rebuild-sales` untuk membangun ulang proyeksi.
-
 ## Rasentra Lokal (server outlet)
 
 Rasentra Lokal adalah instalasi `RASENTRA_PROFILE=lokal` di setiap outlet. Server ini melayani Rasentra POS, Mobile Terminal, Kitchen dan Inventory lewat LAN, tetap berjalan saat internet putus, dan menyinkronkan data dengan Rasentra Central.
@@ -185,13 +152,35 @@ Konsol server ada di `/lokal`, khusus kepala outlet (masuk dengan PIN di layar l
 - **Antrean kirim.** Event yang belum diterima Central beserta error terakhir. Kepala outlet bisa kirim sekarang atau mengantrekan ulang event yang berhenti dicoba.
 - **Harga, promo & resep.** Versi harga, promo aktif dan mendatang, cooking fee, serta riwayat tarik publikasi.
 - **Tutup hari.** Pratinjau struk, penjualan, pembayaran dan selisih kas per shift, lalu kirim ringkasannya ke Central. Ada peringatan bila masih ada shift yang buka.
-- **Pemasangan.** Tempel alamat Central dan token `outlet_server` dari Rasentra Core. Server memeriksa token itu, mengambil kode outlet dan identitas server darinya, lalu menyimpannya terenkripsi. Setelah itu tekan **Ambil snapshot**. Selama server belum punya petugas, halaman ini terbuka tanpa login, jadi lakukan pemasangan segera setelah instalasi.
+- **Pemasangan.** Tempel alamat Central dan token `outlet_server` dari Rasentra Central (Sinkronisasi → Perangkat & token). Server memeriksa token itu, mengambil kode outlet dan identitas server darinya, lalu menyimpannya terenkripsi. Setelah itu tekan **Ambil snapshot**. Selama server belum punya petugas, halaman ini terbuka tanpa login, jadi lakukan pemasangan segera setelah instalasi.
 
 Rasentra POS menampilkan status **Central · N antre** atau **Offline · N antre**, sehingga kasir tahu transaksinya aman walau internet putus. `GET /lokal/health` mengembalikan status JSON tanpa data sensitif untuk alat pemantau. Backup harian (`rasentra:backup`) berjalan pukul 02.00 dan menyimpan 14 berkas terakhir di `storage/app/backups`.
 
-## Rasentra Central
+## Rasentra Central (kantor pusat)
 
-Rasentra Central adalah instalasi `RASENTRA_PROFILE=central` di kantor pusat. API-nya ada di `/api/v1/sync` dan memakai token perangkat (server outlet):
+Rasentra Central adalah instalasi `RASENTRA_PROFILE=central` di kantor pusat Indoguna Group. Central terdiri dari tiga modul:
+
+| Modul | Tugas | Kode |
+| --- | --- | --- |
+| Sinkronisasi | Menerima transaksi semua Rasentra Lokal tanpa data ganda, menyebarkan harga, promo, resep dan master ke outlet, snapshot untuk outlet baru, heartbeat, tutup hari dan rekonsiliasi | API `/api/v1/sync`, `app/Domain/Sync` |
+| Posting SAP | Memposting penjualan, retur dan penyesuaian stok ke instance SAP B1 milik tiap CV (`sap_solo`, `sap_lombok`), cek koneksi per instance, mapping, posting ulang | `app/Domain/Integration/Sap` |
+| Rasentra Core | Admin kantor pusat: master perusahaan, outlet, produk dan pengguna, versi harga, Promotion Designer, resep, cooking fee, laporan dan audit | `app/Http/Controllers/Core`, `app/Domain/Core` |
+
+Ketiga modul dibuka dari satu konsol web di `/core` (alamat `/central` juga mengarah ke sana). Menu samping dikelompokkan per modul. Halaman **Status Central** merangkum ketiganya: kondisi tiap Rasentra Lokal, publikasi yang belum diterapkan, koneksi tiap instance SAP dan job terjadwal.
+
+Login di `/core/login` dengan email dan kata sandi `password`:
+
+| Pengguna | Peran | Email | Akses |
+| --- | --- | --- | --- |
+| Rahman Hidayat | Admin pusat | `admin@rasentra.test` | Semua menu |
+| Laras Wulandari | Merchandising | `merch@rasentra.test` | Dashboard, produk, harga, promo, resep, laporan |
+| Fajar Nugroho | Keuangan | `finance@rasentra.test` | Dashboard, monitoring sinkronisasi dan SAP, laporan, audit |
+
+### Modul Sinkronisasi
+
+Menu: Sinkronisasi outlet (antrean dan event per outlet), Rekonsiliasi harian (tutup hari cocok, menunggu struk, atau selisih), Perangkat & token (token `outlet_server` untuk pairing, tampil sekali dan bisa dicabut), Impor XML NMEXML (MSI/MSR).
+
+API sinkronisasi memakai token perangkat (server outlet):
 
 | Endpoint | Fungsi |
 | --- | --- |
@@ -211,7 +200,38 @@ php artisan rasentra:bootstrap-lokal   # snapshot awal dari Central
 php artisan schedule:work              # outbox 5 detik, tarik publikasi 30 detik, heartbeat 1 menit, backup 02.00, tutup hari 04.00
 ```
 
-Publikasi diterapkan idempoten per baris. Bila satu publikasi gagal (misalnya produk rujukannya belum ada), cursor berhenti tepat sebelumnya dan Central menampilkan error-nya di halaman Rasentra Central.
+Publikasi diterapkan idempoten per baris. Bila satu publikasi gagal (misalnya produk rujukannya belum ada), cursor berhenti tepat sebelumnya dan Central menampilkan error-nya di halaman Status Central.
+
+### Modul Posting SAP
+
+Menu: Dokumen SAP per instance (perlu review, gagal, parsial, posting ulang), Masalah integrasi, dan Mapping SAP per instance (item, gudang, akun kas/bank, akun penyesuaian stok).
+
+- Penjualan menjadi A/R Invoice lalu Incoming Payment, retur menjadi A/R Credit Memo yang merujuk invoice asal lalu Outgoing Payment, dan penyesuaian stok menjadi Goods Issue atau Goods Receipt.
+- Setiap dokumen diposting ke instance milik CV pemilik outlet. Sebelum posting, `U_POS_SRC` dicek agar satu transaksi tidak pernah terposting dua kali; timeout ditandai perlu review.
+- Posting berjalan tiap menit (`rasentra:post-sap`) dan koneksi tiap instance dicek tiap 15 menit (`rasentra:sap-check`).
+
+### Modul Rasentra Core
+
+- **Dashboard.** Ringkasan per perusahaan (penjualan dan status SAP), penjualan 7 hari, kesehatan sinkronisasi tiap outlet, dan pekerjaan yang menunggu tindakan.
+- **Master.** Perusahaan dan database SAP-nya, outlet (nama usaha retail dan restoran, zona waktu) dan lokasi (QR rak), pengguna outlet (PIN, limit approval) dan pusat.
+- **Katalog.**
+  - Produk.
+  - Versi harga: draft, ubah harga, lalu terbitkan oleh orang lain (maker-checker).
+  - Promotion Designer: susun aturan, simulasikan pada keranjang contoh, lalu terbitkan oleh orang lain ke semua outlet, wilayah atau outlet tertentu.
+  - Resep berversi dan aturan cooking fee berversi.
+- **Laporan.** Penjualan per perusahaan dan outlet (unduh CSV), promo per penanggung biaya, waktu saji dapur, opname dan waste, serta audit log.
+
+**Data demo pusat:**
+
+- Riwayat penjualan 7 hari dari Solo dan Lombok, dikirim lewat inbox seperti event sinkronisasi asli. Dua event Solo masih antre (satu gagal kirim).
+- Posting ke SAP tiruan per instance. Di `sap_solo` ada satu dokumen perlu review, satu pembayaran gagal, satu invoice gagal, dan tiga struk tertahan karena Kepiting Bakau belum dimapping. `sap_lombok` memakai akun kas/bank sendiri dan terposting semua.
+- Laras sudah menyiapkan promo kambing (draft), promo salmon yang ditanggung supplier (sudah disimulasikan), dan versi harga November. Masuk sebagai Rahman untuk menyetujui dan menerbitkannya.
+
+- Server Lokal Solo melaporkan satu event antre dan satu gagal kirim; server Lombok masih versi 0.9.8 dan tertinggal dua publikasi. Tutup hari 6 hari terakhir sudah cocok, kecuali Lombok tanggal kemarin lusa yang masih menunggu satu struk sore.
+
+Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbox menerima `order.finalized`. Jalankan `php artisan rasentra:rebuild-sales` untuk membangun ulang proyeksi.
+
+### Menjalankan Central
 
 **Di server Rasentra Central** cukup `php artisan schedule:work`: posting SAP tiap menit, cek koneksi SAP tiap 15 menit, rekonsiliasi ulang tiap jam.
 
@@ -247,7 +267,7 @@ Uji mencakup skenario UAT spesifikasi:
 - Retur penjualan: PIN kepala outlet, pack ke karantina, barang kembali ke stok, kas shift berkurang, batas sisa retur, refund per metode; retur sampai laporan Central, rekonsiliasi tutup hari dan A/R Credit Memo SAP (termasuk menunggu invoice asal); riwayat, cetak ulang SALINAN, laporan tutup shift, dan data pemesan pickup/delivery.
 - Penerimaan barang dan opname.
 - Karantina dan waste: lepas pack dengan PIN kepala outlet lalu jual lagi, waste dari stok jual dengan cek saldo, tahan pack hampir kedaluwarsa, dan dokumen penyesuaian sampai laporan Central serta Goods Issue/Receipt SAP.
-- Seeder demo Indoguna Group dan seluruh halaman Rasentra Core.
+- Seeder demo Indoguna Group dan seluruh halaman konsol Rasentra Central.
 - Posting ke instance SAP milik tiap perusahaan, koneksi per instance, dan tanggal bisnis WITA untuk Lombok.
 - Rasentra Core: hak akses per peran, maker-checker harga dan promo, proyeksi penjualan, dan token perangkat.
 - Rasentra Lokal: akses kepala outlet, pairing dengan pemeriksaan token, pemasangan tanpa login hanya saat server kosong, antrean kirim, tutup hari dari layar, indikator di POS.
@@ -272,7 +292,7 @@ app/Domain/
   Core/           CoreAccess (peran pusat), SalesProjector, SalesReport
   Catalog/        PricePublisher (maker-checker versi harga)
   Promotion/      PromotionDesigner (simulasi, terbit, hentikan)
-app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (Rasentra Core), Lokal/* (konsol server outlet)
+app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (konsol Rasentra Central: modul Sinkronisasi, Posting SAP dan Rasentra Core), Lokal/* (konsol server outlet)
 database/seeders/      OutletSeeder (dua CV), SoloSeeder (demo lengkap), LombokSeeder, CoreSeeder (data pusat), DemoSeeder (outlet UJI untuk uji)
 public/assets/         pos, kitchen, inventory, core (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
 ```

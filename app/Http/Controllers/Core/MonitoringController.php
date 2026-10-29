@@ -84,7 +84,7 @@ class MonitoringController extends Controller
                 ->get(['a.id', 'a.doc_no', DB::raw('NULL as net_amount'), 'outlets.code'])->keyBy('id'));
 
         return view('core.monitor.sap', [
-            'title' => 'Posting SAP',
+            'title' => 'Dokumen SAP',
             'docs' => $docs,
             'orders' => $orders,
             'counts' => SapDocument::when($company, fn ($q, $c) => $q->where('company_db', $c))->groupBy('status')->selectRaw('status, COUNT(*) as n')->pluck('n', 'status'),

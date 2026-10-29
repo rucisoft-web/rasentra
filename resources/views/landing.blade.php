@@ -171,7 +171,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <div>
       <p class="eyebrow">Rasentra · meatshop, grocery & restoran · Indoguna Group</p>
       <h1>Setiap kemasan daging <em>tercatat sampai gram</em>, setiap outlet tetap jualan walau internet putus.</h1>
-      <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk Indoguna Group: CV Solo Kulina Utama (Meatshop & Grocery dan restoran R&amp;B Solo) dan CV Lombok Kulina Utama (Meatshop dan restoran El Primo), masing-masing dengan SAP Business One sendiri. Rasentra Lokal, server di setiap outlet, melayani Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Inventory di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Di kantor pusat, Rasentra Central menjadi pusat POS yang menerima transaksi semua outlet dan memposting ke SAP Business One, sedangkan admin mengatur harga, promo dan resep lewat Rasentra Core.</p>
+      <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk Indoguna Group: CV Solo Kulina Utama (Meatshop & Grocery dan restoran R&amp;B Solo) dan CV Lombok Kulina Utama (Meatshop dan restoran El Primo), masing-masing dengan SAP Business One sendiri. Rasentra Lokal, server di setiap outlet, melayani Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Inventory di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Di kantor pusat, Rasentra Central menjadi pusat POS dengan tiga modul: Sinkronisasi menerima transaksi semua outlet, Posting SAP memposting ke SAP Business One tiap CV, dan Rasentra Core tempat admin mengatur master, harga, promo dan resep.</p>
       <div class="cta">
         <a class="btn primary" href="#alur-retail">Lihat alur kerja</a>
         <a class="btn ghost" href="#panduan">Panduan penggunaan</a>
@@ -208,8 +208,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <article class="feat"><span class="tag">Tablet pelayan</span><h3>Rasentra Mobile Terminal</h3><p>Buka meja, catat order dengan modifier dan course, kirim ke dapur, pantau status sajian, dan setujui pesanan dari QR meja.</p></article>
       <article class="feat"><span class="tag">Dapur</span><h3>Rasentra Kitchen</h3><p>Kitchen Display per station (grill, hot, cold, bar, pastry, packing) dengan timer berwarna, bump lewat sentuh atau scan barcode tiket, layar expeditor, layar antrean pickup, produksi batch, yield dan waste.</p></article>
       <article class="feat"><span class="tag">Server outlet</span><h3>Rasentra Lokal</h3><p>Server lokal di setiap outlet, pusat semua perangkat POS: menyimpan transaksi, Pack ID, stok dan antrean dapur, menjalankan promo, dan tetap bekerja penuh saat internet putus. Data dikirim ke Rasentra Central begitu koneksi kembali. Kepala outlet memantau antrean kirim, tutup hari, pairing dan backup dari konsol <code>/lokal</code>.</p></article>
-      <article class="feat"><span class="tag">Pusat POS</span><h3>Rasentra Central</h3><p>Pusat POS di kantor pusat: menerima sinkronisasi dari semua outlet tanpa data ganda, menyebarkan versi harga, promo dan resep ke outlet, lalu memposting penjualan dan pembayaran ke SAP Business One milik tiap CV. Heartbeat tiap server outlet, snapshot untuk outlet baru dan rekonsiliasi tutup hari memastikan tidak ada struk yang hilang.</p></article>
-      <article class="feat"><span class="tag">Admin kantor pusat</span><h3>Rasentra Core</h3><p>Aplikasi admin kantor pusat: master outlet, produk dan pengguna, harga, Promotion Designer, resep, monitoring outlet per perusahaan, rekonsiliasi SAP per instance dan laporan grup. <a href="/core/login">Buka Rasentra Core</a></p></article>
+      <article class="feat"><span class="tag">Rasentra Central</span><h3>Sinkronisasi</h3><p>Modul pertama Rasentra Central, pusat POS di kantor pusat. Menerima transaksi dari semua outlet tanpa data ganda, menyebarkan versi harga, promo, resep dan master ke outlet, menyiapkan snapshot untuk outlet baru, serta memantau heartbeat, tutup hari dan rekonsiliasi harian sehingga tidak ada struk yang hilang.</p></article>
+      <article class="feat"><span class="tag">Rasentra Central</span><h3>Posting SAP</h3><p>Memposting penjualan, retur dan penyesuaian stok ke SAP Business One milik tiap CV (sap_solo, sap_lombok) lewat Service Layer, tanpa posting ganda. Dokumen yang perlu review, gagal atau parsial bisa diposting ulang, dan mapping item, gudang serta akun diatur per instance.</p></article>
+      <article class="feat"><span class="tag">Rasentra Central</span><h3>Rasentra Core</h3><p>Admin kantor pusat: master perusahaan, outlet, produk dan pengguna, versi harga, Promotion Designer, resep dan cooking fee, laporan grup serta audit log. Halaman Status Central merangkum ketiga modul. <a href="/central">Buka Rasentra Central</a></p></article>
       <article class="feat"><span class="tag">Tamu</span><h3>QR meja & kiosk</h3><p>Menu untuk tamu lewat token meja atau kiosk, pada jaringan tamu terpisah. Pesanan masuk setelah disetujui pelayan.</p></article>
       <article class="feat"><span class="tag">Handheld inventory</span><h3>Rasentra Inventory</h3><p>Cek inventory dengan scanner barcode/QR: penerimaan barang, stok opname blind count, cek saldo per lokasi dan Pack ID. Bekerja lewat Wi-Fi outlet walau internet putus.</p></article>
     </div>
@@ -484,18 +485,25 @@ flowchart TD
 flowchart LR
   subgraph RL["Rasentra Lokal (outlet)"]
     T[Transaksi disimpan] --> O[(Outbox)]
+    AK[Tarik delta dan konfirmasi]
   end
-  O -- kirim ulang aman --> S[Sync API Rasentra Central]
-  S --> IN[(Inbox unik)]
-  IN --> V[Validasi dan mapping SAP]
-  V -- mapping kosong --> X[Antrean pengecualian]
-  V --> P[Posting A/R Invoice]
-  P --> Q[Posting Incoming Payment]
-  Q --> R[Rekonsiliasi harian Finance]
-  subgraph PK["Rasentra Central ke outlet"]
-    PD[Promo / harga / resep disetujui] --> PV[Versi immutable]
-    PV --> AK[Outlet tarik delta dan konfirmasi]
+  subgraph RC["Rasentra Central"]
+    subgraph SY["Modul Sinkronisasi"]
+      S[Sync API] --> IN[(Inbox unik)]
+      IN --> R[Rekonsiliasi harian]
+      PB[Publikasi berversi]
+    end
+    subgraph SP["Modul Posting SAP"]
+      V[Validasi dan mapping] -- mapping kosong --> X[Antrean pengecualian]
+      V --> P[A/R Invoice] --> Q[Incoming Payment]
+    end
+    subgraph CO["Modul Rasentra Core"]
+      PD[Harga, promo, resep disetujui]
+    end
   end
+  O -- kirim ulang aman --> S
+  IN --> V
+  PD --> PB --> AK
 </pre></div>
       <div class="steps">
         <h3>Sinkronisasi, promo dan posting SAP</h3>
@@ -535,7 +543,7 @@ flowchart LR
       <article class="role"><header><h3>Petugas opname</h3><span>Rasentra Inventory</span></header>
         <ol><li>Pilih sesi yang ditugaskan.</li><li>Pindai QR lokasi, lalu barang.</li><li>Timbang barang curah dan bahan setengah jadi.</li><li>Pisahkan barang rusak dengan alasan dan foto.</li><li>Kirim hasil; recount bila diminta.</li></ol>
         <p class="tip">Petugas hitung tidak bisa menyetujui koreksinya sendiri.</p></article>
-      <article class="role"><header><h3>Admin pusat, pemasaran & Finance</h3><span>Rasentra Core + MFA</span></header>
+      <article class="role"><header><h3>Admin pusat, pemasaran & Finance</h3><span>Rasentra Central + MFA</span></header>
         <ol><li>Kelola outlet, perangkat, pengguna dan peran.</li><li>Susun harga, promo dan resep; simulasi lalu publikasi.</li><li>Pantau heartbeat dan umur antrean tiap outlet.</li><li>Finance memeriksa rekonsiliasi harian dan dokumen SAP.</li><li>Tangani antrean pengecualian mapping.</li></ol>
         <p class="tip">Perubahan pusat baru berlaku di outlet setelah outlet mengonfirmasi penerimaan versi.</p></article>
     </div>
@@ -547,7 +555,7 @@ flowchart LR
     <div class="sec-head">
       <p class="eyebrow">Arsitektur</p>
       <h2>Satu basis kode, dua profil instalasi</h2>
-      <p>Rasentra Lokal (server outlet) dan Rasentra Central + Core (kantor pusat) menjalankan aplikasi yang sama dengan profil berbeda. SAP B1 tetap sumber resmi akuntansi, HPP dan nilai persediaan.</p>
+      <p>Rasentra Lokal (server outlet) dan Rasentra Central dengan modul Sinkronisasi, Posting SAP dan Rasentra Core (kantor pusat) menjalankan aplikasi yang sama dengan profil berbeda. SAP B1 tetap sumber resmi akuntansi, HPP dan nilai persediaan.</p>
     </div>
     <div class="tbl"><table>
       <thead><tr><th>Lapisan</th><th>Teknologi</th><th>Peran</th></tr></thead>
@@ -573,7 +581,7 @@ flowchart LR
 <footer>
   <div class="wrap">
     <span>Rasentra untuk Indoguna Group · berdasarkan spesifikasi v2.0, 29 Oktober 2026</span>
-    <span>Rasentra POS · Mobile Terminal · Inventory · Kitchen · Lokal · Central · Core</span>
+    <span>Rasentra POS · Mobile Terminal · Inventory · Kitchen · Lokal · Central (Sinkronisasi, Posting SAP, Core)</span>
   </div>
 </footer>
 
