@@ -6,7 +6,8 @@ use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
- * Panduan operasional per peran (resources/guide/panduan.md) dengan gambar layar di public/assets/guide.
+ * Panduan operasional per peran (resources/guide/panduan.md) dan daftar fitur per aplikasi
+ * (resources/guide/fitur.php), dengan gambar layar di public/assets/guide.
  */
 class GuideController extends Controller
 {
@@ -42,5 +43,24 @@ class GuideController extends Controller
         }, $html);
 
         return view('guide', ['html' => $html, 'toc' => $toc]);
+    }
+
+    public function features(): View
+    {
+        $apps = require resource_path('guide/fitur.php');
+        // Peran dan aplikasi yang dipakai sehari-hari (tabel bagian 0 panduan).
+        $roles = [
+            'Kasir meatshop & grocery' => ['pos'],
+            'Kasir restoran' => ['pos'],
+            'Pelayan' => ['mobile'],
+            'Chef, cook, bar' => ['kitchen'],
+            'Petugas gudang' => ['inventory'],
+            'Kepala outlet' => ['pos', 'kitchen', 'inventory', 'lokal'],
+            'Admin kantor pusat' => ['central', 'sap'],
+            'Merchandising' => ['central'],
+            'Keuangan' => ['central', 'sap'],
+        ];
+
+        return view('features', ['apps' => $apps, 'roles' => $roles, 'total' => array_sum(array_map(fn ($a) => count($a['features']), $apps))]);
     }
 }

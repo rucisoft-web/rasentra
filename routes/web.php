@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 // Landing page Rasentra: fitur, alur kerja retail/resto, panduan.
 Route::view('/', 'landing')->name('landing');
 Route::get('/panduan', [GuideController::class, 'show'])->name('panduan');
+Route::get('/fitur', [GuideController::class, 'features'])->name('fitur');
 
 // Mode demo (RASENTRA_DEMO=true): tamu masuk ke tiap aplikasi dengan akun data contoh.
 Route::get('/demo', [DemoController::class, 'index'])->name('demo');

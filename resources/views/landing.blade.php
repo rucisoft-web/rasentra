@@ -169,6 +169,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <a href="#panduan">Panduan</a>
       <a href="#arsitektur">Arsitektur</a>
 @endverbatim
+      <a href="{{ route('fitur') }}">Fitur Aplikasi</a>
       <a href="{{ route('panduan') }}">Panduan Peran</a>
       @if (config('rasentra.demo.enabled'))<a class="btn primary nav-demo" href="{{ route('demo') }}">Coba demo</a>@endif
 @verbatim
