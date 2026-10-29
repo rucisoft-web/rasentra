@@ -79,7 +79,9 @@ class MonitoringController extends Controller
             ->orderByRaw("CASE status WHEN 'needs_review' THEN 0 WHEN 'failed' THEN 1 WHEN 'partially_posted' THEN 2 ELSE 3 END")
             ->orderByDesc('updated_at')->paginate(50)->withQueryString();
         $orders = DB::table('hq_orders')->join('outlets', 'outlets.id', '=', 'hq_orders.outlet_id')
-            ->whereIn('hq_orders.id', $docs->pluck('source_id'))->get(['hq_orders.id', 'hq_orders.doc_no', 'hq_orders.net_amount', 'outlets.code'])->keyBy('id');
+            ->whereIn('hq_orders.id', $docs->pluck('source_id'))->get(['hq_orders.id', 'hq_orders.doc_no', 'hq_orders.net_amount', 'outlets.code'])->keyBy('id')
+            ->union(DB::table('hq_stock_adjustments as a')->join('outlets', 'outlets.id', '=', 'a.outlet_id')->whereIn('a.id', $docs->pluck('source_id'))
+                ->get(['a.id', 'a.doc_no', DB::raw('NULL as net_amount'), 'outlets.code'])->keyBy('id'));
 
         return view('core.monitor.sap', [
             'title' => 'Posting SAP',
@@ -88,7 +90,7 @@ class MonitoringController extends Controller
             'counts' => SapDocument::when($company, fn ($q, $c) => $q->where('company_db', $c))->groupBy('status')->selectRaw('status, COUNT(*) as n')->pluck('n', 'status'),
             'companies' => BusinessUnit::whereNotNull('sap_company_db')->orderBy('id')->get(),
             'company' => $company,
-            'waiting' => InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->where('status', 'accepted')->count(),
+            'waiting' => InboxEvent::whereIn('event_type', SapPostingService::EVENTS)->where('status', 'accepted')->count(),
             'statuses' => self::SAP_STATUS,
         ]);
     }
@@ -114,7 +116,7 @@ class MonitoringController extends Controller
 
     public function retrySap(Request $request, SapDocument $document, SapPostingService $sap): RedirectResponse
     {
-        $type = $document->source_type === 'sales_return' ? 'order.returned' : 'order.finalized';
+        $type = ['sales_return' => 'order.returned', 'stock_adjustment' => 'stock.adjusted'][$document->source_type] ?? 'order.finalized';
         $event = InboxEvent::where('event_type', $type)->where('entity_id', $document->source_id)->latest('id')->first();
         abort_if($event === null, 404, 'Event sumber tidak ditemukan di inbox.');
 

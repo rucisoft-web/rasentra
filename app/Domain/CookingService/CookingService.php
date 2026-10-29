@@ -3,6 +3,7 @@
 namespace App\Domain\CookingService;
 
 use App\Domain\Audit\Audit;
+use App\Domain\Inventory\StockAdjustmentService;
 use App\Domain\Inventory\StockLedger;
 use App\Domain\Sales\Approval;
 use App\Domain\Sales\OrderService;
@@ -67,7 +68,7 @@ final class CookingService
      */
     public function requestForPackLine(OrderLine $packLine, User $actor, array $instructions): CookingJob
     {
-        return DB::transaction(function () use ($packLine, $actor, $instructions) {
+        return DB::transaction(function () use ($packLine, $instructions) {
             $packLine = OrderLine::lockForUpdate()->with('order')->findOrFail($packLine->id);
             if ($packLine->pack_id === null || $packLine->status !== 'active') {
                 throw new DomainException('not_pack_line', 'Cooking fee hanya untuk baris kemasan daging.');
@@ -164,6 +165,10 @@ final class CookingService
                 PackEvent::create(['pack_id' => $pack->id, 'event' => 'consumed_cancelled', 'from_status' => $pack->status, 'to_status' => 'damaged',
                     'actor_id' => $actor->id, 'reason' => $reason, 'source_type' => 'cooking_job', 'source_id' => $job->id, 'occurred_at' => now()]);
                 $pack->update(['status' => 'damaged', 'reserved_order_id' => null]);
+                app(StockAdjustmentService::class)->record('waste', $order->outlet_id, $actor, $approver->id, 'Batal setelah dimasak: '.$reason, [[
+                    'product_id' => $pack->product_id, 'pack_id' => $pack->id, 'quantity' => (string) $pack->net_weight, 'uom' => $pack->uom_code,
+                    'from_state' => 'available', 'to_state' => null,
+                ]], 'cooking_job', $job->id);
                 OrderLine::where('order_id', $order->id)->where('pack_id', $pack->id)->where('status', 'active')->update(['status' => 'voided']);
             }
             $serviceLine?->update(['status' => 'voided']);

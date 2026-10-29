@@ -105,6 +105,8 @@ Route::middleware('auth')->group(function () {
         Route::post('counts/{session}/lines', 'countLine');
         Route::post('counts/{session}/review', 'review');
         Route::post('counts/{session}/approve', 'approve');
+        Route::get('quarantine', 'quarantine');
+        Route::post('adjustments', 'adjust');
     });
 });
 

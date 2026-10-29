@@ -9,7 +9,9 @@
   const csrf = document.querySelector('meta[name="csrf-token"]').content;
   const isHead = ['outlet_head', 'admin'].includes(document.body.dataset.role);
   const canOpen = isHead || document.body.dataset.role === 'storekeeper';
-  const state = { tab: 'receive', mode: 'accept', session: null, location: null };
+  const state = { tab: 'receive', mode: 'accept', session: null, location: null, quarantine: null };
+  const approvers = JSON.parse(document.body.dataset.approvers || '[]');
+  const day = (v) => (v ? new Date(v + (v.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-');
 
   async function api(method, path, body) {
     const res = await fetch('/inventory/api/' + path, {
@@ -20,7 +22,11 @@
     });
     if (res.status === 401 || res.status === 419) { location.href = '/pos/login'; throw new Error('Sesi berakhir.'); }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.errors ? Object.values(data.errors).flat()[0] : (data.message || 'Gagal.'));
+    if (!res.ok) {
+      const err = new Error(data.errors ? Object.values(data.errors).flat()[0] : (data.message || 'Gagal.'));
+      err.code = data.error || null;
+      throw err;
+    }
     return data;
   }
 
@@ -41,6 +47,7 @@
     document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
     if (name === 'receive') loadExpected();
     if (name === 'count') loadSessions();
+    if (name === 'quarantine') loadQuarantine();
     $('#scan').focus();
   }
 
@@ -143,6 +150,8 @@
   }
 
   // ---- Cek stok ------------------------------------------------------------
+  const MOVES = { opening_balance: 'Saldo awal', sale: 'Penjualan', return: 'Retur pelanggan', receipt: 'Terima kiriman', receipt_rejected: 'Kiriman ditolak', waste: 'Waste',
+    count_adjustment: 'Selisih opname', quarantine_release: 'Lepas karantina', consumption: 'Pemakaian resep', production_issue: 'Bahan produksi prep', production_receipt: 'Hasil produksi prep' };
   async function check(code) {
     try {
       const r = await api('GET', 'lookup?code=' + encodeURIComponent(code));
@@ -151,15 +160,147 @@
         $('#check-result').innerHTML = `<div class="card ${p.own_outlet ? 'ok' : 'err'}"><b>${esc(p.pack_code)}</b> · ${esc(p.product)}
           <dl><dt>Status</dt><dd>${esc(p.status)}</dd><dt>Berat</dt><dd>${qty(p.net_weight)} ${esc(p.uom_code)}</dd>
           <dt>Kedaluwarsa</dt><dd>${esc((p.expires_at || '').slice(0, 10))}</dd><dt>Outlet</dt><dd>${esc(p.outlet)}${p.own_outlet ? '' : ' (bukan outlet ini)'}</dd></dl></div>
+          ${p.own_outlet ? `<div class="acts-row">
+            ${['quarantine', 'damaged'].includes(p.status) ? `<button class="btn alt" data-act="release" data-code="${esc(p.pack_code)}">Lepas ke stok</button>` : ''}
+            ${['received', 'available'].includes(p.status) ? `<button class="btn alt" data-act="hold" data-code="${esc(p.pack_code)}">Tahan</button>` : ''}
+            ${['quarantine', 'damaged', 'received', 'available', 'hold'].includes(p.status) ? `<button class="btn danger" data-act="waste" data-code="${esc(p.pack_code)}">Buang</button>` : ''}
+          </div>` : ''}
           <h3>Riwayat</h3><ul class="list">${r.events.map((e) => `<li><span>${esc(e.event)}${e.reason ? ' · ' + esc(e.reason) : ''}</span><span class="muted">${esc((e.occurred_at || '').slice(0, 16).replace('T', ' '))}</span></li>`).join('')}</ul>`;
       } else {
         $('#check-result').innerHTML = `<div class="card ok"><b>${esc(r.product.name)}</b> · ${esc(r.product.code)}
-          <dl><dt>Tersedia</dt><dd>${qty(r.available)} ${esc(r.product.uom_code)}</dd><dt>Karantina</dt><dd>${qty(r.quarantine)}</dd></dl></div>
+          <dl><dt>Tersedia</dt><dd>${qty(r.available)} ${esc(r.product.uom_code)}</dd><dt>Karantina</dt><dd>${qty(r.quarantine)}</dd>
+          ${r.locations.map((l) => `<dt>${esc(l.location)}${l.state !== 'available' ? ' · ' + esc(l.state) : ''}</dt><dd>${qty(l.quantity)}</dd>`).join('')}</dl>
+          ${!r.product.is_weighed ? `<div class="acts-row">${Number(r.quarantine) > 0 ? `<button class="btn alt" data-act="release" data-code="${esc(r.product.code)}" data-max="${r.quarantine}">Lepas karantina</button>` : ''}
+            <button class="btn danger" data-act="waste" data-code="${esc(r.product.code)}" ${Number(r.quarantine) > 0 ? '' : 'data-from="available"'} data-max="${r.available}">Buang</button></div>` : ''}</div>
+          <h3>Pergerakan terakhir</h3><ul class="list">${r.movements.map((m) => `<li><span>${esc(MOVES[m.movement_type] || m.movement_type)}${m.stock_state !== 'available' ? ' · ' + esc(m.stock_state) : ''}<br><span class="muted">${esc((m.occurred_at || '').slice(0, 16).replace('T', ' '))}</span></span><span>${Number(m.quantity) > 0 ? '+' : ''}${qty(m.quantity)}</span></li>`).join('') || '<li class="muted">Belum ada.</li>'}</ul>
           ${r.packs.length ? `<h3>Pack di outlet (${r.packs.length})</h3><ul class="list">${r.packs.map((p) => `<li><span><b>${esc(p.pack_code)}</b><br><span class="muted">${esc(p.status)} · exp ${esc((p.expires_at || '').slice(0, 10))}</span></span><span>${qty(p.net_weight)} kg</span></li>`).join('')}</ul>` : ''}`;
       }
     } catch (e) {
       $('#check-result').innerHTML = `<div class="card err">${esc(e.message)}</div>`;
     }
+  }
+
+  // ---- Karantina, waste, tahan ----------------------------------------------
+  async function loadQuarantine() {
+    try {
+      const q = await api('GET', 'quarantine');
+      state.quarantine = q;
+      const n = q.packs.length + q.items.length + q.expiring.length;
+      $('#q-count').hidden = !n;
+      $('#q-count').textContent = n;
+      const expired = (d) => d && d <= new Date().toISOString().slice(0, 10);
+      const kinds = { waste: 'Waste', count: 'Opname', release: 'Lepas karantina' };
+      $('#q-content').innerHTML = `
+        <h3>Hampir kedaluwarsa <span class="badge">${q.expiring.length}</span></h3>
+        <ul class="list">${q.expiring.map((p) => `<li><span>${esc(p.product)}<br><b>${esc(p.pack_code)}</b> · ${qty(p.net_weight)} ${esc(p.uom)}
+            <span class="tag ${expired(p.expires_at) ? 'red' : ''}">${expired(p.expires_at) ? 'lewat' : 'exp'} ${day(p.expires_at)}</span>${p.status === 'hold' ? '<span class="tag">ditahan</span>' : ''}</span>
+          <span class="acts">${p.status !== 'hold' ? `<button class="btn sm alt" data-act="hold" data-code="${esc(p.pack_code)}">Tahan</button>` : ''}
+            <button class="btn sm danger" data-act="waste" data-code="${esc(p.pack_code)}">Buang</button></span></li>`).join('') || '<li class="muted">Tidak ada pack yang hampir kedaluwarsa.</li>'}</ul>
+        <h3>Di karantina <span class="badge">${q.packs.length + q.items.length}</span></h3>
+        <ul class="list">${q.packs.map((p) => `<li><span>${esc(p.product)}<br><b>${esc(p.pack_code)}</b> · ${qty(p.net_weight)} ${esc(p.uom)}
+            <br><span class="muted">${esc(p.reason || p.status)}</span></span>
+          <span class="acts"><button class="btn sm alt" data-act="release" data-code="${esc(p.pack_code)}">Ke stok</button>
+            <button class="btn sm danger" data-act="waste" data-code="${esc(p.pack_code)}">Buang</button></span></li>`).join('')}
+          ${q.items.map((i) => `<li><span>${esc(i.product)}<br><b>${esc(i.code)}</b> · ${qty(i.quantity)} ${esc(i.uom)}</span>
+          <span class="acts"><button class="btn sm alt" data-act="release" data-code="${esc(i.code)}" data-max="${i.quantity}">Ke stok</button>
+            <button class="btn sm danger" data-act="waste" data-code="${esc(i.code)}" data-from="quarantine" data-max="${i.quantity}">Buang</button></span></li>`).join('')}
+          ${q.packs.length + q.items.length ? '' : '<li class="muted">Karantina kosong.</li>'}</ul>
+        <h3>Dokumen terakhir</h3>
+        <ul class="list">${q.recent.map((d) => `<li><span><b>${esc(d.doc_no)}</b> · ${esc(kinds[d.kind] || d.kind)}<br><span class="muted">${esc(d.lines)}${d.reason ? ' · ' + esc(d.reason) : ''}</span></span>
+          <span class="muted">${esc(d.user || '')}</span></li>`).join('') || '<li class="muted">Belum ada.</li>'}</ul>`;
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  function closeDialog() { $('#dialog').hidden = true; $('#scan').focus(); }
+
+  // Lembar keputusan: alasan, jumlah (untuk SKU), dan PIN kepala outlet bila petugas gudang.
+  function decide(action, code, { pack = true, from = null, max = null, title = '' } = {}) {
+    const titles = { waste: 'Buang (waste)', release: 'Lepas ke stok jual', hold: 'Tahan pack' };
+    const reasons = {
+      waste: ['Kedaluwarsa', 'Warna/bau berubah', 'Kemasan rusak', 'Vakum bocor', 'Suhu tidak sesuai'],
+      release: ['Sudah diperiksa, layak jual', 'Kemasan diganti', 'Suhu kembali normal'],
+      hold: ['Hampir kedaluwarsa', 'Perlu cek QC', 'Label tidak terbaca'],
+    }[action];
+    const needPin = action !== 'hold' && !isHead;
+    const body = $('#dialog .dialog-body');
+    body.innerHTML = `<h2>${titles[action]}</h2><p><b>${esc(code)}</b>${title ? ' · ' + esc(title) : ''}</p>
+      ${!pack ? `<div class="field"><label>Jumlah${max ? ' (maks. ' + qty(max) + ')' : ''}</label><input id="d-qty" inputmode="decimal" value="${max && action === 'release' ? max : ''}"></div>` : ''}
+      ${!pack && action === 'waste' && !from ? `<div class="field"><label>Diambil dari</label><div class="chips" id="d-from">
+        <button type="button" data-from="available" class="on">Stok jual</button><button type="button" data-from="quarantine">Karantina</button></div></div>` : ''}
+      <div class="field"><label>Alasan</label><div class="chips" id="d-reasons">${reasons.map((r) => `<button type="button" data-r="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+        <input id="d-reason" placeholder="Atau tulis alasan"></div>
+      ${needPin ? `<div class="field"><label>Kepala outlet</label><select id="d-approver">${approvers.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>PIN kepala outlet</label><input id="d-pin" type="password" inputmode="numeric" autocomplete="off"></div>` : ''}
+      <div class="acts-row"><button class="btn alt" data-d="cancel">Batal</button><button class="btn ${action === 'waste' ? 'danger' : ''}" data-d="ok">${titles[action]}</button></div>`;
+    $('#dialog').hidden = false;
+    let source = from || 'available';
+    body.onclick = async (ev) => {
+      const t = ev.target.closest('button');
+      if (!t) return;
+      if (t.dataset.r) {
+        body.querySelector('#d-reason').value = t.dataset.r;
+        body.querySelectorAll('#d-reasons button').forEach((b) => b.classList.toggle('on', b === t));
+        return;
+      }
+      if (t.dataset.from) {
+        source = t.dataset.from;
+        body.querySelectorAll('#d-from button').forEach((b) => b.classList.toggle('on', b === t));
+        return;
+      }
+      if (t.dataset.d === 'cancel') return closeDialog();
+      if (t.dataset.d !== 'ok') return;
+      const reason = body.querySelector('#d-reason').value.trim();
+      if (!reason) return toast('Pilih atau tulis alasan.', 'err');
+      const payload = { action, code, reason, from: source };
+      if (!pack) payload.quantity = body.querySelector('#d-qty').value.trim().replace(',', '.') || null;
+      if (needPin) {
+        const pin = body.querySelector('#d-pin').value;
+        if (pin.length < 4) return toast('Masukkan PIN kepala outlet.', 'err');
+        payload.approval = { approver_id: Number(body.querySelector('#d-approver').value), pin };
+      }
+      try {
+        const r = await api('POST', 'adjustments', payload);
+        closeDialog();
+        toast(action === 'hold' ? `Pack ${r.pack_code} ditahan.` : `${r.doc_no} tercatat.`, 'ok');
+        if (state.tab === 'quarantine') loadQuarantine();
+        if (state.tab === 'check') check(code);
+      } catch (e) { toast(e.message, 'err'); }
+    };
+    (body.querySelector('#d-qty') || body.querySelector('#d-reason')).focus();
+  }
+
+  // Scan di tab Karantina: pilih tindakan yang masuk akal untuk kode itu.
+  async function quarantineScan(code) {
+    try {
+      const r = await api('GET', 'lookup?code=' + encodeURIComponent(code));
+      if (r.kind === 'pack') {
+        const p = r.pack;
+        if (!p.own_outlet) return toast(`Pack ${code} bukan milik outlet ini.`, 'err');
+        if (['quarantine', 'damaged'].includes(p.status)) return choose(code, p.product, ['release', 'waste'], { pack: true });
+        if (['received', 'available'].includes(p.status)) return choose(code, p.product, ['hold', 'waste'], { pack: true });
+        if (p.status === 'hold') return decide('waste', code, { title: p.product });
+        return toast(`Pack ${code} berstatus ${p.status}.`, 'err');
+      }
+      if (r.product.is_weighed) return toast('Produk timbang diproses per Pack ID. Scan label pack-nya.', 'err');
+      const acts = Number(r.quarantine) > 0 ? ['release', 'waste'] : ['waste'];
+      return choose(code, r.product.name, acts, { pack: false, max: Number(r.quarantine) > 0 ? r.quarantine : r.available });
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  function choose(code, title, acts, opts) {
+    if (acts.length === 1) return decide(acts[0], code, { ...opts, title });
+    const labels = { waste: 'Buang (waste)', release: 'Lepas ke stok jual', hold: 'Tahan pack' };
+    const body = $('#dialog .dialog-body');
+    body.innerHTML = `<h2>${esc(title)}</h2><p><b>${esc(code)}</b></p>
+      <div class="acts-row" style="flex-direction:column">${acts.map((a) => `<button class="btn block ${a === 'waste' ? 'danger' : 'alt'}" data-pick="${a}">${labels[a]}</button>`).join('')}
+      <button class="btn block alt" data-pick="">Batal</button></div>`;
+    $('#dialog').hidden = false;
+    body.onclick = (ev) => {
+      const t = ev.target.closest('[data-pick]');
+      if (!t) return;
+      if (!t.dataset.pick) return closeDialog();
+      decide(t.dataset.pick, code, { ...opts, title, from: t.dataset.pick === 'waste' && opts.max && !opts.pack ? null : opts.from });
+    };
   }
 
   // ---- Event ---------------------------------------------------------------
@@ -169,6 +310,7 @@
     if (!code) return;
     if (state.tab === 'receive') receive(code);
     else if (state.tab === 'count') countScan(code);
+    else if (state.tab === 'quarantine') quarantineScan(code);
     else check(code);
   }
 
@@ -183,6 +325,13 @@
       document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b === mode));
       return;
     }
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      const d = act.dataset;
+      const isPack = !d.max;
+      return decide(d.act, d.code, { pack: isPack, from: d.from || (d.act === 'release' ? 'quarantine' : null), max: d.max || null });
+    }
+    if (e.target === $('#dialog')) return closeDialog();
     const s = e.target.closest('[data-session]');
     if (s) return openSession(s.dataset.session);
     const loc = e.target.closest('[data-loc]');
@@ -201,4 +350,9 @@
   });
 
   showTab('receive');
+  api('GET', 'quarantine').then((q) => {
+    const n = q.packs.length + q.items.length + q.expiring.length;
+    $('#q-count').hidden = !n;
+    $('#q-count').textContent = n;
+  }).catch(() => {});
 })();

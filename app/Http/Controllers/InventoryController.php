@@ -3,14 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Inventory\ReceivingService;
+use App\Domain\Inventory\StockAdjustmentService;
 use App\Domain\Inventory\StockCountService;
 use App\Domain\Inventory\StockLedger;
+use App\Domain\Sales\Approval;
 use App\Models\CountSession;
 use App\Models\Location;
 use App\Models\Outlet;
 use App\Models\Pack;
 use App\Models\PackEvent;
 use App\Models\Product;
+use App\Models\StockAdjustment;
+use App\Models\StockBalance;
+use App\Models\StockMovement;
+use App\Models\User;
 use App\Support\DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,13 +24,15 @@ use Illuminate\View\View;
 
 /**
  * Rasentra Inventory: aplikasi handheld untuk cek inventory di outlet. Penerimaan kiriman
- * per Pack ID, stok opname blind count dan cek stok per produk atau Pack ID.
+ * per Pack ID, stok opname blind count, cek stok per produk, lokasi atau Pack ID, serta
+ * karantina, waste dan pack hampir kedaluwarsa.
  */
 class InventoryController extends Controller
 {
     public function __construct(
         private readonly ReceivingService $receiving,
         private readonly StockCountService $counts,
+        private readonly StockAdjustmentService $adjustments,
     ) {}
 
     public function app(Request $request): View
@@ -34,6 +42,8 @@ class InventoryController extends Controller
         return view('inventory.app', [
             'outlet' => Outlet::find($outletId),
             'locations' => Location::where('outlet_id', $outletId)->where('is_active', true)->orderBy('code')->get(['code', 'name']),
+            'approvers' => User::where('outlet_id', $outletId)->where('is_active', true)->whereIn('role', Approval::APPROVER_ROLES)
+                ->where('id', '!=', $request->user()->id)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -61,11 +71,19 @@ class InventoryController extends Controller
             throw new DomainException('code_unknown', "Kode {$code} tidak dikenal.", 404);
         }
 
+        $locations = Location::where('outlet_id', $outletId)->pluck('name', 'id');
+
         return response()->json([
             'kind' => 'product',
             'product' => $product->only(['code', 'name', 'uom_code', 'is_weighed']),
             'available' => StockLedger::balance($outletId, $product->id),
             'quarantine' => StockLedger::balance($outletId, $product->id, 'quarantine'),
+            // Saldo per lokasi; stok jual yang tidak terikat lokasi tampil sebagai "Area jual".
+            'locations' => StockBalance::where('outlet_id', $outletId)->where('product_id', $product->id)->where('quantity', '!=', 0)->get()
+                ->map(fn (StockBalance $b) => ['location' => $b->location_id ? ($locations[$b->location_id] ?? '-') : 'Area jual', 'state' => $b->stock_state, 'quantity' => (string) $b->quantity])
+                ->values(),
+            'movements' => StockMovement::where('outlet_id', $outletId)->where('product_id', $product->id)->latest('occurred_at')->limit(10)
+                ->get(['movement_type', 'quantity', 'stock_state', 'occurred_at']),
             'packs' => $product->is_weighed
                 ? Pack::where('outlet_id', $outletId)->where('product_id', $product->id)->whereIn('status', ['received', 'available', 'reserved', 'hold'])
                     ->orderBy('expires_at')->get(['pack_code', 'net_weight', 'status', 'expires_at'])
@@ -141,6 +159,50 @@ class InventoryController extends Controller
         $session = $this->counts->approve($session, $request->user());
 
         return response()->json($session->only(['id', 'status', 'approved_at', 'summary']));
+    }
+
+    /** Isi karantina dan pack yang hampir kedaluwarsa. */
+    public function quarantine(Request $request): JsonResponse
+    {
+        $outletId = $request->user()->outlet_id;
+
+        return response()->json($this->adjustments->quarantine($outletId) + [
+            'expiring' => $this->adjustments->expiring($outletId)->map(fn (Pack $p) => [
+                'pack_code' => $p->pack_code, 'product' => $p->product->name, 'net_weight' => (string) $p->net_weight, 'uom' => $p->uom_code,
+                'status' => $p->status, 'expires_at' => $p->expires_at->toDateString(),
+            ])->values(),
+            'recent' => StockAdjustment::where('outlet_id', $outletId)->with(['lines.product:id,name', 'user:id,name'])->latest()->limit(15)->get()
+                ->map(fn (StockAdjustment $a) => $a->only(['doc_no', 'kind', 'reason']) + [
+                    'at' => $a->created_at->toIso8601String(), 'user' => $a->user?->name,
+                    'lines' => $a->lines->map(fn ($l) => $l->product->name.' '.rtrim(rtrim((string) $l->quantity, '0'), '.').' '.$l->uom_code)->implode(', '),
+                ]),
+        ]);
+    }
+
+    /** Keputusan stok: buang (waste), lepas karantina, atau tahan pack. */
+    public function adjust(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', 'in:waste,release,hold'],
+            'code' => ['required', 'string', 'max:64'],
+            'quantity' => ['nullable', 'numeric', 'gt:0'],
+            'from' => ['nullable', 'in:available,quarantine'],
+            'reason' => ['required', 'string', 'max:200'],
+            'approval' => ['nullable', 'array'],
+        ]);
+        $user = $request->user();
+        $qty = isset($data['quantity']) ? (string) $data['quantity'] : null;
+
+        if ($data['action'] === 'hold') {
+            $pack = $this->adjustments->hold($user->outlet_id, $user, $data['code'], $data['reason']);
+
+            return response()->json(['pack_code' => $pack->pack_code, 'status' => $pack->status]);
+        }
+        $doc = $data['action'] === 'release'
+            ? $this->adjustments->release($user->outlet_id, $user, $data['code'], $qty, $data['reason'], $data['approval'] ?? null)
+            : $this->adjustments->waste($user->outlet_id, $user, $data['code'], $qty, $data['reason'], $data['approval'] ?? null, $data['from'] ?? 'available');
+
+        return response()->json($doc->only(['id', 'doc_no', 'kind']) + ['lines' => $doc->lines->map->only(['product_id', 'quantity', 'uom_code', 'from_state', 'to_state'])], 201);
     }
 
     private function authorizeOutlet(Request $request, CountSession $session): void

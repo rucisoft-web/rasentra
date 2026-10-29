@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Core\SalesProjector;
+use App\Domain\Core\StockProjector;
 use App\Domain\Integration\Sap\SapHealth;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Integration\Xml\NmexmlImporter;
@@ -103,9 +104,10 @@ Artisan::command('rasentra:import-xml {file} {kind : MSI atau MSR}', function (N
     $this->table(['kunci', 'nilai'], collect($batch->summary)->map(fn ($v, $k) => [$k, is_array($v) ? json_encode($v) : $v])->values());
 })->purpose('Impor file NMEXML MSI/MSR ke staging');
 
-Artisan::command('rasentra:rebuild-sales', function (SalesProjector $projector) {
+Artisan::command('rasentra:rebuild-sales', function (SalesProjector $projector, StockProjector $stock) {
     $this->info('Proyeksi penjualan dibangun ulang dari '.$projector->rebuild().' event inbox.');
-})->purpose('Bangun ulang tabel laporan penjualan Rasentra Core dari inbox');
+    $this->info('Proyeksi penyesuaian stok dibangun ulang dari '.$stock->rebuild().' event inbox.');
+})->purpose('Bangun ulang tabel laporan penjualan dan stok Rasentra Core dari inbox');
 
 Artisan::command('rasentra:backup', function (Backup $backup) {
     $result = $backup->run();

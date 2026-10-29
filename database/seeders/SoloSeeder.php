@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Domain\Cash\ShiftService;
 use App\Domain\CookingService\CookingService;
+use App\Domain\Inventory\ReceivingService;
+use App\Domain\Inventory\StockAdjustmentService;
 use App\Domain\Inventory\StockCountService;
 use App\Domain\Inventory\StockLedger;
 use App\Domain\Kitchen\KitchenBoard;
@@ -31,6 +33,7 @@ use App\Models\TicketItem;
 use App\Models\Uom;
 use App\Models\User;
 use App\Models\Visit;
+use App\Support\Decimal;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -584,6 +587,12 @@ class SoloSeeder extends Seeder
             }
         }
 
+        // ---- Karantina dan waste: satu kiriman ditolak saat terima, satu barang rusak dibuang.
+        $this->at(40);
+        app(ReceivingService::class)->receive($this->outlet->id, 'PK-120005', $this->users['gudang'], 'reject', 'Vakum bocor, suhu 9°C saat tiba');
+        $this->at(35);
+        app(StockAdjustmentService::class)->waste($this->outlet->id, $this->users['kepala'], '8992301001009', '2', 'Kemasan sobek di etalase', null);
+
         // ---- Inventory: sesi opname cycle count berjalan (blind), dihitung Wawan.
         $this->at(30);
         $counts = app(StockCountService::class);
@@ -700,7 +709,7 @@ class SoloSeeder extends Seeder
             } else {
                 $payments->add($order, 'edc_manual', $amount, ['provider' => 'edc_manual', 'provider_ref' => $ref]);
             }
-            $remaining = (string) \App\Support\Decimal::money(\App\Support\Decimal::of($remaining)->minus(\App\Support\Decimal::of($amount)));
+            $remaining = (string) Decimal::money(Decimal::of($remaining)->minus(Decimal::of($amount)));
         }
     }
 

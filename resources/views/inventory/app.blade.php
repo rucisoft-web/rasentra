@@ -7,7 +7,7 @@
 <title>Rasentra Inventory</title>
 <link rel="stylesheet" href="{{ asset('assets/inventory/inventory.css') }}">
 </head>
-<body data-role="{{ auth()->user()->role }}">
+<body data-role="{{ auth()->user()->role }}" data-approvers='@json($approvers)'>
 <header class="mbar">
   <div class="brand"><i></i>Rasentra Inventory</div>
   <span class="muted">{{ $outlet?->code }} · {{ auth()->user()->name }}</span>
@@ -45,6 +45,12 @@
     </div>
   </section>
 
+  <section class="tab" id="tab-quarantine" hidden>
+    <h2>Karantina &amp; kedaluwarsa</h2>
+    <p class="muted">Periksa barang, lalu lepas kembali ke stok jual atau buang. Butuh kepala outlet. Scan kode untuk memilih tindakan.</p>
+    <div id="q-content"><p class="muted">Memuat…</p></div>
+  </section>
+
   <section class="tab" id="tab-check" hidden>
     <h2>Cek stok</h2>
     <p class="muted">Scan Pack ID untuk status dan riwayat, atau barcode produk untuk saldo outlet.</p>
@@ -55,8 +61,10 @@
 <nav class="tabs">
   <button data-tab="receive" class="on">Terima</button>
   <button data-tab="count">Opname</button>
+  <button data-tab="quarantine">Karantina <span class="badge" id="q-count" hidden></span></button>
   <button data-tab="check">Cek stok</button>
 </nav>
+<div class="dialog" id="dialog" hidden><div class="dialog-body" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast" hidden></div>
 <script src="{{ asset('assets/inventory/inventory.js') }}" defer></script>
 </body>

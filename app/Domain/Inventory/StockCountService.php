@@ -176,13 +176,19 @@ final class StockCountService
             }
 
             $report = $this->report($session);
+            $adjusted = [];
             foreach (array_values($report) as $i => $line) {
                 if (Decimal::of($line['variance'])->isZero()) {
                     continue;
                 }
                 StockLedger::move($session->outlet_id, $line['product_id'], $line['variance'], $line['uom'], 'count_adjustment',
                     'count_session', $session->id, sourceLineNo: $i + 1);
+                $more = Decimal::of($line['variance'])->isPositive();
+                $adjusted[] = ['product_id' => $line['product_id'], 'quantity' => $line['variance'], 'uom' => $line['uom'],
+                    'from_state' => $more ? null : 'available', 'to_state' => $more ? 'available' : null];
             }
+            // Selisih opname dikirim ke Central sebagai dokumen penyesuaian (Goods Issue/Receipt di SAP).
+            app(StockAdjustmentService::class)->record('count', $session->outlet_id, $approver, $approver->id, 'Stok opname '.$session->type, $adjusted, 'count_session', $session->id);
 
             $session->update(['status' => 'approved', 'approved_by' => $approver->id, 'approved_at' => now(), 'summary' => $report]);
             Audit::record('count.approved', $session, $approver->id, approverId: $approver->id, outletId: $session->outlet_id,

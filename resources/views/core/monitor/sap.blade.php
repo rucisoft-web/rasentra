@@ -17,7 +17,7 @@
 <p class="muted small">Setiap penjualan diposting ke instance SAP milik CV pemilik outlet sebagai A/R Invoice lalu Incoming Payment. Sebelum membuat dokumen, sistem mencari U_POS_SRC di SAP sehingga posting ulang tidak membuat dokumen ganda. Status "Perlu dicek" muncul saat SAP tidak menjawab dan hasilnya belum pasti.</p>
 <div class="tablewrap">
 <table class="t">
-  <thead><tr><th>Struk</th><th>Outlet</th><th>Instance</th><th>Objek SAP</th><th class="n">Nilai</th><th>Status</th><th class="n">Percobaan</th><th>DocNum</th><th>Catatan</th><th></th></tr></thead>
+  <thead><tr><th>Dokumen</th><th>Outlet</th><th>Instance</th><th>Objek SAP</th><th class="n">Nilai</th><th>Status</th><th class="n">Percobaan</th><th>DocNum</th><th>Catatan</th><th></th></tr></thead>
   <tbody>
   @forelse ($docs as $d)
     @php [$label, $tone] = $statuses[$d->status] ?? [$d->status, 'mute']; $o = $orders[$d->source_id] ?? null; @endphp
@@ -26,7 +26,7 @@
       <td>{{ $o->code ?? '-' }}</td>
       <td class="mono small">{{ $d->company_db }}</td>
       <td>{{ $d->sap_object }}</td>
-      <td class="n">{{ $o ? Fmt::money($o->net_amount) : '-' }}</td>
+      <td class="n">{{ $o && $o->net_amount !== null ? Fmt::money($o->net_amount) : '-' }}</td>
       <td><span class="b {{ $tone }}">{{ $label }}</span></td>
       <td class="n">{{ $d->attempts }}</td>
       <td class="mono">{{ $d->doc_num ?? '-' }}</td>

@@ -22,6 +22,9 @@ use Throwable;
  */
 final class SapPostingService
 {
+    /** Event inbox yang menghasilkan dokumen SAP. */
+    public const EVENTS = ['order.finalized', 'order.returned', 'stock.adjusted'];
+
     public function __construct(private readonly SapClientFactory $clients) {}
 
     /**
@@ -32,10 +35,10 @@ final class SapPostingService
     public function postInbox(int $limit = 200): array
     {
         $summary = [];
-        $events = InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->where('status', 'accepted')->orderBy('id')->limit($limit)->get();
+        $events = InboxEvent::whereIn('event_type', self::EVENTS)->where('status', 'accepted')->orderBy('id')->limit($limit)->get();
         foreach ($events as $event) {
             $result = $this->postEvent($event);
-            if ($result['status'] === 'posted') {
+            if (in_array($result['status'], ['posted', 'not_required'], true)) {
                 $event->update(['status' => 'processed']);
             }
             $summary[$result['status']] = ($summary[$result['status']] ?? 0) + 1;
@@ -46,7 +49,78 @@ final class SapPostingService
 
     public function postEvent(InboxEvent $event): array
     {
-        return $event->event_type === 'order.returned' ? $this->postReturn($event->payload) : $this->postSale($event->payload);
+        return match ($event->event_type) {
+            'order.returned' => $this->postReturn($event->payload),
+            'stock.adjusted' => $this->postStockAdjustment($event->payload),
+            default => $this->postSale($event->payload),
+        };
+    }
+
+    /**
+     * Posting penyesuaian stok outlet: barang keluar dari stok (waste, opname kurang) menjadi Goods Issue
+     * (InventoryGenExits), barang masuk (opname lebih) menjadi Goods Receipt (InventoryGenEntries).
+     * Lepas karantina hanya memindah status di outlet, jadi tidak perlu dokumen SAP.
+     */
+    public function postStockAdjustment(array $adj): array
+    {
+        $exits = array_values(array_filter($adj['lines'], fn ($l) => $l['to_state'] === null));
+        $entries = array_values(array_filter($adj['lines'], fn ($l) => $l['from_state'] === null));
+        if ($exits === [] && $entries === []) {
+            return ['status' => 'not_required'];
+        }
+        $companyDb = Outlet::sapCompanyDb((int) $adj['outlet_id']);
+        if (! $companyDb) {
+            return ['status' => 'failed', 'missing' => ['company:sap_company_db']];
+        }
+        $missing = $this->missingMappings($companyDb, ['lines' => $adj['lines'], 'payments' => []]);
+        if ($missing !== []) {
+            IntegrationException::updateOrCreate(
+                ['kind' => 'missing_mapping', 'source_type' => 'stock_adjustment', 'source_id' => $adj['id'], 'status' => 'open'],
+                ['message' => "Mapping SAP {$companyDb} belum ada: ".implode(', ', $missing)],
+            );
+
+            return ['status' => 'failed', 'missing' => $missing];
+        }
+        $lock = Cache::lock("sap:stock_adjustment:{$adj['id']}", 120);
+        if (! $lock->get()) {
+            return ['status' => 'locked'];
+        }
+
+        try {
+            $statuses = [];
+            foreach (['InventoryGenExits' => $exits, 'InventoryGenEntries' => $entries] as $object => $lines) {
+                if ($lines !== []) {
+                    $statuses[] = $this->post($companyDb, 'stock_adjustment', $adj['id'], $object, $this->stockPayload($companyDb, $adj, $lines))->status;
+                }
+            }
+            $posted = count(array_filter($statuses, fn ($s) => $s === 'posted'));
+
+            return ['status' => $posted === count($statuses) ? 'posted' : ($posted > 0 ? 'partially_posted' : $statuses[0])];
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function stockPayload(string $companyDb, array $adj, array $lines): array
+    {
+        $item = fn ($id) => SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'product', 'entity_key' => (string) $id])->value('sap_code');
+        $warehouse = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'outlet', 'entity_key' => (string) $adj['outlet_id']])->value('sap_code');
+        // Akun lawan per jenis penyesuaian (mis. biaya waste); tanpa mapping SAP memakai akun bawaan gudang.
+        $account = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'account', 'entity_key' => $adj['kind']])->value('sap_code');
+        $labels = ['waste' => 'Waste', 'count' => 'Selisih stok opname', 'release' => 'Lepas karantina'];
+
+        return [
+            'DocDate' => $adj['business_date'],
+            'Reference2' => $adj['doc_no'],
+            'Comments' => trim(($labels[$adj['kind']] ?? $adj['kind']).' '.$adj['doc_no'].': '.($adj['reason'] ?? '')),
+            'DocumentLines' => array_map(fn ($l) => array_filter([
+                'ItemCode' => $item($l['product_id']),
+                'Quantity' => $l['quantity'],
+                'WarehouseCode' => $warehouse,
+                'AccountCode' => $account,
+                'U_POS_PACK' => $l['pack_id'],
+            ], fn ($v) => $v !== null), $lines),
+        ];
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Core;
 use App\Domain\Audit\Audit;
 use App\Domain\Integration\Sap\SapClientFactory;
 use App\Domain\Integration\Sap\SapHealth;
+use App\Domain\Integration\Sap\SapPostingService;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessUnit;
 use App\Models\DailyReconciliation;
@@ -63,7 +64,7 @@ class CentralController extends Controller
             'inbox' => [
                 'hour' => InboxEvent::where('created_at', '>=', now()->subHour())->count(),
                 'day' => InboxEvent::where('created_at', '>=', now()->subDay())->count(),
-                'waiting' => InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->where('status', 'accepted')->count(),
+                'waiting' => InboxEvent::whereIn('event_type', SapPostingService::EVENTS)->where('status', 'accepted')->count(),
                 'rejected' => InboxEvent::where('status', 'rejected')->where('created_at', '>=', now()->subDay())->count(),
                 'last' => InboxEvent::max('created_at'),
             ],

@@ -115,7 +115,9 @@ class CoreSeeder extends Seeder
     {
         OutboxEvent::where('outlet_id', $this->solo->id)->update(['source_id' => 'SRV-SLO']);
         $events = OutboxEvent::where('outlet_id', $this->solo->id)->orderBy('id')->get();
-        $send = $events->slice(0, max(0, $events->count() - 2));
+        // Dua struk terakhir masih antre (outlet sempat putus); event lain sudah sampai.
+        $held = $events->where('event_type', 'order.finalized')->slice(-2)->pluck('id');
+        $send = $events->whereNotIn('id', $held);
 
         $results = collect(app(InboxReceiver::class)->receive($send->map(fn (OutboxEvent $e) => $e->only([
             'event_id', 'source_id', 'outlet_id', 'entity_type', 'entity_id', 'entity_version', 'event_type', 'payload', 'checksum',
@@ -128,7 +130,7 @@ class CoreSeeder extends Seeder
                 InboxEvent::where('event_id', $event->event_id)->update(['created_at' => $event->occurred_at->copy()->addSeconds(5), 'updated_at' => $event->occurred_at->copy()->addSeconds(5)]);
             }
         }
-        $events->last()?->update(['status' => 'failed', 'attempts' => 3, 'last_error' => 'cURL error 28: Connection timed out after 15000 ms', 'next_attempt_at' => $this->now->copy()->addMinute()]);
+        $events->whereIn('id', $held)->last()?->update(['status' => 'failed', 'attempts' => 3, 'last_error' => 'cURL error 28: Connection timed out after 15000 ms', 'next_attempt_at' => $this->now->copy()->addMinute()]);
     }
 
     /**

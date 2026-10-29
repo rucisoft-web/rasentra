@@ -42,10 +42,15 @@ return [
 
     'quantity_scale' => 6,
 
-    // Rasentra POS: batas hari retur sejak tanggal struk, dan nama toko di kepala struk.
+    // Rasentra POS: batas hari retur sejak tanggal struk, dan teks kaki struk.
     'pos' => [
         'return_days' => (int) env('RASENTRA_RETURN_DAYS', 7),
         'receipt_footer' => env('RASENTRA_RECEIPT_FOOTER', 'Terima kasih atas kunjungan Anda'),
+    ],
+
+    // Rasentra Inventory: pack yang kedaluwarsa dalam N hari muncul sebagai peringatan.
+    'inventory' => [
+        'expiry_warning_days' => (int) env('RASENTRA_EXPIRY_WARNING_DAYS', 2),
     ],
 
     'sync' => [

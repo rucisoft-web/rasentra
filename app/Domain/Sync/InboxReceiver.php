@@ -3,6 +3,7 @@
 namespace App\Domain\Sync;
 
 use App\Domain\Core\SalesProjector;
+use App\Domain\Core\StockProjector;
 use App\Models\InboxEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ final class InboxReceiver
     public function __construct(
         private readonly SalesProjector $sales,
         private readonly DayReconciler $days,
+        private readonly StockProjector $stock,
     ) {}
 
     public const REQUIRED = ['event_id', 'source_id', 'outlet_id', 'entity_type', 'entity_id', 'entity_version', 'event_type', 'payload', 'checksum'];
@@ -69,6 +71,7 @@ final class InboxReceiver
                 'status' => 'accepted',
             ]), function (InboxEvent $e) {
                 $this->sales->project($e);
+                $this->stock->project($e);
                 $this->days->handle($e);
             }));
         } catch (UniqueConstraintViolationException) {

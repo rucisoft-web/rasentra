@@ -40,7 +40,8 @@ class IndogunaDemoTest extends TestCase
         $this->assertCount(1, $queue['ready']);
         $this->assertCount(2, $queue['preparing']);
         $this->assertGreaterThan(20, $board->analytics($outlet->id, now()->subDay(), now()->addDay())['overall']['count']);
-        $this->assertSame(5, Pack::where('outlet_id', $outlet->id)->where('status', 'shipped')->count());
+        $this->assertSame(4, Pack::where('outlet_id', $outlet->id)->where('status', 'shipped')->count());
+        $this->assertSame('damaged', Pack::where('pack_code', 'PK-120005')->value('status'), 'Satu kiriman ditolak dan menunggu di karantina');
         $this->assertSame('counting', CountSession::where('outlet_id', $outlet->id)->value('status'));
 
         // Katalog kasir Solo hanya berisi produk berharga di outlet ini, tanpa bahan dapur.
