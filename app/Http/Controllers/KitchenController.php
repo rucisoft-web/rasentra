@@ -3,11 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Kitchen\KitchenBoard;
+use App\Domain\Inventory\StockLedger;
 use App\Domain\Kitchen\KitchenService;
+use App\Domain\Recipe\RecipeExploder;
+use App\Domain\Recipe\RecipeService;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
 use App\Models\Order;
 use App\Models\Outlet;
+use App\Models\Product;
+use App\Models\ProductionBatch;
+use App\Models\RecipeVersion;
 use App\Models\TicketItem;
 use App\Models\Visit;
 use App\Support\DomainException;
@@ -17,7 +23,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 /**
- * Rasentra Kitchen: layar station (KDS), expeditor, antrean pickup dan analisis waktu saji.
+ * Rasentra Kitchen: layar station (KDS), expeditor, antrean pickup, produksi batch dan analisis waktu saji.
  * Station "expo" adalah layar expeditor yang melihat semua station per pesanan.
  */
 class KitchenController extends Controller
@@ -137,6 +143,86 @@ class KitchenController extends Controller
     }
 
     /** Layar analisis waktu saji untuk kepala dapur. */
+    public function productionScreen(Request $request): View
+    {
+        return view('kitchen.production', [
+            'outlet' => Outlet::find($request->user()->outlet_id),
+            'reasons' => config('rasentra.kitchen.production_loss_reasons'),
+            'tolerance' => config('rasentra.kitchen.production_loss_tolerance_percent'),
+        ]);
+    }
+
+    /** Data layar produksi: resep berstok, bahan untuk potong & porsi, stok hasil prep dan riwayat hari ini. */
+    public function production(Request $request, RecipeExploder $exploder): JsonResponse
+    {
+        $outletId = (int) $request->user()->outlet_id;
+        $outlet = Outlet::findOrFail($outletId);
+        $versions = RecipeVersion::with('recipe.product', 'lines')->where('kind', 'stocked_prep')->where('status', 'approved')->get()
+            ->filter(fn (RecipeVersion $v) => $v->outlet_ids === null || in_array($outletId, $v->outlet_ids, true))->values();
+        $balance = fn (int $id) => StockLedger::balance($outletId, $id);
+        $products = Product::whereIn('type', ['ingredient', 'prep'])->where('is_stocked', true)->orderBy('name')->get(['id', 'code', 'name', 'type', 'uom_code']);
+        $names = $products->pluck('name', 'id');
+        $since = now($outlet->timezone)->startOfDay()->utc();
+
+        return response()->json([
+            'recipes' => $versions->map(fn (RecipeVersion $v) => [
+                'version_id' => $v->id, 'version' => $v->version, 'name' => $v->recipe->name, 'product_id' => $v->recipe->product_id,
+                'yield' => (string) $v->yield_quantity, 'uom' => $v->yield_uom, 'stock' => $balance($v->recipe->product_id),
+                'lines' => collect($exploder->explode($v, (string) $v->yield_quantity))->map(fn ($n) => $n + [
+                    'name' => $names[$n['product_id']] ?? Product::whereKey($n['product_id'])->value('name'), 'stock' => $balance($n['product_id']),
+                ])->values(),
+            ]),
+            'products' => $products->map(fn (Product $p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name, 'type' => $p->type, 'uom' => $p->uom_code, 'stock' => $balance($p->id)]),
+            'batches' => ProductionBatch::with('user:id,name', 'recipeVersion.recipe:id,name')->where('outlet_id', $outletId)->where('produced_at', '>=', $since)
+                ->latest('produced_at')->limit(30)->get()->map(fn (ProductionBatch $b) => [
+                    'id' => $b->id, 'doc_no' => $b->doc_no, 'kind' => $b->kind, 'title' => $b->recipeVersion?->recipe->name ?? 'Potong & porsi',
+                    'at' => $b->produced_at->toIso8601String(), 'user' => $b->user?->name,
+                    'inputs' => collect($b->inputs)->map(fn ($l) => ['name' => $names[$l['product_id']] ?? Product::whereKey($l['product_id'])->value('name'), 'quantity' => $l['quantity'], 'uom' => $l['uom'] ?? ''])->values(),
+                    'outputs' => collect($b->outputs)->map(fn ($l) => ['name' => $names[$l['product_id']] ?? Product::whereKey($l['product_id'])->value('name'), 'quantity' => $l['quantity'], 'uom' => $l['uom'] ?? ''])->values(),
+                    'expected' => $b->expected_quantity !== null ? (string) $b->expected_quantity : null,
+                    'loss' => (string) $b->loss_quantity, 'loss_reason' => $b->loss_reason,
+                ]),
+            'tolerance' => config('rasentra.kitchen.production_loss_tolerance_percent'),
+        ]);
+    }
+
+    public function storeProduction(Request $request, RecipeService $recipes): JsonResponse
+    {
+        $data = $request->validate([
+            'mode' => 'required|in:recipe,cutting',
+            'version_id' => 'required_if:mode,recipe|nullable|integer',
+            'quantity' => 'required_if:mode,recipe|nullable|numeric|gt:0',
+            'output' => 'required_if:mode,recipe|nullable|numeric|gt:0',
+            'inputs' => 'array',
+            'inputs.*.product_id' => 'required|integer|exists:products,id',
+            'inputs.*.quantity' => 'required|numeric|min:0',
+            'outputs' => 'required_if:mode,cutting|array',
+            'outputs.*.product_id' => 'required|integer|exists:products,id',
+            'outputs.*.quantity' => 'required|numeric|gt:0',
+            'loss_reason' => 'nullable|string|max:120',
+            'notes' => 'nullable|string|max:200',
+        ]);
+        $user = $request->user();
+        $num = fn ($v) => (string) $v;
+
+        if ($data['mode'] === 'recipe') {
+            $version = RecipeVersion::with('recipe.product')->findOrFail($data['version_id']);
+            $actual = collect($data['inputs'] ?? [])->mapWithKeys(fn ($l) => [(int) $l['product_id'] => $num($l['quantity'])])->all();
+            $batch = $recipes->produceFromRecipe($user->outlet_id, $user, $version, $num($data['quantity']), $num($data['output']), $actual ?: null, $data['loss_reason'] ?? null, $data['notes'] ?? null);
+        } else {
+            $inputs = collect($data['inputs'] ?? [])->filter(fn ($l) => (float) $l['quantity'] > 0)->values();
+            if ($inputs->isEmpty()) {
+                throw new DomainException('quantity_required', 'Isi bahan yang dipotong dan beratnya.', 422);
+            }
+            $line = fn ($l) => ['product_id' => (int) $l['product_id'], 'quantity' => $num($l['quantity'])];
+            $in = $inputs->map($line)->all();
+            $tolerance = (string) (array_sum(array_column($in, 'quantity')) * (float) config('rasentra.kitchen.production_loss_tolerance_percent', 2) / 100);
+            $batch = $recipes->produce($user->outlet_id, $user, $in, collect($data['outputs'])->map($line)->all(), $data['loss_reason'] ?? null, null, $tolerance, $data['notes'] ?? null);
+        }
+
+        return response()->json(['id' => $batch->id, 'doc_no' => $batch->doc_no, 'loss' => (string) $batch->loss_quantity], 201);
+    }
+
     public function analyticsScreen(Request $request): View
     {
         return view('kitchen.analytics', ['outlet' => Outlet::find($request->user()->outlet_id), 'stations' => config('rasentra.kitchen.stations')]);

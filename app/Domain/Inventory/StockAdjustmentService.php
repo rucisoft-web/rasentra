@@ -248,7 +248,7 @@ final class StockAdjustmentService
 
     private function nextDocNo(Outlet $outlet, string $kind, string $date): string
     {
-        $prefix = $outlet->code.'-'.['waste' => 'W', 'count' => 'OP', 'release' => 'RL'][$kind].date('ymd', strtotime($date)).'-';
+        $prefix = $outlet->code.'-'.['waste' => 'W', 'count' => 'OP', 'release' => 'RL', 'production' => 'PR'][$kind].date('ymd', strtotime($date)).'-';
         $last = StockAdjustment::where('outlet_id', $outlet->id)->where('doc_no', 'like', $prefix.'%')->max('doc_no');
         $seq = $last ? ((int) substr($last, strlen($prefix))) + 1 : 1;
 

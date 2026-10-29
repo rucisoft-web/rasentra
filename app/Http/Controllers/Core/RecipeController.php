@@ -52,6 +52,8 @@ class RecipeController extends Controller
             'kinds' => self::KINDS,
             'uoms' => Uom::orderBy('code')->pluck('code'),
             'approver' => $version?->approved_by ? User::whereKey($version->approved_by)->value('name') : null,
+            'editor' => $version?->edited_by ? User::whereKey($version->edited_by)->value('name') : null,
+            'mine' => $version?->status === 'draft' && $version->edited_by !== null && (int) $version->edited_by === (int) $request->user()->id,
             'usedBy' => RecipeLine::query()->join('recipe_versions as rv', 'rv.id', '=', 'recipe_lines.recipe_version_id')
                 ->join('recipes', 'recipes.id', '=', 'rv.recipe_id')->where('rv.status', 'approved')
                 ->where('recipe_lines.component_product_id', $recipe->product_id)->distinct()->pluck('recipes.name'),
@@ -73,6 +75,7 @@ class RecipeController extends Controller
                 'yield_uom' => $from?->yield_uom ?? 'PORSI',
                 'kind' => $from?->kind ?? 'menu',
                 'status' => 'draft',
+                'edited_by' => $request->user()->id,
                 'outlet_ids' => $from?->outlet_ids,
             ]);
             foreach ($from?->lines ?? [] as $line) {
@@ -125,7 +128,7 @@ class RecipeController extends Controller
         }
 
         DB::transaction(function () use ($version, $data, $lines, $request) {
-            $version->update(['yield_quantity' => Decimal::qty((string) $data['yield_quantity']), 'yield_uom' => $data['yield_uom'], 'kind' => $data['kind']]);
+            $version->update(['yield_quantity' => Decimal::qty((string) $data['yield_quantity']), 'yield_uom' => $data['yield_uom'], 'kind' => $data['kind'], 'edited_by' => $request->user()->id]);
             $version->lines()->delete();
             foreach ($lines as $line) {
                 RecipeLine::create(['recipe_version_id' => $version->id] + $line);

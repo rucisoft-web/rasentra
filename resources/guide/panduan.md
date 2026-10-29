@@ -228,14 +228,14 @@ Setiap station melihat tiketnya sendiri, memasak sesuai urutan waktu, dan memaju
 ### 4.1 Memilih layar perangkat
 
 1. Masuk dengan nama dan PIN, lalu buka **Rasentra Kitchen**.
-2. Pilih layar untuk perangkat ini: station (Grill, Hot kitchen, Cold kitchen, Bar, Pastry, Packing), **Expeditor**, **Layar antrean** atau **Analisis waktu saji**. Pilihan disimpan di perangkat.
+2. Pilih layar untuk perangkat ini: station (Grill, Hot kitchen, Cold kitchen, Bar, Pastry, Packing), **Expeditor**, **Layar antrean**, **Produksi** atau **Analisis waktu saji**. Pilihan disimpan di perangkat.
 
 ![Gambar 4.1 · Rasentra Kitchen: pilihan layar untuk perangkat ini.](/assets/guide/4-1.jpg)
 
 ### 4.2 Mengerjakan tiket
 
 1. Tiket baru membunyikan nada pendek dan tampil dengan label meja atau nomor pesanan, modifier dan catatan.
-2. Tekan **Mulai masak**. Bahan resep dipotong dari stok saat ini.
+2. Tekan **Mulai masak**. Bahan sesuai resep menu (lihat 8.4) dipotong dari stok saat ini, termasuk saus hasil produksi.
 3. Tekan **Siap** saat hidangan selesai. Pelayan melihat penanda siap di tabletnya.
 4. Alternatif cepat: scan barcode di tiket cetak untuk memajukan tiket.
 5. Salah tekan Siap? Sentuh item lalu kembalikan ke Dimasak.
@@ -275,6 +275,31 @@ Layar antrean (`/kitchen/queue`) dipasang menghadap pelanggan. Isinya nomor take
 Lihat rata-rata, median, P90, waktu antre dan waktu masak per station, per menu dan per jam, beserta jumlah yang terlambat. Pakai untuk briefing harian dan mengatur jumlah cook per jam sibuk.
 
 ![Gambar 4.7 · Rasentra Kitchen: analisis waktu saji per station.](/assets/guide/4-7.jpg)
+
+### 4.7 Produksi saus, prep dan potong & porsi
+
+Bahan setengah jadi dibuat di layar **Produksi** (`/kitchen/production`). Hasilnya masuk ke stok outlet. Setelah itu, menu yang memakainya memotong hasil produksi tersebut, bukan bahan asalnya. Setiap produksi menjadi dokumen bernomor `SLO-PR…` yang dikirim ke Rasentra Central lalu ke SAP. Di SAP, bahan keluar lewat Goods Issue dan hasil masuk lewat Goods Receipt.
+
+**Dari resep** (saus, kaldu, bumbu berstok):
+
+1. Pilih resep, misalnya **Saus Lada Hitam (produksi)**. Hanya resep berjenis *prep berstok* yang sudah disetujui kantor pusat yang tampil.
+2. Pilih jumlah resep (×1, ×2, …) atau ketik target hasil. Kolom **Standar** menghitung bahan sesuai resep.
+3. Bila pemakaian aktual berbeda, koreksi kolom **Dipakai**. Angka yang dikoreksi berwarna kuning. Kolom **Stok** merah berarti stok bahan di sistem kurang.
+4. Timbang hasilnya, lalu isi **Hasil timbang aktual**. Susut dihitung otomatis dari target dikurangi hasil.
+5. Bila susut di atas 2%, pilih alasannya (Susut masak, Tumpah, Gosong / gagal, dan lainnya), lalu tekan **Simpan produksi**.
+
+![Gambar 4.8 · Rasentra Kitchen: produksi dua resep Saus Lada Hitam dengan pemakaian butter dikoreksi, hasil 3,82 kg dan susut 4,5%.](/assets/guide/4-8.jpg)
+
+**Potong & porsi** (daging atau ikan utuh menjadi porsi siap masak):
+
+1. Pilih bahan yang dipotong, misalnya **Sirloin Utuh**, lalu isi beratnya.
+2. Isi setiap hasil beserta beratnya: porsi steak, trimming, tulang. Tekan **+ Tambah hasil** untuk baris berikutnya.
+3. Susut = bahan masuk dikurangi semua hasil. Hasil tidak boleh melebihi bahan masuk. Susut di atas 2% wajib diberi alasan.
+4. Tekan **Simpan potong & porsi**.
+
+![Gambar 4.9 · Rasentra Kitchen: potong sirloin utuh 5,4 kg menjadi porsi 4,6 kg dan trimming 0,62 kg.](/assets/guide/4-9.jpg)
+
+Panel kanan menampilkan stok hasil prep di outlet dan semua produksi hari ini: nomor dokumen, petugas, bahan, hasil dan susut. Kepala outlet memakai panel ini untuk mencocokkan hasil timbang dengan saus yang tersedia sebelum servis.
 
 ## 5. Petugas gudang (Rasentra Inventory)
 
@@ -458,12 +483,39 @@ Merchandising menyusun produk, harga, promo dan resep. Setiap perubahan harga, p
 
 ![Gambar 8.4 · Rasentra Central: hasil simulasi keranjang sebelum dan sesudah promo.](/assets/guide/8-4.jpg)
 
-### 8.4 Resep dan cooking fee
+### 8.4 Resep (bill of material) dan cooking fee
 
-- **Resep** berversi: bahan dan takaran per porsi. Bahan dipotong dari stok saat dapur menekan Mulai masak. Draft baru disetujui sebelum berlaku.
+Setiap menu restoran punya resep: daftar bahan dan takaran untuk hasil tertentu, misalnya per 1 porsi atau per 2 kg saus. Resep dikelola di **Rasentra Central → Resep**.
+
+| Jenis resep | Contoh | Cara bahan dipotong |
+| --- | --- | --- |
+| Menu | Sirloin Steak 200 g, Selat Solo, Es Teh Manis | Saat dapur menekan **Mulai masak**, sesuai jumlah porsi dan modifier |
+| Prep berstok | Saus Lada Hitam (produksi) | Dibuat lewat layar **Produksi** (4.7). Menu memotong sausnya sebagai barang jadi |
+| Prep virtual | Saus Padang | Tidak distok. Saat menu dimasak, bahan asalnya (cabai, santan, minyak) langsung dipotong |
+| Jasa masak | Jasa Masak Steak (Cooking Fee) | Hanya bahan tambahan (butter, saus). Daging milik pelanggan tidak dipotong lagi |
+
+![Gambar 8.7 · Rasentra Central: daftar resep dengan jenis, versi aktif dan hasil per resep.](/assets/guide/8-7.jpg)
+
+Contoh resep Sirloin Steak 200 g per porsi: Bahan Sirloin Portion 0,200 kg, Kentang 0,150 kg, Sayuran Campur 0,080 kg, Saus Lada Hitam (produksi) 0,050 kg dan Butter 0,010 kg. Kolom **Hanya bila modifier** membuat bahan hanya terpotong bila tamu memilih modifier itu, misalnya *Extra butter* pada Wagyu.
+
+![Gambar 8.8 · Rasentra Central: resep Sirloin Steak 200 g dengan saus hasil produksi sebagai bahan.](/assets/guide/8-8.jpg)
+
+**Mengubah resep:**
+
+1. Buka resep, lalu tekan **Buat draft versi baru**. Versi aktif tetap berlaku selama draft disusun.
+2. Ubah bahan, takaran, hasil per resep dan cakupan outlet, lalu simpan draft.
+3. Rekan pusat lain (admin pusat atau merchandising lain) memeriksa lalu menekan **Setujui & kirim ke outlet**. Penyunting terakhir draft tidak bisa menyetujui draftnya sendiri.
+4. Versi baru dikirim ke semua outlet lewat publikasi. Versi lama berstatus retired. Pemakaian bahan yang sudah tercatat tetap memakai versi lama, sehingga histori tidak berubah.
+
+Sistem menolak resep yang saling memakai, misalnya saus A memakai saus B yang memakai saus A.
+
 - **Cooking fee**: tarif jasa masak per metode (per kg atau per porsi, bisa bertingkat). Ubah tarif dengan membuat aturan pengganti, bukan menimpa yang lama.
 
-![Gambar 8.5 · Rasentra Central: versi resep dengan daftar bahan.](/assets/guide/8-5.jpg)
+![Gambar 8.5 · Rasentra Central: resep Saus Lada Hitam (prep berstok) dengan hasil 2 kg per resep.](/assets/guide/8-5.jpg)
+
+Hasil produksi, susut dan waste dapur per outlet terlihat di **Laporan → Opname & waste**.
+
+![Gambar 8.9 · Rasentra Central: dokumen produksi dapur (bahan dan hasil) di laporan Opname & waste.](/assets/guide/8-9.jpg)
 
 ### 8.5 Laporan untuk merchandising
 

@@ -59,6 +59,7 @@ final class SapPostingService
     /**
      * Posting penyesuaian stok outlet: barang keluar dari stok (waste, opname kurang) menjadi Goods Issue
      * (InventoryGenExits), barang masuk (opname lebih) menjadi Goods Receipt (InventoryGenEntries).
+     * Produksi dapur memakai keduanya: bahan keluar lewat Goods Issue, hasil masuk lewat Goods Receipt.
      * Lepas karantina hanya memindah status di outlet, jadi tidak perlu dokumen SAP.
      */
     public function postStockAdjustment(array $adj): array
@@ -107,7 +108,7 @@ final class SapPostingService
         $warehouse = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'outlet', 'entity_key' => (string) $adj['outlet_id']])->value('sap_code');
         // Akun lawan per jenis penyesuaian (mis. biaya waste); tanpa mapping SAP memakai akun bawaan gudang.
         $account = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'account', 'entity_key' => $adj['kind']])->value('sap_code');
-        $labels = ['waste' => 'Waste', 'count' => 'Selisih stok opname', 'release' => 'Lepas karantina'];
+        $labels = ['waste' => 'Waste', 'count' => 'Selisih stok opname', 'release' => 'Lepas karantina', 'production' => 'Produksi dapur'];
 
         return [
             'DocDate' => $adj['business_date'],

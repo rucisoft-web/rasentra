@@ -145,5 +145,8 @@ return [
         'pickup_channels' => ['takeaway', 'pickup', 'delivery'],
         // Cetak tiket dapur (dengan barcode kode bump) di printer station setiap kirim ke dapur.
         'print_tickets' => (bool) env('RASENTRA_KITCHEN_PRINT', true),
+        // Produksi dapur: susut di atas persentase ini (terhadap hasil standar atau bahan masuk) wajib beralasan.
+        'production_loss_tolerance_percent' => 2,
+        'production_loss_reasons' => ['Susut masak', 'Susut potong', 'Tumpah', 'Gosong / gagal', 'Bahan tidak layak'],
     ],
 ];

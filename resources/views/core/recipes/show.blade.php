@@ -31,7 +31,8 @@
     </dl>
     @if ($draft)
       <form method="post" action="{{ route('core.recipes.approve', $version) }}" style="margin-top:12px">@csrf
-        <button class="btn" data-confirm="Setujui versi {{ $version->version }}? Versi aktif sebelumnya dipensiunkan dan resep baru dipakai dapur outlet.">Setujui & kirim ke outlet</button>
+        <button class="btn" @disabled($mine) data-confirm="Setujui versi {{ $version->version }}? Versi aktif sebelumnya dipensiunkan dan resep baru dipakai dapur outlet.">Setujui & kirim ke outlet</button>
+        @if($editor)<span class="muted small">Terakhir disunting {{ $editor }}.@if($mine) Rekan lain yang harus menyetujui.@endif</span>@endif
       </form>
     @endif
   </div>

@@ -233,12 +233,15 @@ class SoloSeeder extends Seeder
             ['2803009', 'Gula Aren', 'KG'], ['2803010', 'Teh Tubruk', 'KG'], ['2803011', 'Rempah Wedang Uwuh', 'PAK'], ['2803012', 'Kopi Robusta', 'KG'],
             ['2803013', 'Susu Segar', 'LTR'], ['2803014', 'Santan', 'LTR'], ['2803015', 'Tepung Beras', 'KG'], ['2803016', 'Es Krim Vanila Bulk', 'LTR'],
             ['2803017', 'Lada Hitam', 'KG'], ['2803018', 'Kaldu Sapi', 'LTR'], ['2803019', 'Cabai & Bawang', 'KG'], ['2803020', 'Telur Dapur', 'PCS'],
+            ['2801012', 'Sirloin Utuh (bahan potong)', 'KG'],
         ] as [$code, $name, $uom]) {
             $this->products[$code] = Product::create(['code' => $code, 'name' => $name, 'type' => 'ingredient', 'uom_code' => $uom, 'is_weighed' => false, 'is_stocked' => true]);
         }
         // Subresep: saus lada hitam diproduksi batch (stocked_prep), saus padang dibuat per porsi (virtual_prep).
         $this->products['2804001'] = Product::create(['code' => '2804001', 'name' => 'Saus Lada Hitam (produksi)', 'type' => 'prep', 'uom_code' => 'KG', 'is_stocked' => true]);
         $this->products['2804002'] = Product::create(['code' => '2804002', 'name' => 'Saus Padang (virtual)', 'type' => 'prep', 'uom_code' => 'KG', 'is_stocked' => false]);
+        // Produk samping potong & porsi (untuk kaldu dan sop).
+        $this->products['2804003'] = Product::create(['code' => '2804003', 'name' => 'Trimming Sapi', 'type' => 'prep', 'uom_code' => 'KG', 'is_stocked' => true]);
     }
 
     private function recipes(): void
@@ -444,14 +447,15 @@ class SoloSeeder extends Seeder
         $approval = ['approver_id' => $this->users['kepala']->id, 'pin' => '9999'];
         $p = fn (string $code) => $this->products[$code];
 
-        // Produksi pagi: 2 kg saus lada hitam untuk steak dan jasa masak.
+        // Produksi pagi: satu resep saus lada hitam (2 kg) untuk steak dan jasa masak, lalu potong sirloin utuh.
         $this->at(420);
-        app(RecipeService::class)->produce($this->outlet->id, $this->users['chef'], [
-            ['product_id' => $p('2803001')->id, 'quantity' => '0.200', 'uom' => 'KG'],
-            ['product_id' => $p('2803017')->id, 'quantity' => '0.080', 'uom' => 'KG'],
-            ['product_id' => $p('2803018')->id, 'quantity' => '1.500', 'uom' => 'LTR'],
-            ['product_id' => $p('2803019')->id, 'quantity' => '0.300', 'uom' => 'KG'],
-        ], [['product_id' => $p('2804001')->id, 'quantity' => '1.950', 'uom' => 'KG']], 'Penguapan saat reduksi', $this->recipeVersionId('2804001'));
+        app(RecipeService::class)->produceFromRecipe($this->outlet->id, $this->users['chef'],
+            RecipeVersion::with('recipe.product')->findOrFail($this->recipeVersionId('2804001')), '2', '1.950', null, 'Susut masak', 'Batch pagi');
+        $this->at(410);
+        app(RecipeService::class)->produce($this->outlet->id, $this->users['chef'],
+            [['product_id' => $p('2801012')->id, 'quantity' => '6.000', 'uom' => 'KG']],
+            [['product_id' => $p('2801001')->id, 'quantity' => '5.100', 'uom' => 'KG'], ['product_id' => $p('2804003')->id, 'quantity' => '0.700', 'uom' => 'KG']],
+            'Susut potong', null, '0.120', 'Sirloin utuh kiriman gudang pusat');
 
         $this->at(400);
         $retailShift = $shifts->open($this->users['kasir'], $this->outlet->id, '1000000');

@@ -118,3 +118,56 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .kscan { width: 100%; order: 5; }
   .qgrid { grid-template-columns: 1fr; }
 }
+
+/* Produksi batch ---------------------------------------------------------- */
+.pick.make { border-color: #2b4a6a; }
+.prod { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; padding: 20px 24px 48px; max-width: 1400px; margin: 0 auto; }
+.prod h2 { font-size: 1.15rem; margin: 18px 0 10px; }
+.prod-side h2:first-child { margin-top: 0; }
+.seg { display: inline-flex; background: var(--card); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { min-height: 52px; padding: 0 22px; border: 0; border-radius: 9px; background: transparent; font-weight: 700; }
+.seg button.on { background: var(--ok); color: #fff; }
+.recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 12px 0; }
+.recipe { text-align: left; background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 6px; }
+.recipe.on { border-color: var(--accent); }
+.recipe b { font-size: 1.15rem; }
+.recipe span { color: var(--muted); font-size: .9rem; }
+.pform { background: var(--card); border-radius: 14px; padding: 18px; margin-top: 12px; display: grid; gap: 14px; }
+.pform h3 { margin: 0; font-size: 1.25rem; }
+.prow { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.pfield { display: grid; gap: 6px; color: var(--muted); font-size: .9rem; }
+.pfield input, .pfield select, .ptable input, .ptable select { min-height: 52px; border-radius: 10px; border: 2px solid var(--line); background: #0f1512; color: var(--ink); padding: 0 12px; font: inherit; font-size: 1.1rem; color-scheme: dark; }
+.pfield input { width: 160px; font-family: var(--mono); }
+.pfield.wide input, .pfield.wide select { width: 100%; min-width: 260px; }
+.mult { display: flex; gap: 8px; }
+.mult button { min-height: 52px; min-width: 64px; border-radius: 10px; border: 2px solid var(--line); background: transparent; font-weight: 700; }
+.mult button.on { border-color: var(--accent); color: var(--accent); }
+.ptable { width: 100%; border-collapse: collapse; }
+.ptable th, .ptable td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+.ptable th:first-child, .ptable td:first-child { text-align: left; }
+.ptable th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+.ptable input { width: 130px; text-align: right; font-family: var(--mono); }
+.ptable select { width: 100%; }
+.ptable .low { color: var(--late); font-weight: 700; }
+.ptable .diff { color: var(--warn); }
+.balance { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.balance div { background: #0f1512; border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+.balance span { color: var(--muted); font-size: .85rem; }
+.balance b { font-family: var(--mono); font-size: 1.4rem; }
+.balance .bad b { color: var(--warn); }
+.reasons { display: flex; flex-wrap: wrap; gap: 8px; }
+.reasons button { min-height: 48px; padding: 0 14px; border-radius: 10px; border: 2px solid var(--line); background: transparent; }
+.reasons button.on { border-color: var(--warn); background: #3a2a0a; color: #ffd27a; font-weight: 700; }
+.kbtn.go { background: var(--ok); border-color: var(--ok); color: #fff; min-height: 60px; font-size: 1.15rem; }
+.kbtn.small { min-height: 44px; }
+.mini { background: var(--card); border-radius: 12px; padding: 4px 14px; }
+.mini div { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.mini div:last-child { border-bottom: 0; }
+.mini b { font-family: var(--mono); }
+.batch { background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; display: grid; gap: 4px; font-size: .92rem; }
+.batch header { display: flex; justify-content: space-between; gap: 8px; }
+.batch header b { font-size: 1rem; }
+.batch .m { color: var(--muted); }
+.batch .out { color: #8fe0b3; font-weight: 700; }
+.batch .loss { color: var(--warn); }
+@media (max-width: 1000px) { .prod { grid-template-columns: 1fr; } }

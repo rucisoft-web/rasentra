@@ -112,13 +112,14 @@ class ReportController extends Controller
             'sessions' => CountSession::query()->when($outletId, fn ($q, $id) => $q->where('outlet_id', $id))
                 ->whereBetween('cutoff_at', [Carbon::parse($from)->startOfDay(), Carbon::parse($to)->endOfDay()])
                 ->withCount('lines')->latest('cutoff_at')->limit(50)->get(),
-            'adjustments' => $moves('count_adjustment'),
+            'adjustments' => $moves('count'),
+            'production' => $moves('production'),
             'waste' => $moves('waste'),
-            'documents' => $docs()->join('outlets', 'outlets.id', '=', 'a.outlet_id')->whereIn('a.kind', ['waste', 'release'])
+            'documents' => $docs()->join('outlets', 'outlets.id', '=', 'a.outlet_id')->whereIn('a.kind', ['waste', 'release', 'production'])
                 ->orderByDesc('a.created_at')->limit(30)->get(['a.id', 'a.doc_no', 'a.kind', 'a.reason', 'a.business_date', 'outlets.code as outlet']),
             'documentLines' => DB::table('hq_stock_adjustment_lines as l')->join('products', 'products.id', '=', 'l.product_id')
-                ->whereIn('l.hq_stock_adjustment_id', $docs()->whereIn('a.kind', ['waste', 'release'])->orderByDesc('a.created_at')->limit(30)->pluck('a.id'))
-                ->get(['l.hq_stock_adjustment_id', 'products.name', 'l.quantity', 'l.uom', 'l.from_state'])->groupBy('hq_stock_adjustment_id'),
+                ->whereIn('l.hq_stock_adjustment_id', $docs()->whereIn('a.kind', ['waste', 'release', 'production'])->orderByDesc('a.created_at')->limit(30)->pluck('a.id'))
+                ->get(['l.hq_stock_adjustment_id', 'products.name', 'l.quantity', 'l.uom', 'l.from_state', 'l.to_state'])->groupBy('hq_stock_adjustment_id'),
             'nonSale' => DB::table('consumption_events as c')->join('products', 'products.id', '=', 'c.product_id')->join('outlets', 'outlets.id', '=', 'c.outlet_id')
                 ->where('c.reason', '!=', 'sale')->whereBetween('c.occurred_at', [Carbon::parse($from)->startOfDay(), Carbon::parse($to)->endOfDay()])
                 ->when($outletId, fn ($q, $id) => $q->where('c.outlet_id', $id))

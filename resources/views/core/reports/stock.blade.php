@@ -44,7 +44,7 @@
   </div>
 </div>
 
-<h2>Dokumen waste dan lepas karantina</h2>
+<h2>Dokumen waste, lepas karantina dan produksi dapur</h2>
 <div class="tablewrap">
 <table class="t">
   <thead><tr><th>Dokumen</th><th>Outlet</th><th>Tanggal</th><th>Jenis</th><th>Barang</th><th>Alasan</th></tr></thead>
@@ -52,12 +52,16 @@
   @forelse ($documents as $d)
     <tr>
       <td class="mono">{{ $d->doc_no }}</td><td>{{ $d->outlet }}</td><td>{{ \Illuminate\Support\Carbon::parse($d->business_date)->translatedFormat('d M Y') }}</td>
-      <td>@if($d->kind === 'waste')<span class="b err">Waste</span>@else<span class="b ok">Kembali ke stok</span>@endif</td>
-      <td>{{ collect($documentLines[$d->id] ?? [])->map(fn ($l) => $l->name.' '.Fmt::qty($l->quantity).' '.$l->uom.($l->from_state === 'quarantine' ? ' (karantina)' : ''))->implode(', ') }}</td>
+      <td>@if($d->kind === 'waste')<span class="b err">Waste</span>@elseif($d->kind === 'production')<span class="b warn">Produksi</span>@else<span class="b ok">Kembali ke stok</span>@endif</td>
+      <td>@if($d->kind === 'production')
+        @php $lines = collect($documentLines[$d->id] ?? []); @endphp
+        Bahan: {{ $lines->whereNull('to_state')->map(fn ($l) => $l->name.' '.Fmt::qty($l->quantity).' '.$l->uom)->implode(', ') }}<br>
+        <b>Hasil: {{ $lines->whereNotNull('to_state')->map(fn ($l) => $l->name.' '.Fmt::qty($l->quantity).' '.$l->uom)->implode(', ') }}</b>
+      @else{{ collect($documentLines[$d->id] ?? [])->map(fn ($l) => $l->name.' '.Fmt::qty($l->quantity).' '.$l->uom.($l->from_state === 'quarantine' ? ' (karantina)' : ''))->implode(', ') }}@endif</td>
       <td>{{ $d->reason }}</td>
     </tr>
   @empty
-    <tr><td colspan="6" class="muted">Belum ada dokumen waste atau lepas karantina pada rentang ini.</td></tr>
+    <tr><td colspan="6" class="muted">Belum ada dokumen waste, lepas karantina atau produksi pada rentang ini.</td></tr>
   @endforelse
   </tbody>
 </table>

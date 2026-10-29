@@ -104,12 +104,13 @@ Route::middleware('auth')->group(function () {
         Route::post('visits/{token}/close', 'close');
     });
 
-    // Rasentra Kitchen: layar station, expeditor, antrean pickup, analisis waktu saji.
+    // Rasentra Kitchen: layar station, expeditor, antrean pickup, produksi batch, analisis waktu saji.
     Route::controller(KitchenController::class)->group(function () {
         Route::get('kitchen', 'home')->name('kitchen');
         Route::get('kitchen/queue', 'queueScreen')->name('kitchen.queue');
         Route::get('kitchen/s/{station}', 'screen')->name('kitchen.screen');
         Route::get('kitchen/analytics', 'analyticsScreen')->name('kitchen.analytics');
+        Route::get('kitchen/production', 'productionScreen')->name('kitchen.production');
         Route::get('kitchen/print/{order}', 'printTickets')->name('kitchen.print');
 
         Route::prefix('kitchen/api')->group(function () {
@@ -123,6 +124,8 @@ Route::middleware('auth')->group(function () {
             Route::post('scan', 'scan');
             Route::get('queue', 'queue');
             Route::get('analytics', 'analytics');
+            Route::get('production', 'production');
+            Route::post('production', 'storeProduction');
         });
     });
 

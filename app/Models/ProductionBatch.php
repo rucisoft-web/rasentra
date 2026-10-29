@@ -18,8 +18,19 @@ class ProductionBatch extends Model
         return [
             'inputs' => 'array',
             'outputs' => 'array',
+            'expected_quantity' => 'decimal:6',
             'loss_quantity' => 'decimal:6',
             'produced_at' => 'datetime',
         ];
+    }
+
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function recipeVersion(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(RecipeVersion::class);
     }
 }
