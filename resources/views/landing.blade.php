@@ -74,14 +74,14 @@ details.sub .drop a:hover{background:var(--green-soft)}
 .facts b{font-family:var(--display);font-size:1.8rem;line-height:1}
 .facts span{font-size:.85rem;color:var(--muted)}
 /* label timbang */
-.label{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:22px 22px 18px;font-family:var(--mono);font-size:.9rem;box-shadow:0 18px 40px rgba(20,40,30,.12);transform:rotate(-1.5deg);position:relative;max-width:100%}
-.label::before{content:"";position:absolute;inset:0 0 auto;height:8px;background:var(--amber);border-radius:6px 6px 0 0}
-.label .row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dashed var(--line)}
-.label .row:last-of-type{border-bottom:0}
-.label .big{font-size:1.6rem;font-weight:600;color:var(--ink)}
-.label .k{color:var(--muted)}
+.scale-label{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:22px 22px 18px;font-family:var(--mono);font-size:.9rem;box-shadow:0 18px 40px rgba(20,40,30,.12);transform:rotate(-1.5deg);position:relative;max-width:100%}
+.scale-label::before{content:"";position:absolute;inset:0 0 auto;height:8px;background:var(--amber);border-radius:6px 6px 0 0}
+.scale-label .row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.scale-label .row:last-of-type{border-bottom:0}
+.scale-label .big{font-size:1.6rem;font-weight:600;color:var(--ink)}
+.scale-label .k{color:var(--muted)}
 .barcode{height:46px;margin-top:12px;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 4px,var(--ink) 4px 5px,transparent 5px 8px,var(--ink) 8px 11px,transparent 11px 12px)}
-.label .pid{text-align:center;letter-spacing:.2em;margin-top:6px}
+.scale-label .pid{text-align:center;letter-spacing:.2em;margin-top:6px}
 .stamp{position:absolute;right:-10px;bottom:-14px;background:var(--amber);color:var(--amber-ink);font-weight:600;padding:6px 10px;border-radius:4px;transform:rotate(4deg);font-size:.8rem}
 
 section.block{padding-block:72px;border-top:1px solid var(--line)}
@@ -95,7 +95,7 @@ section.block{padding-block:72px;border-top:1px solid var(--line)}
 .feat p{color:var(--muted);font-size:.98rem}
 .feat ul{margin:4px 0 0;padding-left:18px;font-size:.95rem;display:grid;gap:4px}
 @media (max-width:900px){.feat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:600px){.feat-grid{grid-template-columns:1fr}.hero .wrap{grid-template-columns:1fr}.label{transform:none}}
+@media (max-width:600px){.feat-grid{grid-template-columns:1fr}.hero .wrap{grid-template-columns:1fr}.scale-label{transform:none}}
 
 /* contoh hitung */
 .calc{margin-top:40px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
@@ -110,7 +110,8 @@ section.block{padding-block:72px;border-top:1px solid var(--line)}
 .flow{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;margin-top:40px;align-items:start}
 .flow + .flow{padding-top:40px;border-top:1px dashed var(--line)}
 .diagram{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;overflow-x:auto;min-width:0}
-.diagram pre.mermaid{margin:0;background:transparent;font-family:var(--body);display:flex;justify-content:center}
+.diagram pre.mermaid{margin:0;background:transparent;font-family:var(--body);display:flex;justify-content:center;line-height:1.5}
+.diagram .nodeLabel,.diagram .edgeLabel{text-align:center;line-height:1.5}
 .steps{display:grid;gap:14px;counter-reset:s;min-width:0}
 .steps h3{margin-bottom:4px}
 .steps > p{color:var(--muted)}
@@ -193,7 +194,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <div><b class="mono">7 hari</b><span>antrean offline</span></div>
       </div>
     </div>
-    <div class="label" aria-label="Contoh label kemasan daging">
+    <div class="scale-label" aria-label="Contoh label kemasan daging">
       <div class="row"><span class="k">PRODUK</span><span>SIRLOIN AUS</span></div>
       <div class="row"><span class="k">BERAT BERSIH</span><span class="big">1,500 kg</span></div>
       <div class="row"><span class="k">HARGA/KG</span><span>Rp200.000</span></div>
@@ -492,7 +493,7 @@ flowchart TD
 
     <div class="flow" id="alur-sync">
       <div class="diagram"><pre class="mermaid">
-flowchart LR
+flowchart TD
   subgraph RL["Rasentra Lokal (outlet)"]
     T[Transaksi disimpan] --> O[(Outbox)]
     AK[Tarik delta dan konfirmasi]
@@ -608,7 +609,16 @@ document.addEventListener('click',function(e){
 @endverbatim
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
-mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+// Gambar setelah font web siap: ukuran kotak dihitung dari lebar teks, jadi bila font berganti
+// setelah render, teks bergeser keluar kotak.
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'neutral',
+  themeVariables: { fontFamily: '"Source Sans 3", "Segoe UI", system-ui, sans-serif', fontSize: '15px' },
+  flowchart: { htmlLabels: true, useMaxWidth: true, padding: 12 },
+});
+await document.fonts.ready;
+await mermaid.run({ querySelector: 'pre.mermaid' });
 </script>
 </body>
 </html>
