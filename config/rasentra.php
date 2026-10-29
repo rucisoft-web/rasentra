@@ -42,6 +42,12 @@ return [
 
     'quantity_scale' => 6,
 
+    // Rasentra POS: batas hari retur sejak tanggal struk, dan nama toko di kepala struk.
+    'pos' => [
+        'return_days' => (int) env('RASENTRA_RETURN_DAYS', 7),
+        'receipt_footer' => env('RASENTRA_RECEIPT_FOOTER', 'Terima kasih atas kunjungan Anda'),
+    ],
+
     'sync' => [
         // Backoff eksponensial (detik) dengan jitter agar 20 outlet tidak retry serentak.
         'backoff_base' => 5,
@@ -68,6 +74,6 @@ return [
         'warn_ratio' => 0.75,
         // Tiket siap tetap tampil di layar antrean pickup selama N menit setelah disajikan.
         'queue_linger_minutes' => 3,
-        'pickup_channels' => ['takeaway', 'pickup'],
+        'pickup_channels' => ['takeaway', 'pickup', 'delivery'],
     ],
 ];

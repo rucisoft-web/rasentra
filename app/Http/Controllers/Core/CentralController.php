@@ -63,7 +63,7 @@ class CentralController extends Controller
             'inbox' => [
                 'hour' => InboxEvent::where('created_at', '>=', now()->subHour())->count(),
                 'day' => InboxEvent::where('created_at', '>=', now()->subDay())->count(),
-                'waiting' => InboxEvent::where('event_type', 'order.finalized')->where('status', 'accepted')->count(),
+                'waiting' => InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->where('status', 'accepted')->count(),
                 'rejected' => InboxEvent::where('status', 'rejected')->where('created_at', '>=', now()->subDay())->count(),
                 'last' => InboxEvent::max('created_at'),
             ],

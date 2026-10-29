@@ -7,7 +7,7 @@
     $maxCat = max(1, (float) $byCategory->max(fn ($c) => (float) $c->net));
 @endphp
 <div class="grid g4">
-  <div class="card kpi"><div class="label">Penjualan bersih</div><div class="value">{{ Fmt::money($totals->net) }}</div><div class="note">{{ $r->from()->translatedFormat('d M') }} – {{ $r->to()->translatedFormat('d M Y') }}</div></div>
+  <div class="card kpi"><div class="label">Penjualan bersih</div><div class="value">{{ Fmt::money($totals->net) }}</div><div class="note">{{ $r->from()->translatedFormat('d M') }} – {{ $r->to()->translatedFormat('d M Y') }}@if($totals->returns) · setelah {{ $totals->returns }} retur {{ Fmt::money($totals->returned) }}@endif</div></div>
   <div class="card kpi"><div class="label">Jumlah struk</div><div class="value">{{ number_format($totals->orders, 0, ',', '.') }}</div><div class="note">rata-rata {{ Fmt::money($totals->avg) }} per struk</div></div>
   <div class="card kpi"><div class="label">Penjualan kotor</div><div class="value">{{ Fmt::money($totals->gross) }}</div><div class="note">sebelum potongan promo</div></div>
   <div class="card kpi"><div class="label">Potongan promo</div><div class="value">{{ Fmt::money($totals->discount) }}</div><div class="note">@if((float) $totals->gross > 0){{ number_format((float) $totals->discount / (float) $totals->gross * 100, 1, ',', '.') }}% dari kotor @else - @endif</div></div>

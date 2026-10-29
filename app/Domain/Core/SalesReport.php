@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class SalesReport
 {
+    /** Retur tersimpan sebagai dokumen negatif: nilai otomatis bersih, tetapi jumlah struk hanya menghitung penjualan. */
+    private const SALES_COUNT = "SUM(CASE WHEN o.kind = 'sale' THEN 1 ELSE 0 END)";
+
     public function __construct(
         private readonly Carbon $from,
         private readonly Carbon $to,
@@ -56,14 +59,17 @@ final class SalesReport
     {
         return $this->orders()->join('outlets', 'outlets.id', '=', 'o.outlet_id')->join('business_units as bu', 'bu.id', '=', 'outlets.business_unit_id')
             ->groupBy('bu.id', 'bu.name', 'bu.sap_company_db')
-            ->selectRaw('bu.id, bu.name, bu.sap_company_db, COUNT(*) as orders, SUM(o.discount_amount) as discount, SUM(o.net_amount) as net')
+            ->selectRaw('bu.id, bu.name, bu.sap_company_db, '.self::SALES_COUNT.' as orders, SUM(o.discount_amount) as discount, SUM(o.net_amount) as net')
             ->orderByDesc('net')->get();
     }
 
     /** @return object{orders:int, gross:string, discount:string, net:string} */
     public function totals(): object
     {
-        $row = $this->orders()->selectRaw('COUNT(*) as orders, COALESCE(SUM(o.gross_amount),0) as gross, COALESCE(SUM(o.discount_amount),0) as discount, COALESCE(SUM(o.net_amount),0) as net')->first();
+        $row = $this->orders()->selectRaw('COALESCE('.self::SALES_COUNT.',0) as orders, COALESCE(SUM(o.gross_amount),0) as gross, COALESCE(SUM(o.discount_amount),0) as discount, COALESCE(SUM(o.net_amount),0) as net,'
+            ."SUM(CASE WHEN o.kind = 'return' THEN 1 ELSE 0 END) as returns, COALESCE(SUM(CASE WHEN o.kind = 'return' THEN -o.net_amount ELSE 0 END),0) as returned")->first();
+        $row->orders = (int) $row->orders;
+        $row->returns = (int) $row->returns;
         $row->avg = $row->orders > 0 ? (string) Decimal::of((string) $row->net)->dividedBy($row->orders, 2, Decimal::rounding()) : '0';
 
         return $row;
@@ -73,14 +79,14 @@ final class SalesReport
     {
         return $this->orders()->join('outlets', 'outlets.id', '=', 'o.outlet_id')
             ->groupBy('o.outlet_id', 'outlets.code', 'outlets.name')
-            ->selectRaw('o.outlet_id, outlets.code, outlets.name, COUNT(*) as orders, SUM(o.discount_amount) as discount, SUM(o.net_amount) as net')
+            ->selectRaw('o.outlet_id, outlets.code, outlets.name, '.self::SALES_COUNT.' as orders, SUM(o.discount_amount) as discount, SUM(o.net_amount) as net')
             ->orderByDesc('net')->get();
     }
 
     public function byDay(): Collection
     {
         $rows = $this->orders()->groupBy('o.business_date')
-            ->selectRaw('o.business_date as day, COUNT(*) as orders, SUM(o.net_amount) as net')
+            ->selectRaw('o.business_date as day, '.self::SALES_COUNT.' as orders, SUM(o.net_amount) as net')
             ->get()->keyBy(fn ($r) => Carbon::parse($r->day)->toDateString());
 
         // Hari tanpa transaksi tetap tampil sebagai nol agar tren terbaca.
@@ -96,13 +102,13 @@ final class SalesReport
     public function byChannel(): Collection
     {
         return $this->orders()->groupBy('o.channel')
-            ->selectRaw('o.channel, COUNT(*) as orders, SUM(o.net_amount) as net')->orderByDesc('net')->get();
+            ->selectRaw('o.channel, '.self::SALES_COUNT.' as orders, SUM(o.net_amount) as net')->orderByDesc('net')->get();
     }
 
     public function byPayment(): Collection
     {
         return $this->orders()->join('hq_order_payments as p', 'p.hq_order_id', '=', 'o.id')
-            ->groupBy('p.method')->selectRaw('p.method, COUNT(*) as payments, SUM(p.amount) as amount')->orderByDesc('amount')->get();
+            ->groupBy('p.method')->selectRaw('p.method, SUM(CASE WHEN p.amount > 0 THEN 1 ELSE 0 END) as payments, SUM(p.amount) as amount')->orderByDesc('amount')->get();
     }
 
     public function byCategory(): Collection

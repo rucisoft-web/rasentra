@@ -7,7 +7,7 @@
     $sapIssues = ($sap['needs_review'] ?? 0) + ($sap['failed'] ?? 0) + ($sap['partially_posted'] ?? 0);
 @endphp
 <div class="grid g4">
-  <div class="card kpi"><div class="label">Penjualan bersih hari ini</div><div class="value">{{ Fmt::money($totals->net) }}</div><div class="note">{{ $totals->orders }} struk · rata-rata {{ Fmt::money($totals->avg) }}</div></div>
+  <div class="card kpi"><div class="label">Penjualan bersih hari ini</div><div class="value">{{ Fmt::money($totals->net) }}</div><div class="note">{{ $totals->orders }} struk · rata-rata {{ Fmt::money($totals->avg) }}@if($totals->returns) · {{ $totals->returns }} retur {{ Fmt::money($totals->returned) }}@endif</div></div>
   <div class="card kpi"><div class="label">Potongan promo hari ini</div><div class="value">{{ Fmt::money($totals->discount) }}</div><div class="note">dari penjualan kotor {{ Fmt::money($totals->gross) }}</div></div>
   <div class="card kpi"><div class="label">Outlet tersinkron (15 menit)</div><div class="value">{{ $synced }} / {{ $outlets->count() }}</div><div class="note">{{ $outlets->where('health', 'none')->count() }} outlet belum mengirim data</div></div>
   <div class="card kpi"><div class="label">Perlu tindakan</div><div class="value">{{ $sapIssues + $exceptions }}</div><div class="note">{{ $sapIssues }} dokumen SAP, {{ $exceptions }} masalah integrasi</div></div>

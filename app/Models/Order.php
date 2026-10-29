@@ -24,6 +24,7 @@ class Order extends Model
             'net_amount' => 'decimal:2',
             'promotion_snapshot' => 'array',
             'finalized_at' => 'datetime',
+            'promised_at' => 'datetime',
         ];
     }
 
@@ -42,6 +43,16 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function returns(): HasMany
+    {
+        return $this->hasMany(SalesReturn::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public function outlet(): BelongsTo
     {
         return $this->belongsTo(Outlet::class);
@@ -50,5 +61,11 @@ class Order extends Model
     public function isEditable(): bool
     {
         return in_array($this->status, ['draft', 'held', 'confirmed'], true);
+    }
+
+    /** Struk final yang bisa dicetak ulang dan diretur. */
+    public function isFinal(): bool
+    {
+        return $this->doc_no !== null && $this->finalized_at !== null;
     }
 }

@@ -88,7 +88,7 @@ class MonitoringController extends Controller
             'counts' => SapDocument::when($company, fn ($q, $c) => $q->where('company_db', $c))->groupBy('status')->selectRaw('status, COUNT(*) as n')->pluck('n', 'status'),
             'companies' => BusinessUnit::whereNotNull('sap_company_db')->orderBy('id')->get(),
             'company' => $company,
-            'waiting' => InboxEvent::where('event_type', 'order.finalized')->where('status', 'accepted')->count(),
+            'waiting' => InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->where('status', 'accepted')->count(),
             'statuses' => self::SAP_STATUS,
         ]);
     }
@@ -114,11 +114,12 @@ class MonitoringController extends Controller
 
     public function retrySap(Request $request, SapDocument $document, SapPostingService $sap): RedirectResponse
     {
-        $event = InboxEvent::where('event_type', 'order.finalized')->where('entity_id', $document->source_id)->latest('id')->first();
-        abort_if($event === null, 404, 'Event penjualan sumber tidak ditemukan di inbox.');
+        $type = $document->source_type === 'sales_return' ? 'order.returned' : 'order.finalized';
+        $event = InboxEvent::where('event_type', $type)->where('entity_id', $document->source_id)->latest('id')->first();
+        abort_if($event === null, 404, 'Event sumber tidak ditemukan di inbox.');
 
         // Posting ulang selalu memeriksa U_POS_SRC di SAP lebih dulu, jadi tidak membuat dokumen ganda.
-        $result = $sap->postSale($event->payload);
+        $result = $sap->postEvent($event);
         if ($result['status'] === 'posted') {
             $event->update(['status' => 'processed']);
         }

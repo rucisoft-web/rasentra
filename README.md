@@ -103,6 +103,18 @@ Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan k
 
 **Outlet Lombok (Meatshop dan El Primo).** Set `RASENTRA_OUTLET_CODE=LBK`. Katalog dan resep sama dengan Solo, sedangkan harga (Solo + 5%), promo, meja El Primo, cooking fee dan petugas milik Lombok sendiri: Baiq Nurul kasir Meatshop 1111, Lalu Ahmad kasir El Primo 1212, Made kepala outlet 9999, Wayan pelayan 3333, Chef Rizal 2222, Hamdi gudang 4444.
 
+## Rasentra POS (kasir)
+
+Layar sentuh untuk kasir retail dan resto. Selain scan Pack ID/barcode, promo otomatis, pembayaran campuran, tahan pesanan, cooking fee dan kirim dapur, kasir punya:
+
+- **Struk 80 mm.** Setelah transaksi selesai, struk langsung tercetak ke printer thermal (halaman cetak `/pos/receipt/{order}`, ukuran kertas 80 mm). Cetakan berikutnya bertanda **SALINAN ke-N** dan tercatat di audit log (`receipt.reprinted`). Footer struk diatur lewat `RASENTRA_RECEIPT_FOOTER`.
+- **Riwayat.** Tombol Riwayat menampilkan struk hari ini, dengan pencarian nomor struk, nama atau telepon pemesan. Dari detail struk kasir bisa cetak ulang atau memproses retur.
+- **Retur penjualan.** Selalu butuh PIN kepala outlet dan alasan, paling lama `RASENTRA_RETURN_DAYS` hari (bawaan 7) sejak transaksi. Nilai dihitung pro-rata dari harga setelah promo. Daging dengan Pack ID diretur utuh dan masuk lokasi karantina (status pack `quarantine`); barang retail bisa kembali ke stok atau ke karantina bila rusak; menu dan jasa masak hanya pengembalian uang. Uang kembali tunai dari laci kasir (mengurangi saldo kas shift), atau lewat metode bayar asal sebatas nominalnya. Nomor retur `SLO-R261029-0001`, bukti retur tercetak untuk ditandatangani pelanggan.
+- **Pickup dan delivery.** Kanal ini tersedia juga untuk meatshop. Nama dan telepon pemesan wajib, delivery juga wajib alamat; waktu ambil/kirim dan catatan opsional. Datanya tercetak di struk.
+- **Laporan shift.** Laporan sementara bisa dicetak kapan saja dari menu Shift. Saat tutup shift, laporan akhir (penjualan per kanal, pembayaran, retur dan refund, kas masuk/keluar, tunai seharusnya, hitungan, selisih) langsung tercetak untuk ditandatangani kasir dan kepala outlet.
+
+Retur dikirim ke Rasentra Central sebagai event `order.returned`. Di Central retur menjadi dokumen bernilai negatif pada tanggal bisnis retur, sehingga laporan Core menampilkan penjualan bersih setelah retur, sedangkan jumlah struk tetap hanya menghitung penjualan. Tutup hari ikut mengirim jumlah dan nomor retur untuk rekonsiliasi. Di SAP, retur diposting sebagai A/R Credit Memo yang merujuk baris invoice struk asal, lalu Outgoing Payment ke pelanggan. Bila invoice asal belum terposting, retur berstatus "menunggu dokumen lain" dan diposting otomatis pada putaran berikutnya.
+
 ## Rasentra Core (admin kantor pusat)
 
 Login di `/core/login` dengan email dan kata sandi `password`:
@@ -155,7 +167,7 @@ Rasentra Central adalah instalasi `RASENTRA_PROFILE=central` di kantor pusat. AP
 
 | Endpoint | Fungsi |
 | --- | --- |
-| `POST events` | Terima event outbox dari Lokal secara idempoten (`order.finalized`, `business_day.closed`). |
+| `POST events` | Terima event outbox dari Lokal secara idempoten (`order.finalized`, `order.returned`, `business_day.closed`). |
 | `GET changes?cursor=` | Publikasi sejak cursor: harga, promo, resep, cooking fee, serta master produk, outlet, lokasi, meja dan petugas. |
 | `GET snapshot` | Data lengkap untuk Rasentra Lokal baru, khusus server outlet karena berisi hash PIN petugas. |
 | `POST ack` | Lokal melaporkan publikasi yang diterapkan atau gagal beserta cursor terakhir. |
@@ -183,7 +195,9 @@ Perintah lain: `rasentra:pull`, `rasentra:heartbeat`, `rasentra:close-day {tangg
 2. **Pilih ikan, dimasak di resto.** Pilih kanal Dine-in, scan `PK-100031`, sentuh barisnya, lalu pilih Masak di resto → Bakar. Jasa bakar muncul sebagai baris terpisah. Tekan Kirim dapur.
 3. **Dapur.** Login Chef Bambang dan buka station Grill. Tiket berwarna hijau/kuning/merah sesuai target waktu. Sentuh Mulai masak lalu Siap, atau scan barcode tiket. Layar Expeditor menunggu sampai semua station lengkap. Layar Antrean ada di `/kitchen/queue`.
 4. **Penerimaan barang.** Login Wawan di handheld, buka tab Terima, lalu scan `PK-120001`. Untuk pack rusak, pilih Tolak dan isi alasan; stoknya masuk karantina.
-5. **Stok opname.** Lanjutkan sesi yang sedang berjalan: scan QR lokasi (`RAK`, `ESF`, `FRZ`, ...), lalu scan barang. Hendra menekan Review. Selisih di atas ambang wajib dihitung ulang oleh petugas lain (Yuni) sebelum disetujui.
+5. **Retur dan cetak ulang.** Tekan Riwayat, pilih struk tadi. Cetak ulang struk menghasilkan tanda SALINAN. Tekan Retur barang, pilih pack atau barang, alasan dan metode refund, lalu Hendra memasukkan PIN 9999. Bukti retur tercetak, pack masuk karantina.
+6. **Delivery.** Pilih kanal Delivery, scan `PK-100006`, isi nama, telepon dan alamat pemesan, lalu bayar. Di menu Shift, tutup shift untuk mencetak laporan tutup shift.
+7. **Stok opname.** Lanjutkan sesi yang sedang berjalan: scan QR lokasi (`RAK`, `ESF`, `FRZ`, ...), lalu scan barang. Hendra menekan Review. Selisih di atas ambang wajib dihitung ulang oleh petugas lain (Yuni) sebelum disetujui.
 
 Uji otomatis memakai outlet terpisah `UJI` (DemoSeeder, di bawah CV Solo Kulina Utama) yang tidak ikut `migrate:fresh --seed`.
 
@@ -201,6 +215,7 @@ Uji mencakup skenario UAT spesifikasi:
 - Impor XML MSI/MSR.
 - Shift dan selisih kas.
 - Alur HTTP POS, papan dapur dan antrean.
+- Retur penjualan: PIN kepala outlet, pack ke karantina, barang kembali ke stok, kas shift berkurang, batas sisa retur, refund per metode; retur sampai laporan Central, rekonsiliasi tutup hari dan A/R Credit Memo SAP (termasuk menunggu invoice asal); riwayat, cetak ulang SALINAN, laporan tutup shift, dan data pemesan pickup/delivery.
 - Penerimaan barang dan opname.
 - Seeder demo Indoguna Group dan seluruh halaman Rasentra Core.
 - Posting ke instance SAP milik tiap perusahaan, koneksi per instance, dan tanggal bisnis WITA untuk Lombok.

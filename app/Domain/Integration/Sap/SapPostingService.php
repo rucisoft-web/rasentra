@@ -32,9 +32,9 @@ final class SapPostingService
     public function postInbox(int $limit = 200): array
     {
         $summary = [];
-        $events = InboxEvent::where('event_type', 'order.finalized')->where('status', 'accepted')->orderBy('id')->limit($limit)->get();
+        $events = InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->where('status', 'accepted')->orderBy('id')->limit($limit)->get();
         foreach ($events as $event) {
-            $result = $this->postSale($event->payload);
+            $result = $this->postEvent($event);
             if ($result['status'] === 'posted') {
                 $event->update(['status' => 'processed']);
             }
@@ -42,6 +42,60 @@ final class SapPostingService
         }
 
         return $summary;
+    }
+
+    public function postEvent(InboxEvent $event): array
+    {
+        return $event->event_type === 'order.returned' ? $this->postReturn($event->payload) : $this->postSale($event->payload);
+    }
+
+    /**
+     * Posting retur (payload event order.returned): A/R Credit Memo yang merujuk invoice struk asal,
+     * lalu Outgoing Payment ke pelanggan untuk uang yang dikembalikan. Bila invoice asal belum
+     * terposting, retur menunggu (waiting_dependency) dan dicoba lagi pada putaran berikutnya.
+     */
+    public function postReturn(array $return): array
+    {
+        $companyDb = Outlet::sapCompanyDb((int) $return['outlet_id']);
+        if (! $companyDb) {
+            return ['status' => 'failed', 'missing' => ['company:sap_company_db']];
+        }
+        $lock = Cache::lock("sap:sales_return:{$return['id']}", 120);
+        if (! $lock->get()) {
+            return ['status' => 'locked'];
+        }
+
+        try {
+            $missing = $this->missingMappings($companyDb, ['lines' => $return['lines'], 'payments' => [['method' => $return['refund']['method']]]]);
+            if ($missing !== []) {
+                IntegrationException::updateOrCreate(
+                    ['kind' => 'missing_mapping', 'source_type' => 'sales_return', 'source_id' => $return['id'], 'status' => 'open'],
+                    ['message' => "Mapping SAP {$companyDb} belum ada: ".implode(', ', $missing)],
+                );
+
+                return ['status' => 'failed', 'missing' => $missing];
+            }
+
+            $invoice = SapDocument::where(['company_db' => $companyDb, 'source_type' => 'order', 'source_id' => $return['original_order_id'], 'sap_object' => 'Invoices', 'status' => 'posted'])->first();
+            if ($invoice === null) {
+                SapDocument::updateOrCreate(
+                    ['company_db' => $companyDb, 'source_type' => 'sales_return', 'source_id' => $return['id'], 'sap_object' => 'CreditNotes'],
+                    ['status' => 'waiting_dependency', 'last_error' => "Menunggu invoice struk {$return['original_doc_no']} terposting."],
+                );
+
+                return ['status' => 'waiting_dependency'];
+            }
+
+            $memo = $this->post($companyDb, 'sales_return', $return['id'], 'CreditNotes', $this->creditNotePayload($companyDb, $return, $invoice));
+            if ($memo->status !== 'posted') {
+                return ['status' => $memo->status];
+            }
+            $payment = $this->post($companyDb, 'sales_return', $return['id'], 'VendorPayments', $this->refundPayload($companyDb, $return, $memo->doc_entry));
+
+            return ['status' => $payment->status === 'posted' ? 'posted' : 'partially_posted'];
+        } finally {
+            $lock->release();
+        }
     }
 
     /** Posting penjualan (payload event order.finalized): A/R Invoice lalu Incoming Payment. */
@@ -95,6 +149,9 @@ final class SapPostingService
 
         if ($doc->status === 'posted') {
             return $doc; // retry melanjutkan tahap yang belum selesai saja
+        }
+        if ($doc->request_payload === null) {
+            $doc->update(['request_payload' => $payload]); // dokumen yang sebelumnya menunggu dependensi
         }
 
         $ref = "{$sourceType}:{$sourceId}";
@@ -162,6 +219,64 @@ final class SapPostingService
                 'U_POS_PACK' => $l['pack_id'],
             ], fn ($v) => $v !== null), $order['lines']),
         ];
+    }
+
+    private function creditNotePayload(string $companyDb, array $return, SapDocument $invoice): array
+    {
+        $item = fn ($id) => SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'product', 'entity_key' => (string) $id])->first();
+        $customer = $invoice->request_payload['CardCode'] ?? 'C-UMUM';
+
+        return [
+            'CardCode' => $customer,
+            'DocDate' => $return['business_date'],
+            'NumAtCard' => $return['doc_no'],
+            'Comments' => "Retur struk {$return['original_doc_no']}: {$return['reason']}",
+            'DocTotal' => $return['net_amount'],
+            'DocumentLines' => array_map(fn ($l) => array_filter([
+                'ItemCode' => $item($l['product_id'])->sap_code,
+                'Quantity' => $l['quantity'],
+                'UnitPrice' => $l['unit_price'],
+                'LineTotal' => $l['net_amount'],
+                'WarehouseCode' => $invoice->request_payload['DocumentLines'][0]['WarehouseCode'] ?? null,
+                'TaxCode' => $item($l['product_id'])->attributes['tax_code'] ?? null,
+                // Menyalin dari invoice asal agar SAP menautkan retur ke penjualannya.
+                'BaseType' => $l['order_line_no'] !== null ? 13 : null,
+                'BaseEntry' => $l['order_line_no'] !== null ? $invoice->doc_entry : null,
+                'BaseLine' => $l['order_line_no'] !== null ? $this->invoiceLineIndex($invoice, $l) : null,
+                'U_POS_LINE_TYPE' => $l['line_type'],
+                'U_POS_PACK' => $l['pack_id'],
+                'U_POS_DISPOSITION' => $l['disposition'],
+            ], fn ($v) => $v !== null), $return['lines']),
+        ];
+    }
+
+    /** Posisi baris di invoice SAP (berurutan seperti baris aktif struk). */
+    private function invoiceLineIndex(SapDocument $invoice, array $line): ?int
+    {
+        $order = DB::table('hq_order_lines')->where('hq_order_id', $invoice->source_id)->orderBy('line_no')->pluck('line_no')->values()->all();
+        $index = array_search($line['order_line_no'], $order, true);
+
+        return $index === false ? null : $index;
+    }
+
+    private function refundPayload(string $companyDb, array $return, int $creditNoteDocEntry): array
+    {
+        $method = $return['refund']['method'];
+        $account = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'payment_method', 'entity_key' => $method])->value('sap_code');
+        $customer = SapDocument::where(['company_db' => $companyDb, 'source_type' => 'sales_return', 'source_id' => $return['id'], 'sap_object' => 'CreditNotes'])->first()?->request_payload['CardCode'] ?? 'C-UMUM';
+
+        return array_filter([
+            'DocType' => 'rCustomer',
+            'CardCode' => $customer,
+            'DocDate' => $return['business_date'],
+            'DocTotal' => $return['net_amount'],
+            'CashSum' => $method === 'cash' ? $return['net_amount'] : null,
+            'CashAccount' => $method === 'cash' ? $account : null,
+            'TransferSum' => $method !== 'cash' ? $return['net_amount'] : null,
+            'TransferAccount' => $method !== 'cash' ? $account : null,
+            'TransferReference' => $return['refund']['ref'] ?? null,
+            'PaymentInvoices' => [['DocEntry' => $creditNoteDocEntry, 'InvoiceType' => 'it_CredItnote', 'SumApplied' => $return['net_amount']]],
+        ], fn ($v) => $v !== null);
     }
 
     private function paymentPayload(string $companyDb, array $order, int $invoiceDocEntry): array

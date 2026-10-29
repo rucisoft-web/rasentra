@@ -10,7 +10,7 @@
 
 <div class="grid g4">
   <div class="card kpi"><div class="label">Struk</div><div class="value">{{ $s['orders'] }}</div><div class="note">{{ collect($s['by_channel'])->map(fn ($c, $k) => "$k {$c['orders']}")->implode(' · ') ?: '-' }}</div></div>
-  <div class="card kpi"><div class="label">Penjualan bersih</div><div class="value">{{ Fmt::money($s['net_amount']) }}</div><div class="note">kotor {{ Fmt::money($s['gross_amount']) }} · potongan {{ Fmt::money($s['discount_amount']) }}</div></div>
+  <div class="card kpi"><div class="label">Penjualan bersih</div><div class="value">{{ Fmt::money($s['net_amount']) }}</div><div class="note">kotor {{ Fmt::money($s['gross_amount']) }} · potongan {{ Fmt::money($s['discount_amount']) }}@if($s['returns'] ?? 0) · {{ $s['returns'] }} retur {{ Fmt::money($s['returns_net_amount']) }}@endif</div></div>
   <div class="card kpi"><div class="label">Selisih kas shift</div><div class="value">{{ Fmt::money($s['cash_difference']) }}</div><div class="note">{{ count($s['shifts']) }} shift</div></div>
   <div class="card kpi"><div class="label">Status</div><div class="value">@if($closed)<span class="b {{ $statuses[$closed->status][1] ?? 'mute' }}">Ditutup v{{ $closed->entity_version }}</span>@else<span class="b mute">Belum ditutup</span>@endif</div>
     <div class="note">@if($closed){{ $statuses[$closed->status][0] ?? $closed->status }} · {{ Fmt::dt($closed->occurred_at) }}@else - @endif</div></div>

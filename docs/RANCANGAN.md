@@ -137,7 +137,7 @@ Skema yang sama dipakai di outlet dan pusat; di pusat setiap tabel transaksi dii
 | --- | --- | --- |
 | Organisasi & master | `business_units`, `regions`, `outlet_groups`, `outlets`, `locations`, `warehouses`, `devices`, `users`, `roles`, `products`, `uoms`, `price_versions`, `price_items`, `menus`, `modifiers`, `sap_mappings` | `outlets.code` unik; `sap_mappings (entity_type, entity_id, company_db)` unik |
 | Kemasan | `packs`, `pack_events`, `batches`, `packing_runs`, `repack_links` | `packs.pack_code` unik global, tidak dipakai ulang |
-| Penjualan | `orders`, `order_lines`, `order_line_modifiers`, `tax_lines`, `discount_allocations`, `receipts`, `returns`, `return_lines` | `orders (outlet_id, doc_no)` unik; `order_lines.pack_id` unik untuk baris aktif |
+| Penjualan | `orders`, `order_lines`, `order_line_modifiers`, `tax_lines`, `discount_allocations`, `receipts`, `sales_returns`, `sales_return_lines` | `orders (outlet_id, doc_no)` unik; `order_lines.pack_id` unik untuk baris aktif |
 | Restoran | `tables`, `visits`, `kitchen_tickets`, `ticket_items`, `station_acknowledgements` | `visits.visit_token` unik; `ticket_items (id, revision)` |
 | Cooking fee | `cooking_fee_rules`, `cooking_jobs`, `cooking_job_parts`, `service_entitlements` | `service_entitlements (receipt_id, pack_id)` unik |
 | Resep & produksi | `recipes`, `recipe_versions`, `recipe_lines`, `production_batches`, `production_inputs`, `production_outputs`, `consumption_events`, `wastes` | Larangan siklus divalidasi saat approve versi |
@@ -289,7 +289,7 @@ Semua API berversi (`/api/v1`), memakai JSON, HTTPS dan token perangkat yang dib
 | `POST /orders/{id}/finalize` | Finalisasi penjualan, potong stok, nomor struk | Satu transaksi DB + outbox |
 | `GET /packs/resolve?code=` | Resolusi Pack ID atau barcode SKU | p95 ≤ 1 detik |
 | `POST /payments` / `GET /payments/{id}` | Buat pembayaran, cek status | Status `uncertain` dibedakan |
-| `POST /returns` | Retur mengacu struk asal | Keputusan kondisi barang terpisah dari refund |
+| `POST /pos/api/orders/{order}/returns` | Retur mengacu struk asal, PIN kepala outlet | Kondisi barang (stok/karantina) terpisah dari metode refund |
 | `POST /kds/items/{id}/ack` / `/status` | Ack dan ubah status station | Idempoten per `(item_id, revision, station)` |
 | `POST /cooking-jobs` | Buat pekerjaan cooking fee dari Pack ID | Cek hak layanan |
 | `POST /receipts` | Penerimaan barang (goods receipt) dari pengiriman | Parsial diizinkan |

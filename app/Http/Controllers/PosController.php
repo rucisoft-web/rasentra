@@ -3,22 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Cash\ShiftService;
+use App\Domain\Catalog\PriceResolver;
 use App\Domain\CookingService\CookingService;
 use App\Domain\Kitchen\KitchenService;
+use App\Domain\Sales\Approval;
 use App\Domain\Sales\OrderService;
 use App\Domain\Sales\PaymentService;
+use App\Domain\Sales\ReturnService;
+use App\Models\CookingFeeRule;
 use App\Models\CookingJob;
 use App\Models\Order;
 use App\Models\OrderLine;
 use App\Models\Outlet;
 use App\Models\Pack;
 use App\Models\Payment;
+use App\Models\PriceItem;
 use App\Models\Product;
 use App\Models\Shift;
+use App\Models\User;
+use App\Support\Decimal;
 use App\Support\DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 /**
  * API lokal untuk layar sentuh Rasentra POS. Berjalan di Rasentra Lokal (server outlet) melalui LAN dengan
@@ -32,6 +38,7 @@ class PosController extends Controller
         private readonly ShiftService $shifts,
         private readonly CookingService $cooking,
         private readonly KitchenService $kitchen,
+        private readonly ReturnService $returns,
     ) {}
 
     public function bootstrap(Request $request): JsonResponse
@@ -44,17 +51,17 @@ class PosController extends Controller
             'outlet' => $outlet->only(['id', 'code', 'name', 'has_restaurant', 'has_cooking_fee']) + ['region' => $outlet->region->name],
             'shift' => Shift::where('user_id', $user->id)->where('status', 'open')->first(),
             'categories' => Product::where('is_active', true)->whereNotNull('category')
-                ->whereIn('id', \App\Models\PriceItem::query()->join('price_versions as v', 'v.id', '=', 'price_items.price_version_id')
+                ->whereIn('id', PriceItem::query()->join('price_versions as v', 'v.id', '=', 'price_items.price_version_id')
                     ->where('v.status', 'published')->where(fn ($q) => $q->whereNull('v.outlet_id')->orWhere('v.outlet_id', $outlet->id))
                     ->select('price_items.product_id'))
                 ->distinct()->orderBy('category')->pluck('category'),
             'held' => Order::where('outlet_id', $outlet->id)->where('status', 'held')->latest()->limit(20)->get(['id', 'net_amount', 'created_at', 'channel']),
-            'cooking_methods' => $outlet->has_cooking_fee ? \App\Models\CookingFeeRule::query()
+            'cooking_methods' => $outlet->has_cooking_fee ? CookingFeeRule::query()
                 ->where(fn ($q) => $q->whereNull('outlet_id')->orWhere('outlet_id', $outlet->id))
                 ->where('effective_from', '<=', now())->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>', now()))
                 ->get(['method', 'basis', 'rate', 'minimum_fee'])->unique('method')->values() : [],
-            'approvers' => \App\Models\User::where('outlet_id', $outlet->id)->where('is_active', true)
-                ->whereIn('role', \App\Domain\Sales\Approval::APPROVER_ROLES)->where('id', '!=', $user->id)->get(['id', 'name']),
+            'approvers' => User::where('outlet_id', $outlet->id)->where('is_active', true)
+                ->whereIn('role', Approval::APPROVER_ROLES)->where('id', '!=', $user->id)->get(['id', 'name']),
         ]);
     }
 
@@ -68,7 +75,7 @@ class PosController extends Controller
             ->when($request->query('q'), fn ($q, $s) => $q->where(fn ($w) => $w->where('name', 'like', "%{$s}%")->orWhere('code', 'like', "{$s}%")->orWhere('barcode', $s)))
             ->orderBy('name')->limit(120)->get();
 
-        $prices = app(\App\Domain\Catalog\PriceResolver::class);
+        $prices = app(PriceResolver::class);
 
         // Hanya produk yang punya harga berlaku di outlet ini yang tampil di layar kasir.
         return response()->json($products->map(function (Product $p) use ($prices, $outletId) {
@@ -87,7 +94,7 @@ class PosController extends Controller
 
     public function createOrder(Request $request): JsonResponse
     {
-        $data = $request->validate(['channel' => ['nullable', 'in:retail,dine_in,takeaway,pickup']]);
+        $data = $request->validate(['channel' => ['nullable', 'in:retail,dine_in,takeaway,pickup,delivery']]);
         $user = $request->user();
         $shift = Shift::where('user_id', $user->id)->where('status', 'open')->first();
         if ($shift === null) {
@@ -207,7 +214,7 @@ class PosController extends Controller
         $this->authorizeOutlet($order);
         $order = $this->orders->finalize($order, $request->user());
 
-        return $this->orderResponse($order);
+        return response()->json($this->orderPayload($order->fresh()) + ['receipt_url' => route('pos.receipt', $order)]);
     }
 
     public function cooking(Request $request, OrderLine $line): JsonResponse
@@ -249,6 +256,94 @@ class PosController extends Controller
         return response()->json(['tickets' => count($tickets)] + $this->orderPayload($order->fresh()));
     }
 
+    /** Data pemesan untuk kanal pickup dan delivery. */
+    public function customer(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $data = $request->validate([
+            'customer_name' => ['required', 'string', 'max:80'],
+            'customer_phone' => ['required', 'string', 'max:30'],
+            'delivery_address' => [$order->channel === 'delivery' ? 'required' : 'nullable', 'string', 'max:300'],
+            'promised_at' => ['nullable', 'date'],
+            'fulfilment_note' => ['nullable', 'string', 'max:200'],
+        ]);
+        $this->orders->setCustomer($order, $data);
+
+        return $this->orderResponse($order);
+    }
+
+    /** Riwayat struk final outlet ini: hari ini, atau cari nomor struk / nama pemesan. */
+    public function history(Request $request): JsonResponse
+    {
+        $outletId = $request->user()->outlet_id;
+        $q = trim((string) $request->query('q', ''));
+        $date = $request->query('date') ?: Outlet::businessDate($outletId);
+
+        $orders = Order::query()->with('user:id,name')->withSum('returns', 'net_amount')
+            ->where('outlet_id', $outletId)->whereNotNull('finalized_at')
+            ->when($q !== '', fn ($w) => $w->where(fn ($x) => $x->where('doc_no', 'like', "%{$q}%")->orWhere('customer_name', 'like', "%{$q}%")->orWhere('customer_phone', 'like', "%{$q}%")))
+            ->when($q === '', fn ($w) => $w->whereDate('business_date', $date))
+            ->latest('finalized_at')->limit(60)->get();
+
+        return response()->json([
+            'date' => $date,
+            'orders' => $orders->map(fn (Order $o) => $o->only(['id', 'doc_no', 'channel', 'net_amount', 'customer_name', 'print_count']) + [
+                'finalized_at' => $o->finalized_at->toIso8601String(),
+                'cashier' => $o->user?->name,
+                'returned' => Decimal::money($o->returns_sum_net_amount ?? '0'),
+            ])->values(),
+        ]);
+    }
+
+    /** Detail struk final untuk cetak ulang dan retur: sisa yang bisa diretur per baris. */
+    public function orderDetail(Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        if (! $order->isFinal()) {
+            throw DomainException::conflict('order_not_final', 'Transaksi ini belum selesai.');
+        }
+        $payload = $this->orderPayload($order->fresh());
+        $lines = $order->lines()->where('status', 'active')->get()->keyBy('id');
+        $payload['lines'] = collect($payload['lines'])->map(fn ($l) => $l + [
+            'returned_quantity' => (string) $lines[$l['id']]->returned_quantity,
+            'returnable_quantity' => Decimal::qty(Decimal::of($lines[$l['id']]->quantity)->minus(Decimal::of($lines[$l['id']]->returned_quantity))),
+            'restockable' => $l['line_type'] === 'retail_product' && $l['pack_code'] === null,
+        ])->values();
+        $days = (int) config('rasentra.pos.return_days', 7);
+
+        return response()->json($payload + [
+            'customer' => $order->only(['customer_name', 'customer_phone', 'delivery_address', 'promised_at', 'fulfilment_note']),
+            'print_count' => $order->print_count,
+            'cashier' => $order->user?->name,
+            'returns' => $order->returns()->orderBy('doc_no')->get(['id', 'doc_no', 'net_amount', 'refund_method', 'reason', 'created_at']),
+            'refundable' => $this->returns->refundable($order),
+            'return_until' => $order->business_date->copy()->addDays($days)->toDateString(),
+            'can_return' => $order->business_date->copy()->addDays($days)->toDateString() >= Outlet::businessDate($order->outlet_id),
+        ]);
+    }
+
+    public function createReturn(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        $data = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.order_line_id' => ['required', 'string'],
+            'items.*.quantity' => ['required', 'numeric', 'gt:0'],
+            'items.*.restock' => ['nullable', 'boolean'],
+            'reason' => ['required', 'string', 'max:200'],
+            'refund.method' => ['required', 'in:cash,qris,edc,edc_manual,voucher'],
+            'refund.ref' => ['nullable', 'string', 'max:80'],
+            'approval' => ['nullable', 'array'],
+        ]);
+        $items = array_map(fn ($i) => ['order_line_id' => $i['order_line_id'], 'quantity' => (string) $i['quantity'], 'restock' => $i['restock'] ?? true], $data['items']);
+        $return = $this->returns->create($order, $request->user(), $items, $data['reason'], $data['refund'], $data['approval'] ?? null);
+
+        return response()->json([
+            'return' => $return->only(['id', 'doc_no', 'net_amount', 'refund_method']),
+            'receipt_url' => route('pos.receipt.return', $return),
+        ], 201);
+    }
+
     public function openShift(Request $request): JsonResponse
     {
         $data = $request->validate(['opening_cash' => ['required', 'numeric', 'gte:0']]);
@@ -282,7 +377,9 @@ class PosController extends Controller
         $data = $request->validate(['counts' => ['required', 'array'], 'approval' => ['nullable', 'array']]);
         $shift = Shift::where('user_id', $request->user()->id)->where('status', 'open')->firstOrFail();
 
-        return response()->json($this->shifts->close($shift, $request->user(), $data['counts'], $data['approval'] ?? null));
+        $shift = $this->shifts->close($shift, $request->user(), $data['counts'], $data['approval'] ?? null);
+
+        return response()->json($shift->toArray() + ['report_url' => route('pos.shift-report', $shift)]);
     }
 
     private function authorizeOutlet(Order $order): void
@@ -301,10 +398,11 @@ class PosController extends Controller
     {
         $order->load(['lines' => fn ($q) => $q->where('status', 'active')->with(['product:id,name,uom_code', 'pack:id,pack_code']), 'payments']);
         $jobs = CookingJob::where('order_id', $order->id)->get()->keyBy('id');
-        $paid = \App\Support\Decimal::sum($order->payments->where('status', 'succeeded')->pluck('amount'));
+        $paid = Decimal::sum($order->payments->where('status', 'succeeded')->pluck('amount'));
 
         return [
-            'order' => $order->only(['id', 'doc_no', 'channel', 'status', 'payment_status', 'gross_amount', 'discount_amount', 'net_amount', 'finalized_at']),
+            'order' => $order->only(['id', 'doc_no', 'channel', 'status', 'payment_status', 'gross_amount', 'discount_amount', 'net_amount', 'finalized_at',
+                'customer_name', 'customer_phone', 'delivery_address', 'promised_at', 'fulfilment_note']),
             'lines' => $order->lines->map(fn (OrderLine $l) => [
                 'id' => $l->id,
                 'line_type' => $l->line_type,
@@ -320,8 +418,8 @@ class PosController extends Controller
                 'cooking' => $l->cooking_job_id && $jobs->has($l->cooking_job_id) ? $jobs[$l->cooking_job_id]->only(['status', 'portions', 'doneness']) : null,
             ])->values(),
             'payments' => $order->payments->map->only(['id', 'method', 'amount', 'tendered', 'change_amount', 'status'])->values(),
-            'paid' => \App\Support\Decimal::money($paid),
-            'remaining' => \App\Support\Decimal::money(\App\Support\Decimal::of($order->net_amount)->minus($paid)),
+            'paid' => Decimal::money($paid),
+            'remaining' => Decimal::money(Decimal::of($order->net_amount)->minus($paid)),
         ];
     }
 }

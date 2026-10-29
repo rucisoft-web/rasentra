@@ -6,6 +6,7 @@ use App\Domain\Audit\Audit;
 use App\Models\OutboxEvent;
 use App\Models\Outlet;
 use App\Models\Payment;
+use App\Models\SalesReturn;
 use App\Models\Shift;
 use App\Support\Decimal;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,8 @@ final class DayCloser
             ->get(['id', 'doc_no', 'channel', 'net_amount', 'gross_amount', 'discount_amount']);
         $shifts = Shift::where('outlet_id', $outlet->id)->whereDate('business_date', $businessDate)->get();
         $payments = Payment::whereIn('order_id', $orders->pluck('id'))->where('status', 'succeeded')->get(['method', 'amount']);
+        // Retur dicatat pada tanggal bisnis saat retur dibuat, bukan tanggal struk asalnya.
+        $returns = SalesReturn::where('outlet_id', $outlet->id)->whereDate('business_date', $businessDate)->orderBy('doc_no')->get(['doc_no', 'net_amount', 'refund_method']);
 
         return [
             'outlet_code' => $outlet->code,
@@ -38,6 +41,10 @@ final class DayCloser
             'by_channel' => $orders->groupBy('channel')->map(fn ($g) => ['orders' => $g->count(), 'net_amount' => Decimal::money(Decimal::sum($g->pluck('net_amount')))])->all(),
             'payments' => $payments->groupBy('method')->map(fn ($g) => Decimal::money(Decimal::sum($g->pluck('amount'))))->all(),
             'doc_nos' => $orders->pluck('doc_no')->all(),
+            'returns' => $returns->count(),
+            'returns_net_amount' => Decimal::money(Decimal::sum($returns->pluck('net_amount'))),
+            'refunds' => $returns->groupBy('refund_method')->map(fn ($g) => Decimal::money(Decimal::sum($g->pluck('net_amount'))))->all(),
+            'return_doc_nos' => $returns->pluck('doc_no')->all(),
             'shifts' => $shifts->map(fn (Shift $s) => [
                 'id' => $s->id, 'user_id' => $s->user_id, 'status' => $s->status,
                 'cash_difference' => $s->cash_difference !== null ? Decimal::money((string) $s->cash_difference) : null,

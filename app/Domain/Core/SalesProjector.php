@@ -3,16 +3,24 @@
 namespace App\Domain\Core;
 
 use App\Models\InboxEvent;
+use App\Support\Decimal;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Rasentra Central: memproyeksikan event order.finalized dari inbox ke tabel hq_* untuk
- * laporan Rasentra Core. Idempoten per inbox event, jadi aman dijalankan ulang.
+ * Rasentra Central: memproyeksikan event order.finalized dan order.returned dari inbox ke
+ * tabel hq_* untuk laporan Rasentra Core. Retur menjadi dokumen kind=return bernilai negatif
+ * pada tanggal bisnis retur, sehingga penjumlahan biasa langsung menghasilkan penjualan bersih.
+ * Idempoten per inbox event, jadi aman dijalankan ulang.
  */
 final class SalesProjector
 {
     public function project(InboxEvent $event): void
     {
+        if ($event->event_type === 'order.returned') {
+            $this->projectReturn($event);
+
+            return;
+        }
         if ($event->event_type !== 'order.finalized') {
             return;
         }
@@ -69,13 +77,55 @@ final class SalesProjector
         });
     }
 
+    private function projectReturn(InboxEvent $event): void
+    {
+        $r = $event->payload;
+        $neg = fn ($v) => Decimal::money(Decimal::of((string) $v)->negated());
+
+        DB::transaction(function () use ($event, $r, $neg) {
+            if (DB::table('hq_orders')->where('id', $r['id'])->exists()) {
+                return;
+            }
+            DB::table('hq_orders')->insert([
+                'id' => $r['id'],
+                'inbox_event_id' => $event->id,
+                'outlet_id' => $event->outlet_id,
+                'doc_no' => $r['doc_no'],
+                'kind' => 'return',
+                'original_order_id' => $r['original_order_id'],
+                'channel' => $r['channel'],
+                'business_date' => $r['business_date'],
+                'gross_amount' => $neg($r['gross_amount']),
+                'discount_amount' => $neg($r['discount_amount']),
+                'net_amount' => $neg($r['net_amount']),
+                'finalized_at' => $r['finalized_at'] ?? $event->created_at,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            foreach ($r['lines'] ?? [] as $l) {
+                DB::table('hq_order_lines')->insert([
+                    'hq_order_id' => $r['id'],
+                    'line_no' => $l['line_no'],
+                    'line_type' => $l['line_type'],
+                    'product_id' => $l['product_id'],
+                    'quantity' => Decimal::qty(Decimal::of((string) $l['quantity'])->negated()),
+                    'uom' => $l['uom'],
+                    'gross_amount' => $neg($l['gross_amount']),
+                    'discount_amount' => $neg($l['discount_amount']),
+                    'net_amount' => $neg($l['net_amount']),
+                ]);
+            }
+            DB::table('hq_order_payments')->insert(['hq_order_id' => $r['id'], 'method' => $r['refund']['method'], 'amount' => $neg($r['refund']['amount'])]);
+        });
+    }
+
     public function rebuild(): int
     {
         foreach (['hq_order_payments', 'hq_order_discounts', 'hq_order_lines', 'hq_orders'] as $table) {
             DB::table($table)->delete();
         }
         $count = 0;
-        InboxEvent::where('event_type', 'order.finalized')->orderBy('id')->chunkById(500, function ($events) use (&$count) {
+        InboxEvent::whereIn('event_type', ['order.finalized', 'order.returned'])->orderBy('id')->chunkById(500, function ($events) use (&$count) {
             foreach ($events as $event) {
                 $this->project($event);
                 $count++;

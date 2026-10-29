@@ -295,6 +295,7 @@ final class OrderService
             if (! $order->isEditable()) {
                 throw DomainException::conflict('order_not_open', 'Pesanan tidak dapat difinalisasi.');
             }
+            $this->assertCustomer($order);
 
             $paid = Decimal::sum($order->payments()->where('status', 'succeeded')->pluck('amount'));
             if (! $paid->isEqualTo(Decimal::of($order->net_amount))) {
@@ -330,6 +331,37 @@ final class OrderService
 
             return $order->fresh();
         });
+    }
+
+    /** Data pemesan pickup/delivery. Boleh diubah selama pesanan belum final. */
+    public function setCustomer(Order $order, array $data): Order
+    {
+        return DB::transaction(function () use ($order, $data) {
+            $order = $this->lockEditable($order);
+            $order->update([
+                'customer_name' => $data['customer_name'] ?? null,
+                'customer_phone' => $data['customer_phone'] ?? null,
+                'delivery_address' => $data['delivery_address'] ?? null,
+                'promised_at' => $data['promised_at'] ?? null,
+                'fulfilment_note' => $data['fulfilment_note'] ?? null,
+            ]);
+
+            return $order;
+        });
+    }
+
+    /** Pickup butuh nama dan nomor telepon; delivery juga butuh alamat antar. */
+    private function assertCustomer(Order $order): void
+    {
+        if (! in_array($order->channel, ['pickup', 'delivery'], true)) {
+            return;
+        }
+        if (blank($order->customer_name) || blank($order->customer_phone)) {
+            throw new DomainException('customer_required', 'Isi nama dan nomor telepon pemesan untuk pesanan '.$order->channel.'.', 422);
+        }
+        if ($order->channel === 'delivery' && blank($order->delivery_address)) {
+            throw new DomainException('address_required', 'Isi alamat antar untuk pesanan delivery.', 422);
+        }
     }
 
     private function deductStock(Order $order, OrderLine $line, User $actor): void
@@ -406,6 +438,7 @@ final class OrderService
             'doc_no' => $order->doc_no,
             'outlet_id' => $order->outlet_id,
             'channel' => $order->channel,
+            'customer' => $order->customer_name ? ['name' => $order->customer_name, 'phone' => $order->customer_phone] : null,
             'business_date' => $order->business_date->toDateString(),
             'gross_amount' => (string) $order->gross_amount,
             'discount_amount' => (string) $order->discount_amount,

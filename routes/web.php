@@ -6,6 +6,7 @@ use App\Http\Controllers\Lokal\LokalController;
 use App\Http\Controllers\Lokal\SetupController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\PosController;
+use App\Http\Controllers\ReceiptController;
 use Illuminate\Support\Facades\Route;
 
 // Landing page Rasentra: fitur, alur kerja retail/resto, panduan.
@@ -41,12 +42,21 @@ Route::middleware(['auth', 'lokal'])->prefix('lokal')->name('lokal.')->controlle
 Route::middleware('auth')->group(function () {
     Route::view('/pos', 'pos.app')->name('pos');
     Route::get('pos/api/sync-status', [LokalController::class, 'posStatus']);
+    Route::controller(ReceiptController::class)->group(function () {
+        Route::get('pos/receipt/{order}', 'order')->name('pos.receipt');
+        Route::get('pos/receipt/return/{salesReturn}', 'salesReturn')->name('pos.receipt.return');
+        Route::get('pos/shift-report/{shift}', 'shift')->name('pos.shift-report');
+    });
 
     Route::prefix('pos/api')->controller(PosController::class)->group(function () {
         Route::get('bootstrap', 'bootstrap');
         Route::get('catalog', 'catalog');
         Route::post('orders', 'createOrder');
         Route::get('orders/{order}', 'showOrder');
+        Route::get('history', 'history');
+        Route::get('orders/{order}/detail', 'orderDetail');
+        Route::post('orders/{order}/returns', 'createReturn');
+        Route::post('orders/{order}/customer', 'customer');
         Route::post('orders/{order}/scan', 'scan');
         Route::post('orders/{order}/items', 'addItem');
         Route::post('orders/{order}/hold', 'hold');

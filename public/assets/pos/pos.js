@@ -112,10 +112,14 @@
   let sheetClose = null;
   function openSheet(title, html, onClose) {
     $('#sheet-title').textContent = title;
-    $('#sheet-content').innerHTML = html;
+    // Elemen konten baru setiap kali, agar handler klik lembar sebelumnya tidak ikut terpanggil.
+    const prev = $('#sheet-content');
+    const content = prev.cloneNode(false);
+    prev.replaceWith(content);
+    content.innerHTML = html;
     $('#sheet').hidden = false;
     sheetClose = onClose || null;
-    return $('#sheet-content');
+    return content;
   }
 
   function closeSheet() {
@@ -199,7 +203,7 @@
     const b = state.boot;
     $('#outlet-info').textContent = `${b.outlet.code} · ${b.outlet.name} · ${b.outlet.region} · ${b.user.name}`;
     $('#channel').querySelectorAll('button').forEach((btn) => {
-      if (btn.dataset.channel !== 'retail' && !b.outlet.has_restaurant) btn.hidden = true;
+      if ('resto' in btn.dataset && !b.outlet.has_restaurant) btn.hidden = true;
     });
     renderHeld();
     renderCategories();
@@ -249,6 +253,7 @@
     state.lines = data.lines;
     if (data.order.channel) setChannel(data.order.channel, false);
     renderCart();
+    renderCustomer();
   }
 
   function resetOrder() {
@@ -256,6 +261,7 @@
     state.lines = [];
     state.payload = null;
     renderCart();
+    renderCustomer();
     focusScan();
   }
 
@@ -263,8 +269,61 @@
     if (user && state.lines.length) return toast('Ganti kanal hanya untuk pesanan kosong. Tekan Baru dulu.', 'err');
     state.channel = ch;
     $('#channel').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.channel === ch));
-    $('#btn-kitchen').hidden = ch === 'retail';
+    $('#btn-kitchen').hidden = ch === 'retail' || (!state.boot?.outlet.has_restaurant);
     if (user && state.order && !state.lines.length) state.order = null; // pesanan kosong dibuat ulang dengan kanal baru
+    renderCustomer();
+  }
+
+  const needsCustomer = () => ['pickup', 'delivery'].includes(state.channel);
+
+  function renderCustomer() {
+    const el = $('#customer');
+    el.hidden = !needsCustomer();
+    const o = state.order;
+    el.classList.toggle('set', !!o?.customer_name);
+    el.textContent = o?.customer_name
+      ? `${o.customer_name} · ${o.customer_phone}${o.delivery_address ? ' · ' + o.delivery_address : ''}`
+      : `Isi data pemesan ${state.channel === 'delivery' ? '(nama, telepon, alamat)' : '(nama, telepon)'}`;
+  }
+
+  // Data pemesan pickup/delivery: wajib sebelum transaksi diselesaikan.
+  async function customerSheet(then) {
+    try {
+      await ensureOrder();
+    } catch (e) {
+      return fail(e);
+    }
+    const o = state.order;
+    const delivery = state.channel === 'delivery';
+    const local = (v) => (v ? new Date(new Date(v).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
+    const root = openSheet(delivery ? 'Pemesan delivery' : 'Pemesan pickup', `
+      <div class="pay-grid">
+        <div>
+          <div class="field"><label>Nama pemesan</label><input id="c-name" value="${esc(o.customer_name || '')}" autocomplete="off"></div>
+          <div class="field"><label>Nomor telepon / WhatsApp</label><input id="c-phone" inputmode="tel" value="${esc(o.customer_phone || '')}" autocomplete="off"></div>
+          ${delivery ? `<div class="field"><label>Alamat antar</label><input id="c-addr" value="${esc(o.delivery_address || '')}" autocomplete="off"></div>` : ''}
+        </div>
+        <div>
+          <div class="field"><label>${delivery ? 'Waktu kirim' : 'Waktu ambil'}</label><input id="c-time" type="datetime-local" value="${local(o.promised_at)}"></div>
+          <div class="field"><label>Catatan</label><input id="c-note" value="${esc(o.fulfilment_note || '')}" placeholder="Opsional, mis. potong steak 2 cm"></div>
+          <button class="btn primary xl block" data-do="save">Simpan</button>
+        </div>
+      </div>`);
+    root.querySelector('#c-name').focus();
+    root.querySelector('[data-do="save"]').addEventListener('click', async () => {
+      const val = (id) => root.querySelector(id)?.value.trim() || null;
+      const time = val('#c-time');
+      try {
+        applyOrder(await api('POST', `orders/${state.order.id}/customer`, {
+          customer_name: val('#c-name'), customer_phone: val('#c-phone'), delivery_address: val('#c-addr'),
+          promised_at: time ? new Date(time).toISOString() : null, fulfilment_note: val('#c-note'),
+        }));
+        closeSheet();
+        if (then) then();
+      } catch (e) {
+        fail(e);
+      }
+    });
   }
 
   function renderCart() {
@@ -426,6 +485,7 @@
   function paySheet() {
     if (!state.order || !state.lines.length) return;
     if (!state.boot.shift) return openShiftSheet();
+    if (needsCustomer() && !state.order.customer_name) return customerSheet(paySheet);
     let method = 'cash';
     const render = () => {
       const p = state.payload;
@@ -517,12 +577,178 @@
     try {
       const data = await api('POST', `orders/${state.order.id}/finalize`);
       closeSheet();
-      toast(`Transaksi ${data.order.doc_no} selesai.`, 'ok');
+      toast(`Transaksi ${data.order.doc_no} selesai. Mencetak struk…`, 'ok');
+      printDoc(data.receipt_url);
       resetOrder();
       loadCatalog();
     } catch (e) {
       fail(e);
     }
+  }
+
+  // Cetak ke printer thermal 80 mm lewat iframe tersembunyi; halaman cetak memanggil print() sendiri.
+  function printDoc(url) {
+    const frame = document.createElement('iframe');
+    frame.className = 'print-frame';
+    frame.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0';
+    frame.src = url + (url.includes('?') ? '&' : '?') + 'auto=1';
+    document.body.appendChild(frame);
+    setTimeout(() => frame.remove(), 120000);
+  }
+
+  // ---- Riwayat, cetak ulang, retur -----------------------------------------
+  const CHANNEL = { retail: 'Retail', dine_in: 'Dine-in', takeaway: 'Takeaway', pickup: 'Pickup', delivery: 'Delivery' };
+  const time = (v) => new Date(v).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+  function historySheet(query = '') {
+    const root = openSheet('Riwayat transaksi', `
+      <div class="searchbar"><input id="h-q" placeholder="Cari nomor struk, nama atau telepon pemesan" value="${esc(query)}" autocomplete="off">
+        <button class="btn soft" data-do="search">Cari</button></div>
+      <div class="history" id="h-list"><p class="muted">Memuat…</p></div>`);
+    const input = root.querySelector('#h-q');
+    const load = async () => {
+      try {
+        const q = input.value.trim();
+        const data = await api('GET', 'history' + (q ? '?q=' + encodeURIComponent(q) : ''));
+        root.querySelector('#h-list').innerHTML = data.orders.length ? data.orders.map((o) => `
+          <button type="button" data-order="${o.id}">
+            <b class="mono">${esc(o.doc_no)}</b><b class="mono">${rupiah(o.net_amount)}</b>
+            <small>${time(o.finalized_at)} · ${esc(CHANNEL[o.channel] || o.channel)} · ${esc(o.cashier || '')}${o.customer_name ? ' · ' + esc(o.customer_name) : ''}
+              ${Number(o.returned) > 0 ? `<span class="ret">· retur ${rupiah(o.returned)}</span>` : ''}</small>
+          </button>`).join('') : `<p class="muted">${q ? 'Tidak ditemukan.' : 'Belum ada transaksi hari ini.'}</p>`;
+      } catch (e) {
+        fail(e);
+      }
+    };
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); load(); } });
+    root.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-do="search"]')) return load();
+      const b = ev.target.closest('[data-order]');
+      if (b) detailSheet(b.dataset.order, input.value.trim());
+    });
+    input.focus();
+    load();
+  }
+
+  async function detailSheet(id, query = '') {
+    let d;
+    try {
+      d = await api('GET', `orders/${id}/detail`);
+    } catch (e) {
+      return fail(e);
+    }
+    const o = d.order;
+    const canReturn = d.can_return && Number(d.refundable.total) > 0 && d.lines.some((l) => Number(l.returnable_quantity) > 0);
+    const root = openSheet('Struk ' + o.doc_no, `
+      <div class="pay-grid">
+        <div>
+          <div class="receipt-lines">${d.lines.map((l) => `<div>
+            <span>${esc(l.name)}</span><b class="mono">${num(l.net_amount)}</b>
+            <small>${l.pack_code ? esc(l.pack_code) + ' · ' : ''}${qty(l.quantity)} ${esc(l.uom)} × ${num(l.unit_price)}${Number(l.returned_quantity) > 0 ? ` · diretur ${qty(l.returned_quantity)}` : ''}</small>
+          </div>`).join('')}</div>
+        </div>
+        <div>
+          <div class="summary">
+            <div><span>${new Date(o.finalized_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span><span>${esc(CHANNEL[o.channel] || o.channel)}</span></div>
+            <div><span>Kasir</span><span>${esc(d.cashier || '')}</span></div>
+            ${d.customer.customer_name ? `<div><span>Pemesan</span><span>${esc(d.customer.customer_name)} · ${esc(d.customer.customer_phone || '')}</span></div>` : ''}
+            <div><span>Pembayaran</span><span>${d.payments.filter((p) => p.status === 'succeeded').map((p) => esc(REFUND[p.method] || p.method)).join(', ')}</span></div>
+            <div class="big"><span>Total</span><b class="mono">${rupiah(o.net_amount)}</b></div>
+            ${d.returns.map((r) => `<div><span>Retur ${esc(r.doc_no)}</span><b class="mono" style="color:var(--red)">−${num(r.net_amount)}</b></div>`).join('')}
+          </div>
+          <div class="action-list">
+            <button class="btn soft" data-do="reprint">Cetak ulang struk${d.print_count ? ` (salinan ke-${d.print_count})` : ''}</button>
+            ${d.returns.map((r) => `<button class="btn ghost" data-ret="${r.id}">Cetak bukti retur ${esc(r.doc_no)}</button>`).join('')}
+            ${canReturn ? '<button class="btn danger" data-do="return">Retur barang (butuh PIN kepala outlet)</button>'
+              : `<p class="muted">${d.can_return ? 'Semua barang di struk ini sudah diretur.' : `Batas retur sudah lewat (${esc(d.return_until)}).`}</p>`}
+            <button class="btn ghost" data-do="back">Kembali ke riwayat</button>
+          </div>
+        </div>
+      </div>`);
+    root.addEventListener('click', (ev) => {
+      const act = ev.target.closest('[data-do]')?.dataset.do;
+      const ret = ev.target.closest('[data-ret]')?.dataset.ret;
+      if (ret) return printDoc(`/pos/receipt/return/${ret}`);
+      if (act === 'reprint') {
+        printDoc(`/pos/receipt/${o.id}`);
+        toast('Struk dicetak ulang dengan tanda SALINAN.', 'ok');
+        return setTimeout(() => detailSheet(id, query), 800);
+      }
+      if (act === 'return') return returnSheet(d, query);
+      if (act === 'back') return historySheet(query);
+    });
+  }
+
+  const REFUND = { cash: 'Tunai', qris: 'QRIS', edc: 'EDC', edc_manual: 'EDC manual', voucher: 'Voucher' };
+
+  function returnSheet(d, query) {
+    const o = d.order;
+    const rows = d.lines.filter((l) => Number(l.returnable_quantity) > 0).map((l) => ({
+      ...l, max: Number(l.returnable_quantity), whole: !!l.pack_code || l.uom !== 'PCS', pick: 0, restock: l.restockable,
+    }));
+    const methods = Object.keys(d.refundable).filter((m) => m !== 'total' && (m === 'cash' || Number(d.refundable[m]) > 0));
+    if (!methods.includes('cash')) methods.unshift('cash');
+    let method = methods.includes(d.payments[0]?.method) ? d.payments[0].method : 'cash';
+    let reason = '';
+    const estimate = () => rows.reduce((t, r) => t + (r.pick ? Number(r.net_amount) * r.pick / Number(r.quantity) : 0), 0);
+    const render = () => {
+      const root = openSheet('Retur ' + o.doc_no, `
+        <p class="muted">Pilih barang yang dikembalikan. Daging dengan Pack ID diretur utuh dan masuk karantina untuk diperiksa. Nilai dihitung dari harga setelah promo.</p>
+        ${rows.map((r, i) => `<div class="ret-row ${r.pick ? 'on' : ''}">
+          <span><b>${esc(r.name)}</b><br><span class="muted mono">${r.pack_code ? esc(r.pack_code) + ' · ' : ''}sisa ${qty(r.max)} ${esc(r.uom)} · ${num(r.net_amount)}</span></span>
+          ${r.whole ? `<button type="button" class="btn ${r.pick ? 'danger' : 'soft'}" data-toggle="${i}">${r.pick ? 'Diretur' : 'Retur'}</button>`
+            : `<div class="stepper"><button type="button" data-dec="${i}">−</button><b>${qty(r.pick)}</b><button type="button" data-inc="${i}">+</button></div>`}
+          ${r.pick && r.restockable ? `<div class="options" data-restock="${i}">
+            <button type="button" data-v="1" class="${r.restock ? 'on' : ''}">Layak jual, kembali ke stok</button>
+            <button type="button" data-v="0" class="${r.restock ? '' : 'on'}">Rusak, ke karantina</button></div>` : ''}
+          ${r.pick && r.line_type !== 'retail_product' ? '<small>Menu atau jasa: hanya pengembalian uang, tidak kembali ke stok.</small>' : ''}
+        </div>`).join('')}
+        <div class="pay-grid" style="margin-top:12px">
+          <div>
+            <div class="field"><label>Alasan retur</label><div class="options" id="r-reasons">
+              ${['Kualitas tidak sesuai', 'Kemasan rusak', 'Salah beli', 'Kedaluwarsa'].map((t) => `<button type="button" data-r="${t}" class="${reason === t ? 'on' : ''}">${t}</button>`).join('')}
+            </div><input id="r-reason" placeholder="Atau tulis alasan" value="${esc(reason)}"></div>
+          </div>
+          <div>
+            <div class="field"><label>Uang dikembalikan lewat</label><div class="options" id="r-method">
+              ${methods.map((m) => `<button type="button" data-m="${m}" class="${m === method ? 'on' : ''}">${REFUND[m] || esc(m)}</button>`).join('')}
+            </div></div>
+            ${method !== 'cash' ? '<div class="field"><label>No. referensi refund</label><input id="r-ref"></div>' : ''}
+            <div class="summary"><div class="big"><span>Perkiraan</span><b class="mono">${rupiah(Math.round(estimate()))}</b></div></div>
+            <button class="btn danger xl block" data-do="submit" ${rows.some((r) => r.pick) ? '' : 'disabled'}>Proses retur</button>
+          </div>
+        </div>`);
+      root.onclick = async (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        const ds = t.dataset;
+        reason = root.querySelector('#r-reason').value.trim();
+        if (ds.toggle !== undefined) { const r = rows[ds.toggle]; r.pick = r.pick ? 0 : r.max; return render(); }
+        if (ds.inc !== undefined) { const r = rows[ds.inc]; r.pick = Math.min(r.max, r.pick + 1); return render(); }
+        if (ds.dec !== undefined) { const r = rows[ds.dec]; r.pick = Math.max(0, r.pick - 1); return render(); }
+        if (t.parentElement.dataset.restock !== undefined) { rows[t.parentElement.dataset.restock].restock = ds.v === '1'; return render(); }
+        if (ds.r) { reason = ds.r; return render(); }
+        if (ds.m) { method = ds.m; return render(); }
+        if (ds.do === 'submit') return submit(root.querySelector('#r-ref')?.value.trim() || null);
+      };
+    };
+    const submit = async (ref) => {
+      if (!reason) return toast('Alasan retur wajib diisi.', 'err');
+      const items = rows.filter((r) => r.pick).map((r) => ({ order_line_id: r.id, quantity: String(r.pick), restock: r.restock }));
+      closeSheet();
+      try {
+        const res = await withApproval('Retur ' + o.doc_no, (approval) =>
+          api('POST', `orders/${o.id}/returns`, { items, reason, refund: { method, ref }, approval }));
+        if (!res) return;
+        toast(`Retur ${res.return.doc_no} selesai. Kembalikan ${rupiah(res.return.net_amount)} (${REFUND[res.return.refund_method] || res.return.refund_method}).`, 'ok');
+        printDoc(res.receipt_url);
+        loadCatalog();
+        detailSheet(o.id, query);
+      } catch (e) {
+        fail(e);
+      }
+    };
+    render();
   }
 
   // ---- Tahan, lanjutkan, dapur ---------------------------------------------
@@ -607,11 +833,13 @@
         <button class="btn soft" data-do="cash_in">Kas masuk</button>
         <button class="btn soft" data-do="cash_out">Kas keluar</button>
         <button class="btn soft" data-do="no_sale_open">Buka laci tanpa transaksi</button>
+        <button class="btn soft" data-do="report">Cetak laporan shift sementara</button>
         <button class="btn danger" data-do="close">Tutup shift (hitung kas)</button>
       </div>`);
     root.addEventListener('click', (ev) => {
       const act = ev.target.closest('[data-do]')?.dataset.do;
       if (act === 'close') closeShiftSheet();
+      else if (act === 'report') printDoc(`/pos/shift-report/${state.boot.shift.id}`);
       else if (act) cashSheet(act);
     });
   }
@@ -651,8 +879,19 @@
           const shift = await withApproval('Selisih kas tutup shift', (approval) => api('POST', 'shift/close', { counts, approval }));
           if (!shift) return;
           state.boot.shift = null;
-          toast('Shift ditutup. Selisih kas: ' + rupiah(shift.cash_difference ?? 0), 'ok');
-          setTimeout(() => document.querySelector('form[action$="logout"]').submit(), 1500);
+          printDoc(shift.report_url);
+          const done = openSheet('Shift ditutup', `
+            <div class="summary"><div class="big"><span>Selisih kas</span><b class="mono">${rupiah(shift.cash_difference ?? 0)}</b></div></div>
+            <p class="muted">Laporan tutup shift sedang dicetak. Tanda tangani bersama kepala outlet dan simpan bersama uang setoran.</p>
+            <div class="action-list">
+              <button class="btn soft" data-do="print">Cetak laporan lagi</button>
+              <button class="btn primary" data-do="logout">Keluar</button>
+            </div>`);
+          done.addEventListener('click', (ev) => {
+            const act = ev.target.closest('[data-do]')?.dataset.do;
+            if (act === 'print') printDoc(shift.report_url);
+            if (act === 'logout') document.querySelector('form[action$="logout"]').submit();
+          });
         } catch (e) {
           fail(e);
         }
@@ -667,6 +906,8 @@
       const act = a.dataset.action;
       if (act === 'close') return closeSheet();
       if (act === 'held') return heldSheet();
+      if (act === 'history') return historySheet();
+      if (act === 'customer') return customerSheet();
       if (act === 'shift') return shiftSheet();
       if (act === 'scan-submit') { const v = $('#scan').value; $('#scan').value = ''; return scan(v); }
       if (act === 'new') { if (state.lines.length) return toast('Tahan atau batalkan baris dulu.', 'err'); return resetOrder(); }

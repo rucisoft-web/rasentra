@@ -18,6 +18,7 @@
         <dt>Ditutup</dt><dd>{{ Fmt::dt($detail->closed_at) }} · versi {{ $detail->closing_version }}</dd>
         <dt>Struk Lokal / Central</dt><dd>{{ $detail->local_orders }} / {{ $detail->central_orders }}</dd>
         <dt>Bersih Lokal / Central</dt><dd>{{ Fmt::money($detail->local_net) }} / {{ Fmt::money($detail->central_net) }}</dd>
+        <dt>Retur Lokal</dt><dd>{{ $sum['returns'] ?? 0 }} dokumen · {{ Fmt::money($sum['returns_net_amount'] ?? 0) }}</dd>
         <dt>Selisih kas shift</dt><dd>{{ Fmt::money($detail->cash_difference) }} dari {{ $detail->shifts }} shift @if($detail->open_shifts)<span class="b warn">{{ $detail->open_shifts }} masih buka</span>@endif</dd>
       </dl>
       <dl class="dl">

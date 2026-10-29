@@ -15,6 +15,7 @@
     <span class="status-pill" id="net-status" title="Status server lokal">LAN</span>
     <span class="status-pill" id="central-status" title="Koneksi Rasentra Lokal ke Rasentra Central" hidden>Central</span>
     @if (\App\Http\Middleware\EnsureLokalAccess::allows(auth()->user()))<a class="btn ghost" href="{{ route('lokal.index') }}">Server outlet</a>@endif
+    <button class="btn ghost" data-action="history">Riwayat</button>
     <button class="btn ghost" data-action="held">Transaksi ditahan <span class="badge" id="held-count">0</span></button>
     <button class="btn ghost" data-action="shift">Shift</button>
     <form method="post" action="{{ route('pos.logout') }}">@csrf<button class="btn ghost">Keluar</button></form>
@@ -37,9 +38,12 @@
         <div class="cart-title">Pesanan <span id="order-no" class="mono muted"></span></div>
         <div class="segmented" id="channel">
           <button data-channel="retail" class="on">Retail</button>
-          <button data-channel="dine_in">Dine-in</button>
-          <button data-channel="takeaway">Takeaway</button>
+          <button data-channel="dine_in" data-resto>Dine-in</button>
+          <button data-channel="takeaway" data-resto>Takeaway</button>
+          <button data-channel="pickup">Pickup</button>
+          <button data-channel="delivery">Delivery</button>
         </div>
+        <button class="customer-chip" data-action="customer" id="customer" hidden></button>
       </div>
       <button class="btn ghost" data-action="new">Baru</button>
     </div>

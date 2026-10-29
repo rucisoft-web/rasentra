@@ -19,7 +19,7 @@ final class DayReconciler
     {
         if ($event->event_type === 'business_day.closed') {
             $this->record($event);
-        } elseif ($event->event_type === 'order.finalized') {
+        } elseif (in_array($event->event_type, ['order.finalized', 'order.returned'], true)) {
             $date = $event->payload['business_date'] ?? null;
             $open = $date && DailyReconciliation::where('outlet_id', $event->outlet_id)->whereDate('business_date', $date)->where('status', '!=', 'matched')->exists();
             if ($open) {
@@ -54,14 +54,21 @@ final class DayReconciler
     public function check(int $outletId, string $businessDate): DailyReconciliation
     {
         $row = DailyReconciliation::where('outlet_id', $outletId)->whereDate('business_date', $businessDate)->firstOrFail();
-        $central = DB::table('hq_orders')->where('outlet_id', $outletId)->whereDate('business_date', $businessDate)->get(['doc_no', 'net_amount']);
-        $localDocs = $row->local_summary['doc_nos'] ?? [];
-        $centralDocs = $central->pluck('doc_no')->filter()->all();
+        $all = DB::table('hq_orders')->where('outlet_id', $outletId)->whereDate('business_date', $businessDate)->get(['doc_no', 'net_amount', 'kind']);
+        $central = $all->where('kind', 'sale');
+        $returns = $all->where('kind', 'return');
+        $summary = $row->local_summary;
+        // Struk dan dokumen retur dicocokkan bersama: keduanya harus sampai di Central.
+        $localDocs = array_merge($summary['doc_nos'] ?? [], $summary['return_doc_nos'] ?? []);
+        $centralDocs = $all->pluck('doc_no')->filter()->values()->all();
 
         $missing = array_values(array_diff($localDocs, $centralDocs));
         $extra = array_values(array_diff($centralDocs, $localDocs));
         $centralNet = Decimal::sum($central->pluck('net_amount'));
-        $same = $central->count() === (int) $row->local_orders && $centralNet->isEqualTo(Decimal::of((string) $row->local_net));
+        // Retur disimpan negatif di Central; ringkasan Lokal mengirim nilai positif.
+        $returnsNet = Decimal::sum($returns->pluck('net_amount'))->negated();
+        $same = $central->count() === (int) $row->local_orders && $centralNet->isEqualTo(Decimal::of((string) $row->local_net))
+            && $returns->count() === (int) ($summary['returns'] ?? 0) && $returnsNet->isEqualTo(Decimal::of((string) ($summary['returns_net_amount'] ?? '0')));
 
         $row->update([
             'central_orders' => $central->count(),
