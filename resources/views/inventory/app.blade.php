@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>Rasentra Mobile</title>
-<link rel="stylesheet" href="{{ asset('assets/mobile/mobile.css') }}">
+<title>Rasentra Inventory</title>
+<link rel="stylesheet" href="{{ asset('assets/inventory/inventory.css') }}">
 </head>
 <body data-role="{{ auth()->user()->role }}">
 <header class="mbar">
-  <div class="brand"><i></i>Rasentra Mobile</div>
+  <div class="brand"><i></i>Rasentra Inventory</div>
   <span class="muted">{{ $outlet?->code }} · {{ auth()->user()->name }}</span>
   <form method="post" action="{{ route('pos.logout') }}">@csrf<button class="link">Keluar</button></form>
 </header>
@@ -58,6 +58,6 @@
   <button data-tab="check">Cek stok</button>
 </nav>
 <div class="toast" id="toast" hidden></div>
-<script src="{{ asset('assets/mobile/mobile.js') }}" defer></script>
+<script src="{{ asset('assets/inventory/inventory.js') }}" defer></script>
 </body>
 </html>

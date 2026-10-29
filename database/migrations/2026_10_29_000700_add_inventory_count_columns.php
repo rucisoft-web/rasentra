@@ -5,7 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Rasentra Mobile (handheld inventory): ronde hitung aktif, daftar produk yang wajib
+ * Rasentra Inventory (handheld inventory): ronde hitung aktif, daftar produk yang wajib
  * dihitung ulang, ringkasan review opname dan waktu posting penyesuaian.
  */
 return new class extends Migration

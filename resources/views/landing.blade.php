@@ -171,7 +171,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <div>
       <p class="eyebrow">Rasentra · retail daging & restoran · CV Pasar Tani</p>
       <h1>Setiap kemasan daging <em>tercatat sampai gram</em>, setiap outlet tetap jualan walau internet putus.</h1>
-      <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk 20 outlet Toko Tani Indoguna. Satu server lokal per outlet menjalankan Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Mobile di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Rasentra Central di pusat mengatur harga, promo dan resep, lalu memposting transaksi ke SAP Business One.</p>
+      <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk 20 outlet Toko Tani Indoguna. Rasentra Lokal, server di setiap outlet, melayani Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Inventory di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Di kantor pusat, Rasentra Central menjadi pusat POS yang menerima transaksi semua outlet dan memposting ke SAP Business One, sedangkan admin mengatur harga, promo dan resep lewat Rasentra Core.</p>
       <div class="cta">
         <a class="btn primary" href="#alur-retail">Lihat alur kerja</a>
         <a class="btn ghost" href="#panduan">Panduan penggunaan</a>
@@ -200,16 +200,18 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow">Keluarga produk</p>
-      <h2>Enam aplikasi, satu data</h2>
-      <p>Setiap perangkat di outlet membuka aplikasi yang sesuai tugasnya. Semuanya terhubung ke server lokal outlet, dan server outlet terhubung ke Rasentra Central.</p>
+      <h2>Delapan aplikasi, satu data</h2>
+      <p>Setiap perangkat di outlet membuka aplikasi yang sesuai tugasnya. Semuanya terhubung ke Rasentra Lokal di outlet, dan Rasentra Lokal tersinkron ke Rasentra Central di kantor pusat.</p>
     </div>
     <div class="feat-grid">
       <article class="feat"><span class="tag">Kasir</span><h3>Rasentra POS</h3><p>Layar sentuh kasir retail dan resto: scan Pack ID, keranjang, promo, pembayaran, retur, shift dan closing. Menu supervisor untuk approval kepala outlet.</p></article>
       <article class="feat"><span class="tag">Tablet pelayan</span><h3>Rasentra Mobile Terminal</h3><p>Buka meja, catat order dengan modifier dan course, kirim ke dapur, pantau status sajian, dan setujui pesanan dari QR meja.</p></article>
       <article class="feat"><span class="tag">Dapur</span><h3>Rasentra Kitchen</h3><p>Kitchen Display per station (grill, hot, cold, bar, pastry, packing) dengan timer berwarna, bump lewat sentuh atau scan barcode tiket, layar expeditor, layar antrean pickup, produksi batch, yield dan waste.</p></article>
-      <article class="feat"><span class="tag">Pusat</span><h3>Rasentra Central</h3><p>Master outlet dan produk, harga, Promotion Designer, resep, monitoring 20 outlet, sinkronisasi dan jembatan ke SAP Business One.</p></article>
+      <article class="feat"><span class="tag">Server outlet</span><h3>Rasentra Lokal</h3><p>Server lokal di setiap outlet, pusat semua perangkat POS: menyimpan transaksi, Pack ID, stok dan antrean dapur, menjalankan promo, dan tetap bekerja penuh saat internet putus. Data dikirim ke Rasentra Central begitu koneksi kembali.</p></article>
+      <article class="feat"><span class="tag">Pusat POS</span><h3>Rasentra Central</h3><p>Pusat POS di kantor pusat: menerima sinkronisasi dari semua outlet tanpa data ganda, menyebarkan versi harga, promo dan resep ke outlet, lalu memposting penjualan dan pembayaran ke SAP Business One.</p></article>
+      <article class="feat"><span class="tag">Admin kantor pusat</span><h3>Rasentra Core</h3><p>Aplikasi admin kantor pusat: master outlet, produk dan pengguna, harga, Promotion Designer, resep, monitoring 20 outlet, rekonsiliasi SAP dan laporan.</p></article>
       <article class="feat"><span class="tag">Tamu</span><h3>QR meja & kiosk</h3><p>Menu untuk tamu lewat token meja atau kiosk, pada jaringan tamu terpisah. Pesanan masuk setelah disetujui pelayan.</p></article>
-      <article class="feat"><span class="tag">Handheld inventory</span><h3>Rasentra Mobile</h3><p>Cek inventory dengan scanner barcode/QR: penerimaan barang, stok opname blind count, cek saldo per lokasi dan Pack ID. Bekerja lewat Wi-Fi outlet walau internet putus.</p></article>
+      <article class="feat"><span class="tag">Handheld inventory</span><h3>Rasentra Inventory</h3><p>Cek inventory dengan scanner barcode/QR: penerimaan barang, stok opname blind count, cek saldo per lokasi dan Pack ID. Bekerja lewat Wi-Fi outlet walau internet putus.</p></article>
     </div>
   </div>
 </section>
@@ -219,7 +221,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <div class="sec-head">
       <p class="eyebrow">Fitur</p>
       <h2>Satu sistem untuk meatshop, restoran dan gudang pusat</h2>
-      <p>Fitur dikelompokkan sesuai cara kerja outlet. Semua fungsi inti berjalan di server lokal outlet; fungsi yang butuh pusat (voucher global, pembayaran daring, posting SAP) ditandai jelas statusnya.</p>
+      <p>Fitur dikelompokkan sesuai cara kerja outlet. Semua fungsi inti berjalan di Rasentra Lokal (server outlet); fungsi yang butuh pusat (voucher global, pembayaran daring, posting SAP) ditandai jelas statusnya.</p>
     </div>
     <div class="feat-grid">
       <article class="feat"><span class="tag">Daging timbang</span><h3>Pack ID & berat aktual</h3><p>Setiap kemasan ditimbang di gudang pusat dan diberi Pack ID unik dengan berat pecahan seperti 1,500 kg atau 1,750 kg.</p><ul><li>Satu Pack ID hanya bisa terjual sekali, walau dua kasir memindai bersamaan</li><li>Blokir pack salah outlet, belum diterima, kedaluwarsa atau ditahan</li><li>Repack dengan neraca berat dan alasan susut</li></ul></article>
@@ -349,7 +351,7 @@ flowchart TD
         <h3>Stok opname dengan handheld</h3>
         <p>Dipakai petugas opname; persetujuan oleh kepala outlet dan Finance.</p>
         <ol>
-          <li>Di Rasentra Mobile, pilih sesi opname yang ditugaskan. Saldo sistem tidak ditampilkan pada blind count.</li>
+          <li>Di Rasentra Inventory, pilih sesi opname yang ditugaskan. Saldo sistem tidak ditampilkan pada blind count.</li>
           <li>Pindai QR lokasi rak atau chiller lebih dahulu, baru barangnya.</li>
           <li>Pack ID dihitung sekali per sesi; pindai ulang tidak menambah jumlah.</li>
           <li>Barang curah atau terbuka wajib ditimbang ulang; jangan memakai berat label lama.</li>
@@ -480,17 +482,17 @@ flowchart TD
     <div class="flow" id="alur-sync">
       <div class="diagram"><pre class="mermaid">
 flowchart LR
-  subgraph Outlet
+  subgraph RL["Rasentra Lokal (outlet)"]
     T[Transaksi disimpan] --> O[(Outbox)]
   end
-  O -- kirim ulang aman --> S[Sync API pusat]
+  O -- kirim ulang aman --> S[Sync API Rasentra Central]
   S --> IN[(Inbox unik)]
   IN --> V[Validasi dan mapping SAP]
   V -- mapping kosong --> X[Antrean pengecualian]
   V --> P[Posting A/R Invoice]
   P --> Q[Posting Incoming Payment]
   Q --> R[Rekonsiliasi harian Finance]
-  subgraph Pusat ke outlet
+  subgraph PK["Rasentra Central ke outlet"]
     PD[Promo / harga / resep disetujui] --> PV[Versi immutable]
     PV --> AK[Outlet tarik delta dan konfirmasi]
   end
@@ -530,10 +532,10 @@ flowchart LR
       <article class="role"><header><h3>Kepala outlet</h3><span>Rasentra POS · menu supervisor</span></header>
         <ol><li>Terima kiriman dari gudang pusat.</li><li>Setujui void, refund, override sesuai limit.</li><li>Buat sesi opname dan setujui hasil.</li><li>Pantau antrean sinkronisasi dan status printer/KDS.</li><li>Kunci akun lokal bila ada petugas keluar saat offline.</li></ol>
         <p class="tip">Ajukan permintaan barang lewat menu Permintaan, bukan lewat chat.</p></article>
-      <article class="role"><header><h3>Petugas opname</h3><span>Rasentra Mobile</span></header>
+      <article class="role"><header><h3>Petugas opname</h3><span>Rasentra Inventory</span></header>
         <ol><li>Pilih sesi yang ditugaskan.</li><li>Pindai QR lokasi, lalu barang.</li><li>Timbang barang curah dan bahan setengah jadi.</li><li>Pisahkan barang rusak dengan alasan dan foto.</li><li>Kirim hasil; recount bila diminta.</li></ol>
         <p class="tip">Petugas hitung tidak bisa menyetujui koreksinya sendiri.</p></article>
-      <article class="role"><header><h3>Admin pusat, pemasaran & Finance</h3><span>Rasentra Central + MFA</span></header>
+      <article class="role"><header><h3>Admin pusat, pemasaran & Finance</h3><span>Rasentra Core + MFA</span></header>
         <ol><li>Kelola outlet, perangkat, pengguna dan peran.</li><li>Susun harga, promo dan resep; simulasi lalu publikasi.</li><li>Pantau heartbeat dan umur antrean tiap outlet.</li><li>Finance memeriksa rekonsiliasi harian dan dokumen SAP.</li><li>Tangani antrean pengecualian mapping.</li></ol>
         <p class="tip">Perubahan pusat baru berlaku di outlet setelah outlet mengonfirmasi penerimaan versi.</p></article>
     </div>
@@ -545,7 +547,7 @@ flowchart LR
     <div class="sec-head">
       <p class="eyebrow">Arsitektur</p>
       <h2>Satu basis kode, dua profil instalasi</h2>
-      <p>Server outlet dan server pusat menjalankan aplikasi yang sama dengan profil berbeda. SAP B1 tetap sumber resmi akuntansi, HPP dan nilai persediaan.</p>
+      <p>Rasentra Lokal (server outlet) dan Rasentra Central + Core (kantor pusat) menjalankan aplikasi yang sama dengan profil berbeda. SAP B1 tetap sumber resmi akuntansi, HPP dan nilai persediaan.</p>
     </div>
     <div class="tbl"><table>
       <thead><tr><th>Lapisan</th><th>Teknologi</th><th>Peran</th></tr></thead>
@@ -553,10 +555,10 @@ flowchart LR
         <tr><td>Backend</td><td class="mono">Laravel 13 · PHP 8.3+</td><td>API lokal, sync API, portal, SAP bridge</td></tr>
         <tr><td>Database</td><td class="mono">MySQL 8.4 InnoDB</td><td>DECIMAL untuk uang dan berat, UUID transaksi, ledger append-only</td></tr>
         <tr><td>Realtime LAN</td><td class="mono">Laravel Reverb</td><td>Order ke KDS, status meja dan pembayaran; polling cadangan</td></tr>
-        <tr><td>Antarmuka</td><td class="mono">Vue 3 + Inertia</td><td>Rasentra POS, Mobile Terminal, Mobile, Kitchen, kiosk dan Central</td></tr>
+        <tr><td>Antarmuka</td><td class="mono">Blade + JavaScript lokal</td><td>Rasentra POS, Mobile Terminal, Inventory, Kitchen, kiosk dan Core; tanpa CDN agar tetap jalan saat internet putus</td></tr>
         <tr><td>Proses latar</td><td class="mono">Queue + Scheduler</td><td>Outbox, cetak, aktivasi promo, posting SAP, backup</td></tr>
         <tr><td>Integrasi</td><td class="mono">SAP Service Layer · XML MSI/MSR</td><td>A/R Invoice, Incoming Payment, transfer, produksi, opname</td></tr>
-        <tr><td>Server outlet</td><td class="mono">4 core · 16 GB · SSD 512 GB · UPS</td><td>Profil awal pilot, final mengikuti uji beban</td></tr>
+        <tr><td>Rasentra Lokal (server outlet)</td><td class="mono">4 core · 16 GB · SSD 512 GB · UPS</td><td>Profil awal pilot, final mengikuti uji beban</td></tr>
       </tbody>
     </table></div>
     <div class="outlets" aria-label="Daftar outlet">
@@ -571,7 +573,7 @@ flowchart LR
 <footer>
   <div class="wrap">
     <span>Rasentra untuk CV Pasar Tani · berdasarkan spesifikasi v1.3, 29 Oktober 2026</span>
-    <span>Rasentra POS · Mobile Terminal · Mobile · Kitchen · Central</span>
+    <span>Rasentra POS · Mobile Terminal · Inventory · Kitchen · Lokal · Central · Core</span>
   </div>
 </footer>
 

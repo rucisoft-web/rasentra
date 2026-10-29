@@ -16,7 +16,7 @@ use App\Support\DomainException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Stok opname dengan Rasentra Mobile. Petugas hitung tidak melihat saldo sistem (blind
+ * Stok opname dengan Rasentra Inventory. Petugas hitung tidak melihat saldo sistem (blind
  * count). Saldo pembanding diambil per waktu cutoff, sehingga penjualan selama
  * penghitungan tidak mengacaukan selisih. Selisih di atas ambang wajib dihitung ulang
  * oleh petugas yang berbeda sebelum kepala outlet menyetujui dan penyesuaian diposting.

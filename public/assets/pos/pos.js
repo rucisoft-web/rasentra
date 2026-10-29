@@ -366,15 +366,19 @@
   }
 
   function cookSheet(l) {
-    const pick = { portions: 1, doneness: 'medium', method: 'grill', sauce: null };
+    // Metode mengikuti tarif cooking fee yang berlaku di outlet (null = tarif standar).
+    const METHOD_LABEL = { '': 'Standar / grill', bakar: 'Bakar', goreng: 'Goreng', saus_padang: 'Saus Padang', grill: 'Grill', pan: 'Pan sear' };
+    const methods = (state.boot.cooking_methods || []).map((r) => r.method ?? '');
+    if (!methods.length) methods.push('');
+    const pick = { portions: 1, doneness: 'medium', method: methods[0], sauce: null };
     const opt = (key, values) => `<div class="options" data-key="${key}">${values.map(([v, t]) =>
       `<button type="button" data-v="${v}" class="${String(pick[key]) === String(v) ? 'on' : ''}">${t}</button>`).join('')}</div>`;
     const root = openSheet('Masak di resto: ' + l.name, `
-      <p class="muted">Daging tetap dijual sebagai baris retail (Pack ID ${esc(l.pack_code)}). Jasa memasak ditambahkan sebagai baris terpisah berdasarkan berat mentah.</p>
-      <div class="field"><label>Metode</label>${opt('method', [['grill', 'Grill'], ['pan', 'Pan sear'], ['bbq', 'BBQ']])}</div>
+      <p class="muted">Daging atau ikan tetap dijual sebagai baris retail (Pack ID ${esc(l.pack_code)}). Jasa memasak ditambahkan sebagai baris terpisah sesuai tarif metode.</p>
+      <div class="field"><label>Metode</label>${opt('method', methods.map((m) => [m, METHOD_LABEL[m] || m]))}</div>
       <div class="field"><label>Kematangan</label>${opt('doneness', [['rare', 'Rare'], ['medium_rare', 'Medium rare'], ['medium', 'Medium'], ['well_done', 'Well done']])}</div>
       <div class="field"><label>Porsi</label>${opt('portions', [[1, '1'], [2, '2'], [3, '3'], [4, '4']])}</div>
-      <div class="field"><label>Saus</label>${opt('sauce', [['blackpepper', 'Lada hitam'], ['mushroom', 'Jamur'], ['bbq', 'BBQ']])}</div>
+      <div class="field"><label>Saus / sambal</label>${opt('sauce', [['lada hitam', 'Lada hitam'], ['jamur', 'Jamur'], ['sambal matah', 'Sambal matah'], ['sambal kecap', 'Sambal kecap']])}</div>
       <div class="field"><label>Catatan alergi</label><input id="allergy" placeholder="Opsional"></div>
       <button class="btn primary xl block" data-do="send">Tambah jasa memasak</button>`);
     root.addEventListener('click', async (ev) => {
@@ -386,7 +390,7 @@
         return;
       }
       if (ev.target.closest('[data-do="send"]')) {
-        const body = { ...pick, portions: Number(pick.portions), allergy_note: root.querySelector('#allergy').value || null };
+        const body = { ...pick, method: pick.method || null, portions: Number(pick.portions), allergy_note: root.querySelector('#allergy').value || null };
         closeSheet();
         try {
           applyOrder(await api('POST', `lines/${l.id}/cooking`, body));

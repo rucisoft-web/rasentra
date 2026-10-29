@@ -3,17 +3,22 @@
 return [
 
     /*
-    | Profil instalasi. "outlet" untuk server lokal di setiap outlet (Rasentra POS,
-    | Mobile Terminal, Kitchen), "central" untuk Rasentra Central di pusat.
+    | Profil instalasi:
+    | - "lokal"   Rasentra Lokal, server di setiap outlet yang melayani Rasentra POS,
+    |             Mobile Terminal, Kitchen dan Inventory; tetap jalan saat internet putus.
+    | - "central" Rasentra Central, pusat POS di kantor pusat: menerima sinkronisasi dari
+    |             semua outlet, menyebarkan harga/promo/resep dan memposting ke SAP B1.
+    |             Rasentra Core (aplikasi admin kantor pusat) berjalan di instalasi ini.
     */
-    'profile' => env('RASENTRA_PROFILE', 'outlet'),
+    'profile' => env('RASENTRA_PROFILE', 'lokal'),
 
     // Identitas instalasi; dipakai sebagai source_id pada event sinkronisasi.
     'source_id' => env('RASENTRA_SOURCE_ID', 'dev-local'),
 
-    // Kode outlet yang dilayani server ini (profil outlet).
+    // Kode outlet yang dilayani Rasentra Lokal ini (profil lokal).
     'outlet_code' => env('RASENTRA_OUTLET_CODE'),
 
+    // Alamat Rasentra Central yang dituju sinkronisasi dari Rasentra Lokal.
     'central' => [
         'url' => env('RASENTRA_CENTRAL_URL'),
         'token' => env('RASENTRA_CENTRAL_TOKEN'),

@@ -11,7 +11,7 @@ use App\Support\DomainException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Penerimaan kiriman gudang pusat lewat Rasentra Mobile: scan Pack ID satu per satu.
+ * Penerimaan kiriman gudang pusat lewat Rasentra Inventory: scan Pack ID satu per satu.
  * Pack diterima masuk stok outlet; pack rusak/tidak sesuai ditolak ke karantina
  * tanpa menambah stok jual. Scan ulang tidak menambah stok dua kali.
  */

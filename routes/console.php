@@ -7,8 +7,8 @@ use App\Models\InboxEvent;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-// Server outlet: kirim outbox ke Rasentra Central setiap 5 detik.
-Schedule::job(new DispatchOutbox)->everyFiveSeconds()->when(fn () => config('rasentra.profile') === 'outlet');
+// Rasentra Lokal (server outlet): kirim outbox ke Rasentra Central setiap 5 detik.
+Schedule::job(new DispatchOutbox)->everyFiveSeconds()->when(fn () => config('rasentra.profile') === 'lokal');
 
 // Rasentra Central: posting penjualan yang sudah diterima ke SAP B1.
 Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->when(fn () => config('rasentra.profile') === 'central');

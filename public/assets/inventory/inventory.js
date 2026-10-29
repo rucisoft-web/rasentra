@@ -1,4 +1,4 @@
-// Rasentra Mobile: satu kolom scan untuk semua tab. Scanner handheld bekerja sebagai
+// Rasentra Inventory: satu kolom scan untuk semua tab. Scanner handheld bekerja sebagai
 // keyboard dan mengirim Enter; hasil scan diarahkan ke tab yang sedang aktif.
 (() => {
   'use strict';
@@ -12,7 +12,7 @@
   const state = { tab: 'receive', mode: 'accept', session: null, location: null };
 
   async function api(method, path, body) {
-    const res = await fetch('/mobile/api/' + path, {
+    const res = await fetch('/inventory/api/' + path, {
       method,
       credentials: 'same-origin',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },

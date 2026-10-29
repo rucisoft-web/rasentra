@@ -17,10 +17,10 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Rasentra Mobile: aplikasi handheld untuk cek inventory di outlet. Penerimaan kiriman
+ * Rasentra Inventory: aplikasi handheld untuk cek inventory di outlet. Penerimaan kiriman
  * per Pack ID, stok opname blind count dan cek stok per produk atau Pack ID.
  */
-class MobileController extends Controller
+class InventoryController extends Controller
 {
     public function __construct(
         private readonly ReceivingService $receiving,
@@ -31,7 +31,7 @@ class MobileController extends Controller
     {
         $outletId = $request->user()->outlet_id;
 
-        return view('mobile.app', [
+        return view('inventory.app', [
             'outlet' => Outlet::find($outletId),
             'locations' => Location::where('outlet_id', $outletId)->where('is_active', true)->orderBy('code')->get(['code', 'name']),
         ]);

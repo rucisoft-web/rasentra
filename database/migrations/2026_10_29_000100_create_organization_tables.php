@@ -55,7 +55,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('outlet_id')->constrained();
             $table->string('code', 40)->unique();
-            $table->string('app', 20); // pos, mobile, kitchen, kiosk, outlet_server
+            $table->string('app', 20); // pos, terminal, inventory, kitchen, kiosk, outlet_server
             $table->char('token_hash', 64)->nullable()->unique(); // token perangkat/server (sha256), dapat dicabut
             $table->string('name');
             $table->boolean('is_active')->default(true);

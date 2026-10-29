@@ -32,6 +32,9 @@ final class PaymentService
             $paid = Decimal::sum($order->payments()->whereIn('status', ['succeeded', 'pending', 'uncertain'])->pluck('amount'));
             $remaining = Decimal::of($order->net_amount)->minus($paid);
             $amount = Decimal::of($amount);
+            if (! $amount->isPositive()) {
+                throw new DomainException('payment_amount_invalid', 'Nominal pembayaran harus lebih dari nol.', 422);
+            }
 
             $tendered = null;
             $change = null;

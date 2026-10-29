@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Throwable;
 
 /**
- * Server outlet: kirim event outbox ke Rasentra Central. At-least-once; idempotensi
+ * Rasentra Lokal (server outlet): kirim event outbox ke Rasentra Central. At-least-once; idempotensi
  * dijamin penerima. Gagal = backoff eksponensial + jitter, lalu parked.
  */
 final class OutboxDispatcher

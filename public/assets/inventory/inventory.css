@@ -1,4 +1,4 @@
-/* Rasentra Mobile: handheld potret dengan scanner bawaan. Tombol besar di bawah layar,
+/* Rasentra Inventory: handheld potret dengan scanner bawaan. Tombol besar di bawah layar,
    satu tangan, kontras tinggi untuk gudang dan chiller. */
 :root { --bg: #f1f4f2; --s: #fff; --ink: #14241c; --muted: #5a6b62; --line: #d5dfd9; --green: #1f5a40; --soft: #e1eee7; --amber: #e3a21a; --red: #b3352f; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }

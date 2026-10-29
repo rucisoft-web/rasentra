@@ -21,7 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
- * API lokal untuk layar sentuh Rasentra POS. Berjalan di server outlet melalui LAN dengan
+ * API lokal untuk layar sentuh Rasentra POS. Berjalan di Rasentra Lokal (server outlet) melalui LAN dengan
  * sesi login petugas. Semua aturan bisnis ada di layanan domain, controller hanya memetakan.
  */
 class PosController extends Controller
@@ -43,8 +43,16 @@ class PosController extends Controller
             'user' => $user->only(['id', 'name', 'role']),
             'outlet' => $outlet->only(['id', 'code', 'name', 'has_restaurant', 'has_cooking_fee']) + ['region' => $outlet->region->name],
             'shift' => Shift::where('user_id', $user->id)->where('status', 'open')->first(),
-            'categories' => Product::where('is_active', true)->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'),
+            'categories' => Product::where('is_active', true)->whereNotNull('category')
+                ->whereIn('id', \App\Models\PriceItem::query()->join('price_versions as v', 'v.id', '=', 'price_items.price_version_id')
+                    ->where('v.status', 'published')->where(fn ($q) => $q->whereNull('v.outlet_id')->orWhere('v.outlet_id', $outlet->id))
+                    ->select('price_items.product_id'))
+                ->distinct()->orderBy('category')->pluck('category'),
             'held' => Order::where('outlet_id', $outlet->id)->where('status', 'held')->latest()->limit(20)->get(['id', 'net_amount', 'created_at', 'channel']),
+            'cooking_methods' => $outlet->has_cooking_fee ? \App\Models\CookingFeeRule::query()
+                ->where(fn ($q) => $q->whereNull('outlet_id')->orWhere('outlet_id', $outlet->id))
+                ->where('effective_from', '<=', now())->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>', now()))
+                ->get(['method', 'basis', 'rate', 'minimum_fee'])->unique('method')->values() : [],
             'approvers' => \App\Models\User::where('outlet_id', $outlet->id)->where('is_active', true)
                 ->whereIn('role', \App\Domain\Sales\Approval::APPROVER_ROLES)->where('id', '!=', $user->id)->get(['id', 'name']),
         ]);
@@ -58,10 +66,11 @@ class PosController extends Controller
             ->whereIn('type', ['retail', 'menu', 'weighed'])
             ->when($request->query('category'), fn ($q, $c) => $q->where('category', $c))
             ->when($request->query('q'), fn ($q, $s) => $q->where(fn ($w) => $w->where('name', 'like', "%{$s}%")->orWhere('code', 'like', "{$s}%")->orWhere('barcode', $s)))
-            ->orderBy('name')->limit(60)->get();
+            ->orderBy('name')->limit(120)->get();
 
         $prices = app(\App\Domain\Catalog\PriceResolver::class);
 
+        // Hanya produk yang punya harga berlaku di outlet ini yang tampil di layar kasir.
         return response()->json($products->map(function (Product $p) use ($prices, $outletId) {
             try {
                 $price = $prices->resolve($p->id, $outletId)['unit_price'];
@@ -73,7 +82,7 @@ class PosController extends Controller
                 'price' => $price,
                 'available_packs' => $p->is_weighed ? Pack::where('product_id', $p->id)->where('outlet_id', $outletId)->where('status', 'received')->count() : null,
             ];
-        }));
+        })->filter(fn ($p) => $p['price'] !== null)->values());
     }
 
     public function createOrder(Request $request): JsonResponse

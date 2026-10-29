@@ -67,7 +67,7 @@ class DemoSeeder extends Seeder
         $tea = $p('0700703', ['name' => 'Es Teh Tani', 'type' => 'menu', 'uom_code' => 'PORSI', 'is_stocked' => false, 'category' => 'Minuman', 'kitchen_station' => 'bar']);
         $cookFee = $p('0900901', ['name' => 'Jasa Masak (Cooking Fee)', 'type' => 'service', 'uom_code' => 'PCS', 'is_stocked' => false, 'kitchen_station' => 'grill']);
 
-        $pv = PriceVersion::updateOrCreate(['code' => 'HRG-2026-10'], ['effective_from' => now()->subDay(), 'status' => 'published']);
+        $pv = PriceVersion::updateOrCreate(['code' => 'HRG-2026-10'], ['outlet_id' => $outlet->id, 'effective_from' => now()->subDay(), 'status' => 'published']);
         foreach ([[$sirloin, 200000], [$tenderloin, 320000], [$ribeye, 650000], [$wings, 32000], [$sausage, 45000], [$bbq, 28000],
             [$steak, 135000], [$fries, 25000], [$tea, 12000]] as [$prod, $price]) {
             PriceItem::updateOrCreate(['price_version_id' => $pv->id, 'product_id' => $prod->id], ['unit_price' => $price]);
@@ -85,7 +85,7 @@ class DemoSeeder extends Seeder
                 StockLedger::move($outlet->id, $prod->id, $weight, 'KG', 'opening_balance', 'opening', $pack->id, packId: $pack->id);
             }
         }
-        // Kiriman gudang pusat yang masih dalam perjalanan: diterima lewat Rasentra Mobile.
+        // Kiriman gudang pusat yang masih dalam perjalanan: diterima lewat Rasentra Inventory.
         foreach ([['PK-000510', $sirloin, '1.320'], ['PK-000511', $tenderloin, '0.940']] as [$code, $prod, $weight]) {
             Pack::firstOrCreate(['pack_code' => $code], [
                 'product_id' => $prod->id, 'net_weight' => $weight, 'uom_code' => 'KG', 'weigh_source' => 'SCALE-GDG-01',

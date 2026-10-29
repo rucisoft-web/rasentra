@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\KitchenController;
-use App\Http\Controllers\MobileController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 // Landing page Rasentra: fitur, alur kerja retail/resto, panduan.
 Route::view('/', 'landing')->name('landing');
 
-// Rasentra POS (layar sentuh kasir) di server outlet.
+// Rasentra POS (layar sentuh kasir), dilayani Rasentra Lokal di outlet.
 Route::get('/pos/login', [PosAuthController::class, 'show'])->name('pos.login');
 Route::post('/pos/login', [PosAuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/pos/logout', [PosAuthController::class, 'logout'])->name('pos.logout');
@@ -58,9 +58,9 @@ Route::middleware('auth')->group(function () {
         });
     });
 
-    // Rasentra Mobile: handheld inventory (penerimaan, stok opname, cek stok).
-    Route::get('mobile', [MobileController::class, 'app'])->name('mobile');
-    Route::prefix('mobile/api')->controller(MobileController::class)->group(function () {
+    // Rasentra Inventory: handheld inventory (penerimaan, stok opname, cek stok).
+    Route::get('inventory', [InventoryController::class, 'app'])->name('inventory');
+    Route::prefix('inventory/api')->controller(InventoryController::class)->group(function () {
         Route::get('lookup', 'lookup');
         Route::get('receiving', 'expected');
         Route::post('receiving', 'receive');

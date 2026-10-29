@@ -7,7 +7,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 
 /**
- * Promotion Engine yang berjalan di server outlet. Murni (tanpa I/O): masukan keranjang
+ * Promotion Engine yang berjalan di Rasentra Lokal (server outlet). Murni (tanpa I/O): masukan keranjang
  * dan daftar promo aktif, keluaran alokasi diskon per baris yang deterministik.
  *
  * Urutan: promo item lebih dahulu, lalu promo keranjang. Promo diurutkan berdasarkan

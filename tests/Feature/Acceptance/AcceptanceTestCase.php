@@ -32,7 +32,7 @@ abstract class AcceptanceTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(DatabaseSeeder::class);
+        $this->seed([\Database\Seeders\OutletSeeder::class, \Database\Seeders\DemoSeeder::class]);
         $this->outlet = Outlet::where('code', 'PJT')->firstOrFail();
         $this->cashier = User::where('email', 'kasir@pjt.test')->firstOrFail();
         $this->head = User::where('email', 'kepala@pjt.test')->firstOrFail();
