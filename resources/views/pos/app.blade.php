@@ -16,6 +16,7 @@
     <span class="status-pill" id="central-status" title="Koneksi Rasentra Lokal ke Rasentra Central" hidden>Central</span>
     @if (\App\Http\Middleware\EnsureLokalAccess::allows(auth()->user()))<a class="btn ghost" href="{{ route('lokal.index') }}">Server outlet</a>@endif
     <button class="btn ghost" data-action="history">Riwayat</button>
+    <button class="btn ghost" data-action="tables" id="btn-tables" hidden>Meja <span class="badge" id="tables-count">0</span></button>
     <button class="btn ghost" data-action="held">Transaksi ditahan <span class="badge" id="held-count">0</span></button>
     <button class="btn ghost" data-action="shift">Shift</button>
     <form method="post" action="{{ route('pos.logout') }}">@csrf<button class="btn ghost">Keluar</button></form>

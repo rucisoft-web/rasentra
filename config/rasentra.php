@@ -65,6 +65,33 @@ return [
         'max_elements' => 500_000,
     ],
 
+    // Rasentra Mobile Terminal: pilihan modifier per kategori menu. Kunci opsi dipakai resep
+    // (mis. extra_butter menambah butter) dan tampil di tiket dapur sebagai label.
+    'menu_modifiers' => [
+        'Steak' => [
+            ['group' => 'doneness', 'label' => 'Kematangan', 'required' => true, 'options' => [
+                ['rare', 'Rare'], ['medium_rare', 'Medium rare'], ['medium', 'Medium'], ['medium_well', 'Medium well'], ['well_done', 'Well done'],
+            ]],
+            ['group' => 'extra', 'label' => 'Tambahan', 'multiple' => true, 'options' => [['extra_butter', 'Extra butter']]],
+        ],
+        'Bakaran' => [
+            ['group' => 'spicy', 'label' => 'Level pedas', 'options' => [['not_spicy', 'Tidak pedas'], ['mild', 'Pedas sedang'], ['hot', 'Pedas']]],
+        ],
+        'Seafood' => [
+            ['group' => 'spicy', 'label' => 'Level pedas', 'options' => [['not_spicy', 'Tidak pedas'], ['mild', 'Pedas sedang'], ['hot', 'Pedas']]],
+        ],
+        'Nasi & Mie' => [
+            ['group' => 'spicy', 'label' => 'Level pedas', 'options' => [['not_spicy', 'Tidak pedas'], ['mild', 'Pedas sedang'], ['hot', 'Pedas']]],
+        ],
+        'Minuman' => [
+            ['group' => 'sugar', 'label' => 'Gula', 'options' => [['normal_sugar', 'Normal'], ['less_sugar', 'Kurang manis'], ['no_sugar', 'Tanpa gula']]],
+            ['group' => 'ice', 'label' => 'Es', 'options' => [['normal_ice', 'Es normal'], ['less_ice', 'Sedikit es'], ['no_ice', 'Tanpa es']]],
+        ],
+    ],
+
+    // Catatan cepat untuk pelayan.
+    'quick_notes' => ['Tanpa bawang', 'Tanpa sambal', 'Saus dipisah', 'Porsi anak', 'Alergi kacang', 'Bungkus'],
+
     // Rasentra Kitchen: station, target waktu saji (menit) dan ambang warna timer.
     'kitchen' => [
         'stations' => [

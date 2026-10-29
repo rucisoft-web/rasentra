@@ -208,6 +208,11 @@
     renderHeld();
     renderCategories();
     loadCatalog();
+    if (b.outlet.has_restaurant) {
+      $('#btn-tables').hidden = false;
+      refreshTables();
+      setInterval(refreshTables, 30000);
+    }
     if (!b.shift) openShiftSheet();
     focusScan();
     refreshCentral();
@@ -328,7 +333,7 @@
 
   function renderCart() {
     const o = state.order;
-    $('#order-no').textContent = o?.doc_no || '';
+    $('#order-no').textContent = o?.doc_no || (o?.table ? `Meja ${o.table}` : '');
     const ul = $('#lines');
     if (!state.lines.length) {
       ul.innerHTML = '<li class="empty">Pindai produk atau sentuh menu untuk mulai.</li>';
@@ -765,6 +770,37 @@
     }
   }
 
+  // ---- Meja dari Mobile Terminal: kasir mengambil pesanan meja untuk dibayar ----------
+  async function refreshTables() {
+    try {
+      const list = await api('GET', 'tables');
+      $('#tables-count').textContent = list.filter((t) => t.status === 'billing').length;
+      return list;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async function tablesSheet() {
+    const list = await refreshTables();
+    const root = openSheet('Meja terisi', list.length
+      ? `<div class="held-list">${list.map((t) => `<button type="button" data-order="${t.order_id}" class="${t.status === 'billing' ? 'billing' : ''}">
+          <span><b>Meja ${esc(t.code)}</b> · ${t.guests} tamu · ${esc(t.waiter || '-')}${t.status === 'billing' ? ' · <em>minta bayar</em>' : ''}${t.unsent ? ` · ${t.unsent} belum dikirim` : ''}</span>
+          <b class="mono">${rupiah(t.net_amount)}</b></button>`).join('')}</div>`
+      : '<p class="muted">Tidak ada meja yang terisi.</p>');
+    root.addEventListener('click', async (ev) => {
+      const b = ev.target.closest('[data-order]');
+      if (!b) return;
+      if (state.lines.length) return toast('Tahan atau selesaikan pesanan aktif dulu.', 'err');
+      try {
+        applyOrder(await api('POST', `orders/${b.dataset.order}/take`));
+        closeSheet();
+      } catch (e) {
+        fail(e);
+      }
+    });
+  }
+
   function heldSheet() {
     const list = state.boot.held;
     const root = openSheet('Transaksi ditahan', list.length
@@ -907,6 +943,7 @@
       const act = a.dataset.action;
       if (act === 'close') return closeSheet();
       if (act === 'held') return heldSheet();
+      if (act === 'tables') return tablesSheet();
       if (act === 'history') return historySheet();
       if (act === 'customer') return customerSheet();
       if (act === 'shift') return shiftSheet();

@@ -128,7 +128,9 @@ body.pos { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow:
 .options button { min-height: 52px; padding: 0 18px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); font-weight: 600; }
 .options button.on { border-color: var(--green); background: var(--green-soft); color: var(--green); }
 .held-list { display: grid; gap: 10px; }
-.held-list button { display: flex; justify-content: space-between; min-height: 64px; padding: 0 18px; border-radius: var(--radius); border: 2px solid var(--line); background: var(--surface); font-weight: 600; }
+.held-list button.billing { border-color: var(--amber); background: #fff6e0; }
+.held-list button em { color: #8a5a00; font-style: normal; font-weight: 700; }
+.held-list button { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; min-height: 64px; padding: 0 18px; border-radius: var(--radius); border: 2px solid var(--line); background: var(--surface); font-weight: 600; }
 
 .customer-chip { display: block; margin-top: 8px; min-height: 44px; width: 100%; padding: 6px 12px; text-align: left; border-radius: 10px; border: 2px dashed var(--amber); background: #fff8e6; font-weight: 600; font-size: .9rem; }
 .customer-chip[hidden] { display: none; }

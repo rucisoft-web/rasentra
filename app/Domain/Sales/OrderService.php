@@ -17,7 +17,9 @@ use App\Models\Outlet;
 use App\Models\Pack;
 use App\Models\PackEvent;
 use App\Models\Product;
+use App\Models\TicketItem;
 use App\Models\User;
+use App\Models\Visit;
 use App\Support\Decimal;
 use App\Support\DomainException;
 use Illuminate\Support\Facades\DB;
@@ -62,10 +64,13 @@ final class OrderService
                 ->where('status', 'active')
                 ->whereNull('pack_id')
                 ->where('line_type', $lineType)
-                ->when(! empty($options['modifiers']), fn ($q) => $q->whereRaw('1 = 0')) // modifier berbeda = baris baru
+                // Modifier atau catatan = baris baru; urutan saji (course) harus sama.
+                ->when(! empty($options['modifiers']) || ! empty($options['note']), fn ($q) => $q->whereRaw('1 = 0'))
+                ->whereNull('note')
+                ->when($options['course'] ?? null, fn ($q, $c) => $q->where('course', $c), fn ($q) => $q->whereNull('course'))
                 ->first();
 
-            if ($existing && empty($options['modifiers'])) {
+            if ($existing) {
                 $qty = Decimal::of($existing->quantity)->plus(Decimal::of($quantity));
                 $existing->update([
                     'quantity' => Decimal::qty($qty),
@@ -203,8 +208,9 @@ final class OrderService
             }
 
             $approver = null;
-            if ($order->status === 'confirmed') {
-                // Item sudah dikirim ke dapur: void butuh supervisor.
+            $sent = TicketItem::where('order_line_id', $line->id)->exists();
+            if ($sent) {
+                // Item sudah dikirim ke dapur: void butuh supervisor. Baris yang belum dikirim bebas dihapus.
                 $approver = Approval::verify($approval, $actor->id, $order->outlet_id, $line->net_amount);
             }
 
@@ -221,7 +227,7 @@ final class OrderService
             }
 
             $line->update(['status' => 'voided', 'revision' => $line->revision + 1]);
-            if ($order->status === 'confirmed') {
+            if ($sent) {
                 app(KitchenService::class)->lineVoided($line, $actor, $reason);
             }
             Audit::record('line.void', $line, $actor->id, reason: $reason, approverId: $approver?->id, outletId: $order->outlet_id, amount: $line->net_amount);
@@ -316,6 +322,11 @@ final class OrderService
 
             foreach ($lines as $line) {
                 $this->deductStock($order, $line, $actor);
+            }
+
+            if ($order->visit_id) {
+                // Meja kembali kosong; token kunjungan lama tidak bisa dipakai lagi.
+                Visit::whereKey($order->visit_id)->where('status', 'open')->update(['status' => 'closed', 'closed_at' => now()]);
             }
 
             $order->update([

@@ -10,7 +10,7 @@ Platform POS untuk Indoguna Group: meatshop, grocery dan restoran dalam satu cod
 | Aplikasi | Untuk | Alamat / profil |
 | --- | --- | --- |
 | Rasentra POS | Layar sentuh kasir retail dan resto | `/pos` |
-| Rasentra Mobile Terminal | Tablet pelayan (meja, order, kirim dapur) | API `/pos/api` (UI tahap berikutnya) |
+| Rasentra Mobile Terminal | Tablet pelayan: peta meja, pesanan dengan modifier, kirim dapur per gelombang, antar hidangan, minta bayar | `/mobile` |
 | Rasentra Kitchen | Layar dapur per station, expeditor, layar antrean pickup | `/kitchen` |
 | Rasentra Inventory | Handheld: penerimaan barang, stok opname, karantina dan waste, cek stok | `/inventory` |
 | Rasentra Lokal | Server lokal di setiap outlet untuk semua perangkat di atas; tetap jalan saat internet putus | profil `lokal` |
@@ -53,7 +53,7 @@ Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan k
 | Tono | Kasir resto | 1212 | Rasentra POS |
 | Hendra | Kepala outlet, limit approval Rp5.000.000 | 9999 | Rasentra POS |
 | Maya | Asisten kepala, limit Rp1.000.000 | 8888 | Rasentra POS |
-| Lusi, Agus | Pelayan | 3333, 3434 | Rasentra POS |
+| Lusi, Agus | Pelayan | 3333, 3434 | Rasentra Mobile Terminal |
 | Chef Bambang, Sri, Dimas | Grill, hot kitchen, bar | 2222, 2323, 2424 | Rasentra Kitchen |
 | Wawan, Yuni | Gudang | 4444, 5555 | Rasentra Inventory |
 
@@ -114,6 +114,20 @@ Layar sentuh untuk kasir retail dan resto. Selain scan Pack ID/barcode, promo ot
 - **Laporan shift.** Laporan sementara bisa dicetak kapan saja dari menu Shift. Saat tutup shift, laporan akhir (penjualan per kanal, pembayaran, retur dan refund, kas masuk/keluar, tunai seharusnya, hitungan, selisih) langsung tercetak untuk ditandatangani kasir dan kepala outlet.
 
 Retur dikirim ke Rasentra Central sebagai event `order.returned`. Di Central retur menjadi dokumen bernilai negatif pada tanggal bisnis retur, sehingga laporan Core menampilkan penjualan bersih setelah retur, sedangkan jumlah struk tetap hanya menghitung penjualan. Tutup hari ikut mengirim jumlah dan nomor retur untuk rekonsiliasi. Di SAP, retur diposting sebagai A/R Credit Memo yang merujuk baris invoice struk asal, lalu Outgoing Payment ke pelanggan. Bila invoice asal belum terposting, retur berstatus "menunggu dokumen lain" dan diposting otomatis pada putaran berikutnya.
+
+## Rasentra Mobile Terminal (tablet pelayan)
+
+Pelayan masuk dengan PIN di `/pos/login` dan langsung diarahkan ke `/mobile`. Layar bekerja lanskap (menu dan pesanan berdampingan) maupun potret (menu dan pesanan bergantian).
+
+- **Peta meja per area.** Kosong, terisi (jumlah tamu, lama duduk, total, pelayan) atau minta bayar. Penanda biru "N siap" muncul saat dapur selesai, dan merah bila masih ada item yang belum dikirim.
+- **Kunjungan bertoken.** Membuka meja membuat kunjungan dengan token baru. Semua permintaan tablet memakai token itu, jadi setelah meja dibayar dan dibuka lagi, pesanan dari tablet yang masih membuka meja lama ditolak dan tidak pernah masuk ke tamu berikutnya.
+- **Catat menu.** Modifier per kategori (kematangan steak wajib dipilih, extra butter, level pedas, gula dan es minuman; diatur di `rasentra.menu_modifiers`), jumlah, catatan cepat atau bebas, dan urutan saji: langsung, pembuka, utama atau penutup.
+- **Kirim dapur per gelombang.** Kirim semua, atau hanya Pembuka dulu lalu Utama saat tamu siap. Station hanya menerima tambahan baru, dan tiket dapur berlabel nomor meja.
+- **Status per item.** Belum dikirim, antre, dimasak, siap diantar, disajikan, minta batal. Tombol "Antar N hidangan siap" menandai hidangan disajikan.
+- **Batal.** Item yang belum dikirim bisa langsung dihapus. Item yang sudah di dapur butuh alasan dan PIN kepala outlet, lalu menjadi Minta batal di layar station.
+- **Masak daging tamu.** Daging atau ikan yang dibeli di kasir meatshop dimasak di resto dengan nomor struk dan Pack ID; cooking fee masuk tagihan meja dan hak layanannya hanya bisa dipakai sekali.
+- **Pindah meja, ubah jumlah tamu, tutup meja** bila tamu batal sebelum memesan.
+- **Minta bayar.** Meja berubah kuning. Pembayaran tetap di kasir: di Rasentra POS tombol **Meja** menampilkan meja terisi (yang minta bayar paling atas); kasir memilihnya, pesanan masuk ke shift kasir itu, lalu dibayar seperti biasa. Setelah lunas, kunjungan ditutup dan meja kembali kosong.
 
 ## Rasentra Inventory (handheld gudang)
 
@@ -241,11 +255,12 @@ Perintah lain: `rasentra:pull`, `rasentra:heartbeat`, `rasentra:close-day {tangg
 
 1. **Kasir retail.** Login Rina, lalu scan `PK-100004` dan `PK-100005` di kolom pindai (scanner barcode mengetik lalu Enter). Promo borong terhitung otomatis. Lanjutkan Bayar → Tunai → Selesaikan.
 2. **Pilih ikan, dimasak di resto.** Pilih kanal Dine-in, scan `PK-100031`, sentuh barisnya, lalu pilih Masak di resto → Bakar. Jasa bakar muncul sebagai baris terpisah. Tekan Kirim dapur.
-3. **Dapur.** Login Chef Bambang dan buka station Grill. Tiket berwarna hijau/kuning/merah sesuai target waktu. Sentuh Mulai masak lalu Siap, atau scan barcode tiket. Layar Expeditor menunggu sampai semua station lengkap. Layar Antrean ada di `/kitchen/queue`.
-4. **Penerimaan barang.** Login Wawan di handheld, buka tab Terima, lalu scan `PK-120001`. Untuk pack rusak, pilih Tolak dan isi alasan; stoknya masuk karantina. Di tab Karantina, `PK-120005` bisa dilepas ke stok atau dibuang dengan PIN Hendra (9999), dan pack yang hampir kedaluwarsa bisa ditahan.
-5. **Retur dan cetak ulang.** Tekan Riwayat, pilih struk tadi. Cetak ulang struk menghasilkan tanda SALINAN. Tekan Retur barang, pilih pack atau barang, alasan dan metode refund, lalu Hendra memasukkan PIN 9999. Bukti retur tercetak, pack masuk karantina.
-6. **Delivery.** Pilih kanal Delivery, scan `PK-100006`, isi nama, telepon dan alamat pemesan, lalu bayar. Di menu Shift, tutup shift untuk mencetak laporan tutup shift.
-7. **Stok opname.** Lanjutkan sesi yang sedang berjalan: scan QR lokasi (`RAK`, `ESF`, `FRZ`, ...), lalu scan barang. Hendra menekan Review. Selisih di atas ambang wajib dihitung ulang oleh petugas lain (Yuni) sebelum disetujui.
+3. **Pelayan.** Login Lusi (3333) di tablet. Sentuh meja kosong, isi jumlah tamu, pilih Ribeye (kematangan wajib, set Utama) dan minuman (set Pembuka). Tekan Kirim Pembuka, lalu Kirim dapur. Saat dapur selesai, meja bertanda biru dan tombol Antar muncul. Tekan Minta bayar, lalu login Tono (1212) di kasir, tekan Meja dan bayar meja itu.
+4. **Dapur.** Login Chef Bambang dan buka station Grill. Tiket berwarna hijau/kuning/merah sesuai target waktu. Sentuh Mulai masak lalu Siap, atau scan barcode tiket. Layar Expeditor menunggu sampai semua station lengkap. Layar Antrean ada di `/kitchen/queue`.
+5. **Penerimaan barang.** Login Wawan di handheld, buka tab Terima, lalu scan `PK-120001`. Untuk pack rusak, pilih Tolak dan isi alasan; stoknya masuk karantina. Di tab Karantina, `PK-120005` bisa dilepas ke stok atau dibuang dengan PIN Hendra (9999), dan pack yang hampir kedaluwarsa bisa ditahan.
+6. **Retur dan cetak ulang.** Tekan Riwayat, pilih struk tadi. Cetak ulang struk menghasilkan tanda SALINAN. Tekan Retur barang, pilih pack atau barang, alasan dan metode refund, lalu Hendra memasukkan PIN 9999. Bukti retur tercetak, pack masuk karantina.
+7. **Delivery.** Pilih kanal Delivery, scan `PK-100006`, isi nama, telepon dan alamat pemesan, lalu bayar. Di menu Shift, tutup shift untuk mencetak laporan tutup shift.
+8. **Stok opname.** Lanjutkan sesi yang sedang berjalan: scan QR lokasi (`RAK`, `ESF`, `FRZ`, ...), lalu scan barang. Hendra menekan Review. Selisih di atas ambang wajib dihitung ulang oleh petugas lain (Yuni) sebelum disetujui.
 
 Uji otomatis memakai outlet terpisah `UJI` (DemoSeeder, di bawah CV Solo Kulina Utama) yang tidak ikut `migrate:fresh --seed`.
 
@@ -263,6 +278,7 @@ Uji mencakup skenario UAT spesifikasi:
 - Impor XML MSI/MSR.
 - Shift dan selisih kas.
 - Alur HTTP POS, papan dapur dan antrean.
+- Mobile Terminal: meja hanya bisa dibuka sekali, modifier wajib dan tidak dikenal, kirim per gelombang, hapus bebas sebelum dikirim dan PIN setelah dikirim, antar hidangan siap, minta bayar sampai dibayar kasir, token lama ditolak, pindah meja dan tutup meja kosong.
 - Dapur: kiriman delta saat porsi ditambah, void kasir menjadi Minta batal lalu waste, tiket cetak dengan barcode Code 128, penanda perubahan papan, dan analisis per zona waktu outlet.
 - Retur penjualan: PIN kepala outlet, pack ke karantina, barang kembali ke stok, kas shift berkurang, batas sisa retur, refund per metode; retur sampai laporan Central, rekonsiliasi tutup hari dan A/R Credit Memo SAP (termasuk menunggu invoice asal); riwayat, cetak ulang SALINAN, laporan tutup shift, dan data pemesan pickup/delivery.
 - Penerimaan barang dan opname.
@@ -277,7 +293,7 @@ Uji mencakup skenario UAT spesifikasi:
 
 ```
 app/Domain/
-  Sales/          OrderService, PaymentService, Approval
+  Sales/          OrderService, PaymentService, ReturnService, TableService (meja dan kunjungan Mobile Terminal), Approval
   Catalog/        PriceResolver
   Promotion/      PromotionEngine (murni, deterministik), ActivePromotions, PromotionPublisher
   Inventory/      StockLedger (append-only), ReceivingService, StockCountService
@@ -292,7 +308,7 @@ app/Domain/
   Core/           CoreAccess (peran pusat), SalesProjector, SalesReport
   Catalog/        PricePublisher (maker-checker versi harga)
   Promotion/      PromotionDesigner (simulasi, terbit, hentikan)
-app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (konsol Rasentra Central: modul Sinkronisasi, Posting SAP dan Rasentra Core), Lokal/* (konsol server outlet)
+app/Http/Controllers/  PosController, MobileController, KitchenController, InventoryController, SyncController, Core/* (konsol Rasentra Central: modul Sinkronisasi, Posting SAP dan Rasentra Core), Lokal/* (konsol server outlet)
 database/seeders/      OutletSeeder (dua CV), SoloSeeder (demo lengkap), LombokSeeder, CoreSeeder (data pusat), DemoSeeder (outlet UJI untuk uji)
-public/assets/         pos, kitchen, inventory, core (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
+public/assets/         pos, mobile, kitchen, inventory, core (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
 ```

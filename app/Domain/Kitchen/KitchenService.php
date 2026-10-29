@@ -27,13 +27,19 @@ final class KitchenService
 {
     public function __construct(private readonly RecipeService $recipes) {}
 
-    /** @return list<KitchenTicket> */
-    public function send(Order $order): array
+    /**
+     * Kirim baris yang belum dikirim. $course membatasi ke satu gelombang (starter, main,
+     * dessert) sehingga pelayan bisa menahan hidangan utama sampai pembuka selesai.
+     *
+     * @return list<KitchenTicket>
+     */
+    public function send(Order $order, ?string $course = null): array
     {
-        $tickets = DB::transaction(function () use ($order) {
+        $tickets = DB::transaction(function () use ($order, $course) {
             $order = Order::lockForUpdate()->findOrFail($order->id);
             $lines = $order->lines()->where('status', 'active')
                 ->whereIn('line_type', ['restaurant_menu', 'cooking_service', 'add_on'])
+                ->when($course, fn ($q, $c) => $q->where('course', $c))
                 ->with('product')->get();
 
             // Delta: baris yang direvisi (qty ditambah) hanya mengirim tambahannya; revisi tanpa

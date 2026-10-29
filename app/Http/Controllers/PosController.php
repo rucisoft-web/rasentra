@@ -10,8 +10,10 @@ use App\Domain\Sales\Approval;
 use App\Domain\Sales\OrderService;
 use App\Domain\Sales\PaymentService;
 use App\Domain\Sales\ReturnService;
+use App\Domain\Sales\TableService;
 use App\Models\CookingFeeRule;
 use App\Models\CookingJob;
+use App\Models\DiningTable;
 use App\Models\Order;
 use App\Models\OrderLine;
 use App\Models\Outlet;
@@ -21,6 +23,7 @@ use App\Models\PriceItem;
 use App\Models\Product;
 use App\Models\Shift;
 use App\Models\User;
+use App\Models\Visit;
 use App\Support\Decimal;
 use App\Support\DomainException;
 use Illuminate\Http\JsonResponse;
@@ -256,6 +259,34 @@ class PosController extends Controller
         return response()->json(['tickets' => count($tickets)] + $this->orderPayload($order->fresh()));
     }
 
+    /** Meja yang sedang terisi; yang minta bayar di atas. Kasir mengambil pesanannya untuk dibayar. */
+    public function tables(Request $request): JsonResponse
+    {
+        $tables = collect(app(TableService::class)->map($request->user()->outlet_id))->whereNotNull('visit');
+
+        return response()->json($tables->map(fn ($t) => [
+            'code' => $t['code'], 'area' => $t['area'], 'status' => $t['status'], 'guests' => $t['visit']['guests'],
+            'waiter' => $t['visit']['waiter'], 'net_amount' => $t['visit']['net_amount'], 'unsent' => $t['visit']['unsent'],
+            'order_id' => Order::where('visit_id', Visit::where('visit_token', $t['visit']['token'])->value('id'))->whereIn('status', ['draft', 'held', 'confirmed'])->value('id'),
+        ])->sortBy(fn ($t) => ($t['status'] === 'billing' ? '0' : '1').$t['code'])->values());
+    }
+
+    /** Pesanan meja masuk ke shift kasir yang menerima pembayarannya. */
+    public function takeTableOrder(Request $request, Order $order): JsonResponse
+    {
+        $this->authorizeOutlet($order);
+        if ($order->visit_id === null || ! $order->isEditable()) {
+            throw DomainException::conflict('not_table_order', 'Pesanan ini bukan pesanan meja yang masih terbuka.');
+        }
+        $shift = Shift::where('user_id', $request->user()->id)->where('status', 'open')->first();
+        if ($shift === null) {
+            throw new DomainException('shift_required', 'Buka shift terlebih dahulu.');
+        }
+        $order->update(['shift_id' => $shift->id]);
+
+        return $this->orderResponse($order);
+    }
+
     /** Data pemesan untuk kanal pickup dan delivery. */
     public function customer(Request $request, Order $order): JsonResponse
     {
@@ -402,7 +433,9 @@ class PosController extends Controller
 
         return [
             'order' => $order->only(['id', 'doc_no', 'channel', 'status', 'payment_status', 'gross_amount', 'discount_amount', 'net_amount', 'finalized_at',
-                'customer_name', 'customer_phone', 'delivery_address', 'promised_at', 'fulfilment_note']),
+                'customer_name', 'customer_phone', 'delivery_address', 'promised_at', 'fulfilment_note']) + [
+                    'table' => $order->visit_id ? DiningTable::whereKey(Visit::whereKey($order->visit_id)->value('dining_table_id'))->value('code') : null,
+                ],
             'lines' => $order->lines->map(fn (OrderLine $l) => [
                 'id' => $l->id,
                 'line_type' => $l->line_type,

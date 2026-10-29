@@ -38,9 +38,11 @@ class PosAuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        // Petugas dapur ke Rasentra Kitchen, petugas gudang ke Rasentra Inventory, lainnya ke Rasentra POS.
+        // Petugas dapur ke Rasentra Kitchen, pelayan ke Mobile Terminal, petugas gudang ke
+        // Rasentra Inventory, lainnya ke Rasentra POS.
         $home = match ($user->role) {
             'chef', 'kitchen' => route('kitchen'),
+            'waiter' => route('mobile'),
             'storekeeper' => route('inventory'),
             default => route('pos'),
         };

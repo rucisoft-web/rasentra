@@ -4,6 +4,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\Lokal\LokalController;
 use App\Http\Controllers\Lokal\SetupController;
+use App\Http\Controllers\MobileController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\ReceiptController;
@@ -54,6 +55,8 @@ Route::middleware('auth')->group(function () {
         Route::post('orders', 'createOrder');
         Route::get('orders/{order}', 'showOrder');
         Route::get('history', 'history');
+        Route::get('tables', 'tables');
+        Route::post('orders/{order}/take', 'takeTableOrder');
         Route::get('orders/{order}/detail', 'orderDetail');
         Route::post('orders/{order}/returns', 'createReturn');
         Route::post('orders/{order}/customer', 'customer');
@@ -73,6 +76,25 @@ Route::middleware('auth')->group(function () {
         Route::post('shift/open', 'openShift');
         Route::post('shift/cash', 'cashMovement');
         Route::post('shift/close', 'closeShift');
+    });
+
+    // Rasentra Mobile Terminal: tablet pelayan. Permintaan per meja memakai token kunjungan.
+    Route::get('mobile', [MobileController::class, 'app'])->name('mobile');
+    Route::prefix('mobile/api')->controller(MobileController::class)->group(function () {
+        Route::get('bootstrap', 'bootstrap');
+        Route::get('tables', 'tables');
+        Route::get('menu', 'menu');
+        Route::post('tables/{table}/open', 'open');
+        Route::get('visits/{token}', 'show');
+        Route::post('visits/{token}/items', 'addItem');
+        Route::post('visits/{token}/lines/{line}/void', 'voidLine');
+        Route::post('visits/{token}/send', 'send');
+        Route::post('visits/{token}/serve', 'serve');
+        Route::post('visits/{token}/cooking-from-receipt', 'cookFromReceipt');
+        Route::post('visits/{token}/bill', 'bill');
+        Route::post('visits/{token}/move', 'move');
+        Route::post('visits/{token}/guests', 'guests');
+        Route::post('visits/{token}/close', 'close');
     });
 
     // Rasentra Kitchen: layar station, expeditor, antrean pickup, analisis waktu saji.
