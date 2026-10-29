@@ -19,7 +19,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .mbar { display: flex; align-items: center; gap: 14px; padding: 8px 16px; background: var(--green); color: #fff; }
 .brand { font-weight: 800; display: flex; align-items: center; gap: 10px; }
-.brand i { width: 13px; height: 13px; background: var(--amber); transform: rotate(45deg); border-radius: 3px; display: inline-block; }
+.brand i { width: 30px; height: 30px; flex: none; display: inline-block; border-radius: 8px; background: #fff url(../brand/rasentra-tile.png) center / contain no-repeat; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); }
 .who { margin-left: auto; color: #cfe3d8; font-size: .92rem; }
 .pill { font-size: .78rem; font-weight: 700; padding: 5px 10px; border-radius: 999px; background: #173d2a; color: #8fe0b3; }
 .pill.off { background: #5c1d19; color: #ffc2bb; }

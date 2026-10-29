@@ -2,6 +2,8 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+<link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <title>Tiket dapur {{ $label }}</title>
 <style>
   /* Printer thermal 80 mm di station. Satu tiket per station, dipotong per halaman. */

@@ -2,6 +2,8 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+<link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <title>@yield('title')</title>
 <style>
   /* Printer thermal 80 mm: lebar cetak efektif ±72 mm. */

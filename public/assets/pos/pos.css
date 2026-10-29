@@ -18,7 +18,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 :focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
 
 .brand { font-weight: 800; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
-.brand i { width: 14px; height: 14px; background: var(--amber); transform: rotate(45deg); border-radius: 3px; display: inline-block; }
+.brand i { width: 30px; height: 30px; flex: none; display: inline-block; border-radius: 8px; background: #fff url(../brand/rasentra-tile.png) center / contain no-repeat; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); }
 
 .btn { min-height: var(--tap); padding: 0 20px; border-radius: var(--radius); border: 2px solid var(--line); background: var(--surface); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .btn:active { transform: scale(.97); }
@@ -35,7 +35,7 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 /* Login */
 body.login { display: grid; place-items: center; padding: 24px; }
 .login-wrap { width: min(1100px, 100%); background: var(--surface); border-radius: 20px; padding: 32px; box-shadow: 0 20px 60px rgba(20, 40, 30, .12); }
-.login-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
+.login-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .login-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; }
 .login h2 { font-size: 1.1rem; margin: 0 0 14px; }
 .user-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -168,3 +168,4 @@ body.pos { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow:
   .login-grid, .pay-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .btn:active { transform: none; } }
+.login .brand i { width: 44px; height: 44px; border-radius: 11px; }

@@ -2,6 +2,8 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+<link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 @verbatim
 <title>Rasentra · Indoguna Group</title>
@@ -42,7 +44,7 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
 header.top .wrap{display:flex;align-items:center;gap:24px;min-height:60px;flex-wrap:wrap}
 .brand{font-family:var(--display);font-weight:800;font-size:1.25rem;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:10px}
-.brand i{display:inline-block;width:14px;height:14px;border-radius:3px;background:var(--amber);transform:rotate(45deg)}
+.brand i{display:inline-block;flex:none;width:34px;height:34px;background:url(/assets/brand/rasentra-mark.png) center/contain no-repeat}
 nav.menu{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap;align-items:center}
 nav.menu > a, nav.menu summary{font-weight:600;font-size:.95rem;color:var(--ink);text-decoration:none;padding:8px 12px;border-radius:6px;cursor:pointer;list-style:none}
 nav.menu > a:hover, nav.menu summary:hover{background:var(--green-soft)}

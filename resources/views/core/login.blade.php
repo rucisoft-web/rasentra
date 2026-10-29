@@ -2,6 +2,8 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+<link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Masuk · Rasentra Central</title>
 <link rel="stylesheet" href="{{ asset('assets/core/core.css') }}">

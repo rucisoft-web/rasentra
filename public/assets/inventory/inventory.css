@@ -10,7 +10,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .mbar .muted { color: #cfe3d8; margin-left: auto; }
 .mbar .link { background: none; border: 0; color: #fff; text-decoration: underline; min-height: 44px; }
 .brand { font-weight: 800; display: flex; align-items: center; gap: 8px; }
-.brand i { width: 12px; height: 12px; background: var(--amber); transform: rotate(45deg); border-radius: 2px; display: inline-block; }
+.brand i { width: 30px; height: 30px; flex: none; display: inline-block; border-radius: 8px; background: #fff url(../brand/rasentra-tile.png) center / contain no-repeat; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); }
 .scanrow { display: flex; gap: 8px; padding: 10px 14px; background: var(--s); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 3; }
 .scanrow input { flex: 1; min-height: 52px; border: 2px solid var(--line); border-radius: 12px; padding: 0 14px; font: inherit; }
 .scanrow button, .btn { min-height: 52px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--green); color: #fff; font-weight: 700; }

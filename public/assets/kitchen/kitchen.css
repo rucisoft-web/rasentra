@@ -14,7 +14,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
 .brand { font-weight: 800; display: flex; align-items: center; gap: 10px; }
-.brand i { width: 14px; height: 14px; background: var(--accent); transform: rotate(45deg); border-radius: 3px; display: inline-block; }
+.brand i { width: 30px; height: 30px; flex: none; display: inline-block; border-radius: 8px; background: #fff url(../brand/rasentra-tile.png) center / contain no-repeat; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); }
 .push { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .kbtn { min-height: 52px; padding: 0 18px; border-radius: 10px; border: 2px solid var(--line); background: var(--card); font-weight: 700; }
 .kbtn.ghost { background: transparent; }
