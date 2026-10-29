@@ -12,7 +12,7 @@ Platform POS untuk CV Pasar Tani (Toko Tani Indoguna): meatshop, ikan laut, anek
 | Rasentra Central | Pusat POS di kantor pusat: menerima sinkronisasi semua outlet, menyebarkan harga/promo/resep, posting ke SAP | profil `central` |
 | Rasentra Core | Aplikasi admin kantor pusat: master outlet/produk/pengguna, harga, Promotion Designer, monitoring, laporan | berjalan di instalasi `central` (UI tahap berikutnya) |
 
-Rancangan teknis ada di [docs/RANCANGAN.md](docs/RANCANGAN.md). Landing page dengan penjelasan fitur dan diagram alur kerja retail/resto ada di `/`.
+Spesifikasi lengkap v2.0 ada di [Spesifikasi Lengkap Rasentra v2.0](https://claude.ai/artifact/MidWQUchfyxN2rsywyT8aw); rancangan teknis awal di [docs/RANCANGAN.md](docs/RANCANGAN.md). Landing page dengan penjelasan fitur dan diagram alur kerja retail/resto ada di `/`.
 
 ## Arsitektur singkat
 

@@ -2,6 +2,8 @@
 
 Oct 29, 2026 · @Jaya Martha
 
+> **Catatan:** spesifikasi terbaru (v2.0, nama aplikasi Rasentra POS, Mobile Terminal, Kitchen, Inventory, Lokal, Central dan Core) ada di [Spesifikasi Lengkap Rasentra v2.0](https://claude.ai/artifact/MidWQUchfyxN2rsywyT8aw). Dokumen di bawah ini adalah rancangan awal dan masih memakai nama lama (server outlet, Rasentra Mobile).
+
 Rancangan ini menerjemahkan Spesifikasi POS CV Pasar Tani v1.3 menjadi arsitektur, skema data, kontrak API dan rencana uji untuk Laravel 13 dan MySQL 8.4, dengan satu server lokal per outlet dan SAP B1 sebagai pembukuan resmi.
 
 Nama program: **Rasentra**. Aplikasinya: **Rasentra POS** (kasir retail dan resto), **Rasentra Mobile Terminal** (tablet pelayan untuk order di meja), Rasentra Mobile (handheld cek inventory: penerimaan barang, stok opname, cek saldo per lokasi dan Pack ID), **Rasentra Kitchen** (KDS dan expeditor) dan **Rasentra Central** (portal pusat, sinkronisasi, SAP bridge). Di kode, nama ini menjadi folder `resources/js/apps/{pos,mobile,kitchen,central}`.
