@@ -6,6 +6,7 @@ use App\Domain\Audit\Audit;
 use App\Domain\Inventory\StockLedger;
 use App\Models\ConsumptionEvent;
 use App\Models\ProductionBatch;
+use App\Models\PublicationVersion;
 use App\Models\Recipe;
 use App\Models\RecipeVersion;
 use App\Models\User;
@@ -25,6 +26,13 @@ final class RecipeService
             RecipeVersion::where('recipe_id', $version->recipe_id)->where('id', '!=', $version->id)
                 ->where('status', 'approved')->update(['status' => 'retired']);
             Audit::record('recipe.approved', $version, $approver->id);
+            // Rasentra Central menyebarkan resep yang disetujui ke outlet lewat cursor publikasi.
+            PublicationVersion::create([
+                'entity_type' => 'recipe_version',
+                'entity_key' => (string) $version->id,
+                'payload' => $version->fresh('lines')->toArray(),
+                'outlet_ids' => $version->outlet_ids,
+            ]);
 
             return $version->fresh();
         });

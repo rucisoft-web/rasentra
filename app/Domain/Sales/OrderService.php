@@ -410,6 +410,7 @@ final class OrderService
             'gross_amount' => (string) $order->gross_amount,
             'discount_amount' => (string) $order->discount_amount,
             'net_amount' => (string) $order->net_amount,
+            'finalized_at' => $order->finalized_at?->toIso8601ZuluString(),
             'lines' => $order->lines->where('status', 'active')->values()->map(fn (OrderLine $l) => [
                 'id' => $l->id,
                 'line_no' => $l->line_no,

@@ -3,10 +3,16 @@
 namespace Tests\Feature\Acceptance;
 
 use App\Domain\Kitchen\KitchenBoard;
+use App\Models\CookingFeeRule;
 use App\Models\CountSession;
 use App\Models\Order;
 use App\Models\Outlet;
 use App\Models\Pack;
+use App\Models\PriceVersion;
+use App\Models\Product;
+use App\Models\PromotionVersion;
+use App\Models\Recipe;
+use App\Models\SapDocument;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,5 +53,27 @@ class JmSoloDemoTest extends TestCase
         $boot = $this->getJson('/pos/api/bootstrap')->assertOk();
         $this->assertContains('bakar', collect($boot->json('cooking_methods'))->pluck('method')->all());
         $this->assertContains('Ikan Laut', $boot->json('categories'));
+
+        // Rasentra Core: riwayat 7 hari tersinkron, SAP dengan kasus review, dan semua halaman admin terisi.
+        $this->assertGreaterThan(300, \DB::table('hq_orders')->count());
+        $this->assertSame(1, SapDocument::where('status', 'needs_review')->count());
+        $this->assertSame(['draft', 'simulated'], PromotionVersion::whereIn('status', ['draft', 'simulated'])->orderBy('id')->pluck('status')->all());
+        $this->actingAs(User::where('email', 'admin@rasentra.test')->firstOrFail());
+        $pages = ['core.dashboard', 'core.outlets.index', 'core.users.index', 'core.users.create', 'core.devices.index', 'core.products.index', 'core.products.create',
+            'core.prices.index', 'core.promotions.index', 'core.promotions.create', 'core.recipes.index', 'core.cooking-fees.index', 'core.monitor.sync',
+            'core.monitor.sap', 'core.monitor.exceptions', 'core.sap-mappings.index', 'core.xml.index', 'core.reports.sales', 'core.reports.promotions',
+            'core.reports.kitchen', 'core.reports.stock', 'core.audit'];
+        foreach ($pages as $name) {
+            $this->get(route($name))->assertOk();
+        }
+        $this->get(route('core.outlets.edit', $outlet))->assertOk()->assertSee('J&amp;M Solo', false);
+        $this->get(route('core.prices.show', PriceVersion::where('code', 'JMS-2026-11')->firstOrFail()))->assertOk();
+        $this->get(route('core.promotions.show', PromotionVersion::firstOrFail()))->assertOk();
+        $this->get(route('core.recipes.show', Recipe::firstOrFail()))->assertOk();
+        $this->get(route('core.cooking-fees.edit', CookingFeeRule::firstOrFail()))->assertOk();
+        $this->get(route('core.monitor.sap.show', SapDocument::where('status', 'needs_review')->firstOrFail()))->assertOk();
+        $this->get(route('core.products.edit', Product::firstOrFail()))->assertOk();
+        $this->get(route('core.users.edit', User::firstOrFail()))->assertOk();
+        $this->get(route('core.reports.sales'))->assertSee('J&amp;M Solo', false);
     }
 }

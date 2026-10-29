@@ -2,6 +2,7 @@
 
 namespace App\Domain\Integration\Sap;
 
+use App\Models\InboxEvent;
 use App\Models\IntegrationException;
 use App\Models\SapDocument;
 use App\Models\SapMapping;
@@ -21,6 +22,26 @@ final class SapPostingService
     public function __construct(private readonly SapClient $sap, private readonly string $companyDb = 'PASARTANI') {}
 
     /** Posting penjualan (payload event order.finalized): A/R Invoice lalu Incoming Payment. */
+    /**
+     * Posting penjualan yang sudah diterima inbox Rasentra Central dan belum terposting.
+     *
+     * @return array<string, int> jumlah per status hasil
+     */
+    public function postInbox(int $limit = 200): array
+    {
+        $summary = [];
+        $events = InboxEvent::where('event_type', 'order.finalized')->where('status', 'accepted')->orderBy('id')->limit($limit)->get();
+        foreach ($events as $event) {
+            $result = $this->postSale($event->payload);
+            if ($result['status'] === 'posted') {
+                $event->update(['status' => 'processed']);
+            }
+            $summary[$result['status']] = ($summary[$result['status']] ?? 0) + 1;
+        }
+
+        return $summary;
+    }
+
     public function postSale(array $order): array
     {
         $lock = Cache::lock("sap:order:{$order['id']}", 120);
@@ -31,10 +52,11 @@ final class SapPostingService
         try {
             $missing = $this->missingMappings($order);
             if ($missing !== []) {
-                IntegrationException::create([
-                    'kind' => 'missing_mapping', 'source_type' => 'order', 'source_id' => $order['id'],
-                    'message' => 'Mapping SAP belum ada: '.implode(', ', $missing),
-                ]);
+                // Satu catatan terbuka per order, agar posting berkala tidak menumpuk duplikat.
+                IntegrationException::updateOrCreate(
+                    ['kind' => 'missing_mapping', 'source_type' => 'order', 'source_id' => $order['id'], 'status' => 'open'],
+                    ['message' => 'Mapping SAP belum ada: '.implode(', ', $missing)],
+                );
 
                 return ['status' => 'failed', 'missing' => $missing];
             }

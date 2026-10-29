@@ -10,7 +10,7 @@ Platform POS untuk CV Pasar Tani (Toko Tani Indoguna): meatshop, ikan laut, anek
 | Rasentra Inventory | Handheld: penerimaan barang, stok opname, cek stok | `/inventory` |
 | Rasentra Lokal | Server lokal di setiap outlet untuk semua perangkat di atas; tetap jalan saat internet putus | profil `lokal` |
 | Rasentra Central | Pusat POS di kantor pusat: menerima sinkronisasi semua outlet, menyebarkan harga/promo/resep, posting ke SAP | profil `central` |
-| Rasentra Core | Aplikasi admin kantor pusat: master outlet/produk/pengguna, harga, Promotion Designer, monitoring, laporan | berjalan di instalasi `central` (UI tahap berikutnya) |
+| Rasentra Core | Aplikasi admin kantor pusat: master outlet/produk/pengguna, harga, Promotion Designer, monitoring, laporan | `/core`, berjalan di instalasi `central` |
 
 Spesifikasi lengkap v2.0 ada di [Spesifikasi Lengkap Rasentra v2.0](https://claude.ai/artifact/MidWQUchfyxN2rsywyT8aw); rancangan teknis awal di [docs/RANCANGAN.md](docs/RANCANGAN.md). Landing page dengan penjelasan fitur dan diagram alur kerja retail/resto ada di `/`.
 
@@ -93,6 +93,37 @@ Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan k
 | `PK-120001` – `PK-120005` | Kiriman dalam perjalanan | Terima lewat Rasentra Inventory |
 | `8992301001009` | Barcode Sosis Bratwurst | Scan 3 kali: beli 2 gratis 1 |
 
+## Rasentra Core (admin kantor pusat)
+
+Login di `/core/login` dengan email dan kata sandi `password`:
+
+| Pengguna | Peran | Email | Akses |
+| --- | --- | --- | --- |
+| Rahman Hidayat | Admin pusat | `admin@rasentra.test` | Semua menu |
+| Laras Wulandari | Merchandising | `merch@rasentra.test` | Dashboard, produk, harga, promo, resep, laporan |
+| Fajar Nugroho | Keuangan | `finance@rasentra.test` | Dashboard, monitoring sinkronisasi dan SAP, laporan, audit |
+
+**Menu:**
+
+- **Dashboard.** Penjualan hari ini dan 7 hari, kesehatan sinkronisasi tiap outlet, dan pekerjaan yang menunggu tindakan.
+- **Master.** Outlet dan lokasi (QR rak), pengguna outlet (PIN, limit approval) dan pusat, perangkat dengan token yang hanya tampil sekali dan bisa dicabut.
+- **Katalog.**
+  - Produk.
+  - Versi harga: draft, ubah harga, lalu terbitkan oleh orang lain (maker-checker).
+  - Promotion Designer: susun aturan, simulasikan pada keranjang contoh, lalu terbitkan oleh orang lain ke semua outlet, wilayah atau outlet tertentu.
+  - Resep berversi dan aturan cooking fee berversi.
+- **Monitoring.** Antrean sinkronisasi per outlet, posting SAP (perlu review, gagal, parsial, posting ulang), masalah integrasi, mapping SAP, impor XML NMEXML.
+- **Laporan.** Penjualan (unduh CSV), promo per penanggung biaya, waktu saji dapur, opname dan waste, serta audit log.
+
+**Data demo pusat:**
+
+- Riwayat penjualan 7 hari dari J&M Solo dan sembilan outlet lain, dikirim lewat inbox seperti event sinkronisasi asli.
+- Dua outlet berstatus terlambat, dan dua event J&M Solo masih antre (satu gagal kirim).
+- Posting ke SAP tiruan dengan satu dokumen perlu review, satu pembayaran gagal, satu invoice gagal, dan tiga struk yang tertahan karena Kepiting Bakau belum dimapping.
+- Laras sudah menyiapkan promo kambing (draft), promo salmon yang ditanggung supplier (sudah disimulasikan), dan versi harga November. Masuk sebagai Rahman untuk menyetujui dan menerbitkannya.
+
+Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbox menerima `order.finalized`. Jalankan `php artisan rasentra:rebuild-sales` untuk membangun ulang proyeksi.
+
 ## Coba alurnya
 
 1. **Kasir retail.** Login Rina, lalu scan `PK-100004` dan `PK-100005` di kolom pindai (scanner barcode mengetik lalu Enter). Promo borong terhitung otomatis. Lanjutkan Bayar → Tunai → Selesaikan.
@@ -118,7 +149,8 @@ Uji mencakup skenario UAT spesifikasi:
 - Shift dan selisih kas.
 - Alur HTTP POS, papan dapur dan antrean.
 - Penerimaan barang dan opname.
-- Seeder demo J&M Solo.
+- Seeder demo J&M Solo dan seluruh halaman Rasentra Core.
+- Rasentra Core: hak akses per peran, maker-checker harga dan promo, proyeksi penjualan, dan token perangkat.
 
 ## Struktur kode
 
@@ -134,7 +166,10 @@ app/Domain/
   Cash/           ShiftService
   Sync/           Outbox, OutboxDispatcher, InboxReceiver
   Integration/    Sap/* (Service Layer), Xml/* (NMEXML)
-app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController
-database/seeders/      OutletSeeder, DemoSeeder (PJT, untuk uji), JmSoloSeeder (demo lengkap)
-public/assets/         pos, kitchen, inventory (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
+  Core/           CoreAccess (peran pusat), SalesProjector, SalesReport
+  Catalog/        PricePublisher (maker-checker versi harga)
+  Promotion/      PromotionDesigner (simulasi, terbit, hentikan)
+app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (Rasentra Core)
+database/seeders/      OutletSeeder, DemoSeeder (PJT, untuk uji), JmSoloSeeder (demo lengkap), CoreSeeder (data pusat)
+public/assets/         pos, kitchen, inventory, core (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
 ```

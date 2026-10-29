@@ -1,9 +1,9 @@
 <?php
 
+use App\Domain\Core\SalesProjector;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Integration\Xml\NmexmlImporter;
 use App\Jobs\DispatchOutbox;
-use App\Models\InboxEvent;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
@@ -14,13 +14,8 @@ Schedule::job(new DispatchOutbox)->everyFiveSeconds()->when(fn () => config('ras
 Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->when(fn () => config('rasentra.profile') === 'central');
 
 Artisan::command('rasentra:post-sap {--limit=200}', function (SapPostingService $sap) {
-    $events = InboxEvent::where('event_type', 'order.finalized')->where('status', 'accepted')->orderBy('id')->limit((int) $this->option('limit'))->get();
-    foreach ($events as $event) {
-        $result = $sap->postSale($event->payload);
-        if ($result['status'] === 'posted') {
-            $event->update(['status' => 'processed']);
-        }
-        $this->line("{$event->entity_id}: {$result['status']}");
+    foreach ($sap->postInbox((int) $this->option('limit')) as $status => $count) {
+        $this->line("{$status}: {$count}");
     }
 })->purpose('Posting penjualan dari inbox ke SAP Business One');
 
@@ -35,3 +30,7 @@ Artisan::command('rasentra:import-xml {file} {kind : MSI atau MSR}', function (N
     $batch = $importer->import(file_get_contents($file), basename($file), $kind);
     $this->table(['kunci', 'nilai'], collect($batch->summary)->map(fn ($v, $k) => [$k, is_array($v) ? json_encode($v) : $v])->values());
 })->purpose('Impor file NMEXML MSI/MSR ke staging');
+
+Artisan::command('rasentra:rebuild-sales', function (SalesProjector $projector) {
+    $this->info('Proyeksi penjualan dibangun ulang dari '.$projector->rebuild().' event inbox.');
+})->purpose('Bangun ulang tabel laporan penjualan Rasentra Core dari inbox');

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RecipeLine extends Model
 {
@@ -15,5 +16,10 @@ class RecipeLine extends Model
         return [
             'quantity' => 'decimal:6',
         ];
+    }
+
+    public function component(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'component_product_id');
     }
 }

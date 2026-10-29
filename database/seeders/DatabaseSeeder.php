@@ -11,7 +11,7 @@ class DatabaseSeeder extends Seeder
         $this->call(OutletSeeder::class);
 
         if (! app()->isProduction()) {
-            $this->call([DemoSeeder::class, JmSoloSeeder::class]);
+            $this->call([DemoSeeder::class, JmSoloSeeder::class, CoreSeeder::class]);
         }
     }
 }

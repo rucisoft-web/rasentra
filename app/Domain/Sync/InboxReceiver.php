@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sync;
 
+use App\Domain\Core\SalesProjector;
 use App\Models\InboxEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +15,8 @@ use Illuminate\Support\Str;
  */
 final class InboxReceiver
 {
+    public function __construct(private readonly SalesProjector $sales) {}
+
     public const REQUIRED = ['event_id', 'source_id', 'outlet_id', 'entity_type', 'entity_id', 'entity_version', 'event_type', 'payload', 'checksum'];
 
     /** @return list<array{event_id:string, result:string, ack_ref?:string, error?:string}> */
@@ -49,7 +52,7 @@ final class InboxReceiver
         }
 
         try {
-            $inbox = DB::transaction(fn () => InboxEvent::create([
+            $inbox = DB::transaction(fn () => tap(InboxEvent::create([
                 'source_id' => $sourceId,
                 'event_id' => $eventId,
                 'outlet_id' => $event['outlet_id'],
@@ -61,7 +64,7 @@ final class InboxReceiver
                 'checksum' => $event['checksum'],
                 'ack_ref' => 'ACK-'.Str::upper(Str::random(20)),
                 'status' => 'accepted',
-            ]));
+            ]), fn (InboxEvent $e) => $this->sales->project($e)));
         } catch (UniqueConstraintViolationException) {
             // Dua worker mengirim event sama bersamaan: yang kalah membaca ack milik pemenang.
             $inbox = InboxEvent::where('source_id', $sourceId)->where('event_id', $eventId)->firstOrFail();

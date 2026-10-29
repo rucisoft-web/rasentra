@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\PosAuthController;
 use App\Http\Controllers\PosController;
 use Illuminate\Support\Facades\Route;
@@ -72,3 +72,5 @@ Route::middleware('auth')->group(function () {
         Route::post('counts/{session}/approve', 'approve');
     });
 });
+
+require __DIR__.'/core.php';

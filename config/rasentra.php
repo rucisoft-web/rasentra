@@ -18,6 +18,9 @@ return [
     // Kode outlet yang dilayani Rasentra Lokal ini (profil lokal).
     'outlet_code' => env('RASENTRA_OUTLET_CODE'),
 
+    // Zona waktu tampilan Rasentra Core (data disimpan dalam UTC).
+    'display_timezone' => env('RASENTRA_DISPLAY_TZ', 'Asia/Jakarta'),
+
     // Alamat Rasentra Central yang dituju sinkronisasi dari Rasentra Lokal.
     'central' => [
         'url' => env('RASENTRA_CENTRAL_URL'),
