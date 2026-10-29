@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Core;
 use App\Domain\Audit\Audit;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Http\Controllers\Controller;
+use App\Models\BusinessUnit;
 use App\Models\Device;
 use App\Models\InboxEvent;
 use App\Models\IntegrationException;
@@ -71,7 +72,9 @@ class MonitoringController extends Controller
 
     public function sap(Request $request): View
     {
+        $company = $request->query('company');
         $docs = SapDocument::query()
+            ->when($company, fn ($q, $c) => $q->where('company_db', $c))
             ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
             ->orderByRaw("CASE status WHEN 'needs_review' THEN 0 WHEN 'failed' THEN 1 WHEN 'partially_posted' THEN 2 ELSE 3 END")
             ->orderByDesc('updated_at')->paginate(50)->withQueryString();
@@ -82,7 +85,9 @@ class MonitoringController extends Controller
             'title' => 'Posting SAP',
             'docs' => $docs,
             'orders' => $orders,
-            'counts' => SapDocument::groupBy('status')->selectRaw('status, COUNT(*) as n')->pluck('n', 'status'),
+            'counts' => SapDocument::when($company, fn ($q, $c) => $q->where('company_db', $c))->groupBy('status')->selectRaw('status, COUNT(*) as n')->pluck('n', 'status'),
+            'companies' => BusinessUnit::whereNotNull('sap_company_db')->orderBy('id')->get(),
+            'company' => $company,
             'waiting' => InboxEvent::where('event_type', 'order.finalized')->where('status', 'accepted')->count(),
             'statuses' => self::SAP_STATUS,
         ]);

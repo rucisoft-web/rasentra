@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Core;
 
 use App\Domain\Core\SalesReport;
 use App\Http\Controllers\Controller;
+use App\Models\BusinessUnit;
 use App\Models\IntegrationException;
 use App\Models\Outlet;
 use App\Models\PriceVersion;
@@ -14,7 +15,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
-/** Ringkasan semua outlet: penjualan hari ini, kesehatan sinkronisasi, SAP dan pekerjaan tertunda. */
+/** Ringkasan grup per perusahaan (CV) dan outlet: penjualan hari ini, kesehatan sinkronisasi, SAP dan pekerjaan tertunda. */
 class DashboardController extends Controller
 {
     public function index(): View
@@ -28,7 +29,7 @@ class DashboardController extends Controller
             ->groupBy('outlet_id', 'status')->selectRaw('outlet_id, status, COUNT(*) as n')->get()->groupBy('outlet_id');
         $sales = $day->byOutlet()->keyBy('outlet_id');
 
-        $outlets = Outlet::with('region')->where('is_active', true)->orderBy('code')->get()->map(function (Outlet $o) use ($lastInbox, $outbox, $sales) {
+        $outlets = Outlet::with('region', 'businessUnit')->where('is_active', true)->orderBy('code')->get()->map(function (Outlet $o) use ($lastInbox, $outbox, $sales) {
             $last = isset($lastInbox[$o->id]) ? Carbon::parse($lastInbox[$o->id]) : null;
             $queue = collect($outbox->get($o->id, []))->pluck('n', 'status');
 
@@ -47,8 +48,19 @@ class DashboardController extends Controller
             ];
         });
 
+        $companySales = $day->byCompany()->keyBy('id');
+        $sapByCompany = SapDocument::groupBy('company_db', 'status')->selectRaw('company_db, status, COUNT(*) as n')->get()->groupBy('company_db');
+        $companies = BusinessUnit::orderBy('id')->get()->map(fn (BusinessUnit $c) => (object) [
+            'company' => $c,
+            'net' => $companySales[$c->id]->net ?? '0',
+            'orders' => $companySales[$c->id]->orders ?? 0,
+            'outlets' => $outlets->filter(fn ($r) => $r->outlet->business_unit_id === $c->id),
+            'sap' => collect($sapByCompany->get($c->sap_company_db, []))->pluck('n', 'status'),
+        ]);
+
         return view('core.dashboard', [
-            'title' => 'Dashboard',
+            'title' => 'Dashboard '.config('rasentra.group_name'),
+            'companies' => $companies,
             'today' => $today,
             'totals' => $day->totals(),
             'weekTotals' => $week->totals(),

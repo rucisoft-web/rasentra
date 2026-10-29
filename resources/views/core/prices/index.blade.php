@@ -6,7 +6,7 @@
   <form method="post" action="{{ route('core.prices.store') }}" style="margin-top:12px">
     @csrf
     <div class="fields">
-      <label class="f"><span>Kode versi</span><input name="code" value="{{ old('code') }}" placeholder="JMS-2026-11" required></label>
+      <label class="f"><span>Kode versi</span><input name="code" value="{{ old('code') }}" placeholder="LBK-2026-11" required></label>
       <label class="f"><span>Outlet</span><select name="outlet_id"><option value="">Semua outlet</option>@foreach ($outlets as $o)<option value="{{ $o->id }}" @selected(old('outlet_id') == $o->id)>{{ $o->code }} {{ $o->name }}</option>@endforeach</select></label>
       <label class="f"><span>Kanal</span><select name="channel"><option value="">Semua kanal</option>@foreach ($channels as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></label>
       <label class="f"><span>Berlaku mulai</span><input type="datetime-local" name="effective_from" value="{{ old('effective_from', now(config('rasentra.display_timezone'))->addDay()->startOfDay()->format('Y-m-d\TH:i')) }}" required></label>

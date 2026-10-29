@@ -3,10 +3,12 @@
 namespace Tests\Feature\Acceptance;
 
 use App\Domain\Inventory\StockLedger;
+use App\Models\Outlet;
 use App\Models\Pack;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Support\Decimal;
 
 /**
  * Rasentra Inventory: penerimaan per Pack ID, stok opname blind count dengan hitung ulang
@@ -23,13 +25,13 @@ class InventoryAppTest extends AcceptanceTestCase
     {
         $sirloin = Product::where('code', '0100101')->firstOrFail();
         $before = StockLedger::balance($this->outlet->id, $sirloin->id);
-        $this->actingAs($this->user('gudang@pjt.test'));
+        $this->actingAs($this->user('gudang@uji.test'));
 
         $this->getJson('/inventory/api/receiving')->assertOk()->assertJsonCount(2);
         $this->postJson('/inventory/api/receiving', ['code' => 'PK-000510'])->assertOk()
             ->assertJsonPath('status', 'received')->assertJsonPath('remaining', 1);
         $this->postJson('/inventory/api/receiving', ['code' => 'PK-000510'])->assertStatus(409)->assertJsonPath('error', 'pack_already_received');
-        $this->assertSame('1.320000', (string) \App\Support\Decimal::of(StockLedger::balance($this->outlet->id, $sirloin->id))->minus($before)->toScale(6));
+        $this->assertSame('1.320000', (string) Decimal::of(StockLedger::balance($this->outlet->id, $sirloin->id))->minus($before)->toScale(6));
 
         $this->postJson('/inventory/api/receiving', ['code' => 'PK-000511', 'action' => 'reject'])->assertStatus(422)->assertJsonPath('error', 'reason_required');
         $this->postJson('/inventory/api/receiving', ['code' => 'PK-000511', 'action' => 'reject', 'reason' => 'Vakum bocor'])->assertOk()->assertJsonPath('status', 'damaged');
@@ -37,7 +39,7 @@ class InventoryAppTest extends AcceptanceTestCase
         $this->assertSame('0.940000', StockLedger::balance($this->outlet->id, $tenderloin, 'quarantine'));
 
         // Pack outlet lain ditolak.
-        Pack::where('pack_code', 'PK-000203')->update(['status' => 'shipped', 'outlet_id' => \App\Models\Outlet::where('code', 'PSM')->value('id')]);
+        Pack::where('pack_code', 'PK-000203')->update(['status' => 'shipped', 'outlet_id' => Outlet::where('code', 'PSM')->value('id')]);
         $this->postJson('/inventory/api/receiving', ['code' => 'PK-000203'])->assertStatus(409)->assertJsonPath('error', 'pack_other_outlet');
 
         $this->getJson('/inventory/api/lookup?code=PK-000510')->assertOk()->assertJsonPath('kind', 'pack')
@@ -54,7 +56,7 @@ class InventoryAppTest extends AcceptanceTestCase
         $this->actingAs($this->cashier);
         $this->postJson('/inventory/api/counts', [])->assertStatus(403);
 
-        $this->actingAs($this->user('gudang@pjt.test'));
+        $this->actingAs($this->user('gudang@uji.test'));
         $sessionId = $this->postJson('/inventory/api/counts', ['type' => 'cycle'])->assertCreated()->json('id');
 
         // Penjualan sesudah cutoff tidak memengaruhi saldo pembanding.
@@ -86,10 +88,10 @@ class InventoryAppTest extends AcceptanceTestCase
         $this->postJson("/inventory/api/counts/{$sessionId}/approve")->assertStatus(409)->assertJsonPath('error', 'count_not_reviewed');
 
         // Hitung ulang oleh petugas yang sama ditolak; petugas lain diterima.
-        $this->actingAs($this->user('gudang@pjt.test'));
+        $this->actingAs($this->user('gudang@uji.test'));
         $this->postJson("/inventory/api/counts/{$sessionId}/lines", ['code' => '8991234500011', 'location' => 'ETL', 'quantity' => 38])
             ->assertStatus(409)->assertJsonPath('error', 'recount_same_counter');
-        $this->actingAs($this->user('gudang2@pjt.test'));
+        $this->actingAs($this->user('gudang2@uji.test'));
         $this->postJson("/inventory/api/counts/{$sessionId}/lines", ['code' => '8991234500011', 'location' => 'ETL', 'quantity' => 38])->assertCreated();
         foreach (['PK-000184', 'PK-000191', 'PK-000203', 'PK-000999'] as $pack) {
             $this->postJson("/inventory/api/counts/{$sessionId}/lines", ['code' => $pack, 'location' => 'ETL'])->assertCreated();
@@ -112,7 +114,7 @@ class InventoryAppTest extends AcceptanceTestCase
 
     public function test_storekeeper_pin_login_lands_on_inventory(): void
     {
-        $this->post('/pos/login', ['user_id' => $this->user('gudang@pjt.test')->id, 'pin' => '4444'])->assertRedirect('/inventory');
+        $this->post('/pos/login', ['user_id' => $this->user('gudang@uji.test')->id, 'pin' => '4444'])->assertRedirect('/inventory');
         $this->get('/inventory')->assertOk()->assertSee('Rasentra Inventory')->assertSee('GDG');
     }
 }

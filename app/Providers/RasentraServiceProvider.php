@@ -4,30 +4,19 @@ namespace App\Providers;
 
 use App\Domain\Integration\Sap\FakeSapClient;
 use App\Domain\Integration\Sap\SapClient;
-use App\Domain\Integration\Sap\SapPostingService;
-use App\Domain\Integration\Sap\ServiceLayerClient;
+use App\Domain\Integration\Sap\SapClientFactory;
 use Illuminate\Support\ServiceProvider;
 
 /**
  * Registrasi layanan per profil. SAP Bridge hanya aktif pada profil central; di outlet
- * tidak ada kredensial SAP sama sekali.
+ * tidak ada kredensial SAP sama sekali. Setiap CV memposting ke instance SAP-nya sendiri.
  */
 class RasentraServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(SapClient::class, function () {
-            $sap = config('services.sap');
-            if (config('rasentra.profile') !== 'central' || empty($sap['url'])) {
-                return new FakeSapClient;
-            }
-
-            return new ServiceLayerClient($sap);
-        });
-
-        $this->app->bind(SapPostingService::class, fn ($app) => new SapPostingService(
-            $app->make(SapClient::class),
-            config('services.sap.company_db') ?: 'PASARTANI',
-        ));
+        // Klien bawaan saat instance SAP belum dikonfigurasi (pengembangan dan uji).
+        $this->app->singleton(SapClient::class, fn () => new FakeSapClient);
+        $this->app->singleton(SapClientFactory::class, fn () => new SapClientFactory);
     }
 }

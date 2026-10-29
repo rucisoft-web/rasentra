@@ -8,8 +8,13 @@
     <div class="fields">
       <label class="f"><span>Kode</span><input value="{{ $outlet->code }}" disabled></label>
       <label class="f"><span>Nama</span><input name="name" value="{{ old('name', $outlet->name) }}" required></label>
-      <label class="f"><span>Wilayah</span>
-        <select name="region_id">@foreach ($regions as $r)<option value="{{ $r->id }}" @selected($r->id == $outlet->region_id)>{{ $r->name }}</option>@endforeach</select>
+      <label class="f"><span>Nama usaha retail</span><input name="retail_name" value="{{ old('retail_name', $outlet->retail_name) }}" placeholder="Meatshop & Grocery"></label>
+      <label class="f"><span>Nama restoran</span><input name="restaurant_name" value="{{ old('restaurant_name', $outlet->restaurant_name) }}" placeholder="R&B Solo"></label>
+      <label class="f"><span>Wilayah · perusahaan</span>
+        <select name="region_id">@foreach ($regions as $r)<option value="{{ $r->id }}" @selected($r->id == $outlet->region_id)>{{ $r->name }} · {{ $r->businessUnit->name }} ({{ $r->businessUnit->sap_company_db }})</option>@endforeach</select>
+      </label>
+      <label class="f"><span>Zona waktu</span>
+        <select name="timezone">@foreach (['Asia/Jakarta' => 'WIB (Asia/Jakarta)', 'Asia/Makassar' => 'WITA (Asia/Makassar)', 'Asia/Jayapura' => 'WIT (Asia/Jayapura)'] as $tz => $label)<option value="{{ $tz }}" @selected($outlet->timezone === $tz)>{{ $label }}</option>@endforeach</select>
       </label>
       <label class="f"><span>Kode gudang SAP</span><input name="sap_warehouse_code" value="{{ old('sap_warehouse_code', $outlet->sap_warehouse_code) }}"></label>
       <div class="wide actions">

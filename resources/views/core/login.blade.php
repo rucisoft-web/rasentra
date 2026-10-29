@@ -11,7 +11,7 @@
   @csrf
   <div>
     <div class="brand"><i></i>Rasentra Core</div>
-    <div class="muted">Admin kantor pusat CV Pasar Tani</div>
+    <div class="muted">Admin kantor pusat {{ config('rasentra.group_name') }}</div>
   </div>
   @if ($errors->any())<div class="alert err">{{ $errors->first() }}</div>@endif
   <label class="f"><span>Email</span><input type="email" name="email" value="{{ old('email') }}" required autofocus></label>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 @verbatim
-<title>Rasentra · CV Pasar Tani</title>
+<title>Rasentra · Indoguna Group</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -169,9 +169,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 <section class="hero">
   <div class="wrap">
     <div>
-      <p class="eyebrow">Rasentra · retail daging & restoran · CV Pasar Tani</p>
+      <p class="eyebrow">Rasentra · meatshop, grocery & restoran · Indoguna Group</p>
       <h1>Setiap kemasan daging <em>tercatat sampai gram</em>, setiap outlet tetap jualan walau internet putus.</h1>
-      <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk 20 outlet Toko Tani Indoguna. Rasentra Lokal, server di setiap outlet, melayani Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Inventory di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Di kantor pusat, Rasentra Central menjadi pusat POS yang menerima transaksi semua outlet dan memposting ke SAP Business One, sedangkan admin mengatur harga, promo dan resep lewat Rasentra Core.</p>
+      <p class="lead">Rasentra adalah platform Laravel 13 dan MySQL untuk Indoguna Group: CV Solo Kulina Utama (Meatshop & Grocery dan restoran R&amp;B Solo) dan CV Lombok Kulina Utama (Meatshop dan restoran El Primo), masing-masing dengan SAP Business One sendiri. Rasentra Lokal, server di setiap outlet, melayani Rasentra POS di kasir, Rasentra Mobile Terminal di tablet pelayan, Rasentra Inventory di handheld untuk cek inventory, serta Rasentra Kitchen di layar dapur. Di kantor pusat, Rasentra Central menjadi pusat POS yang menerima transaksi semua outlet dan memposting ke SAP Business One, sedangkan admin mengatur harga, promo dan resep lewat Rasentra Core.</p>
       <div class="cta">
         <a class="btn primary" href="#alur-retail">Lihat alur kerja</a>
         <a class="btn ghost" href="#panduan">Panduan penggunaan</a>
@@ -209,7 +209,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <article class="feat"><span class="tag">Dapur</span><h3>Rasentra Kitchen</h3><p>Kitchen Display per station (grill, hot, cold, bar, pastry, packing) dengan timer berwarna, bump lewat sentuh atau scan barcode tiket, layar expeditor, layar antrean pickup, produksi batch, yield dan waste.</p></article>
       <article class="feat"><span class="tag">Server outlet</span><h3>Rasentra Lokal</h3><p>Server lokal di setiap outlet, pusat semua perangkat POS: menyimpan transaksi, Pack ID, stok dan antrean dapur, menjalankan promo, dan tetap bekerja penuh saat internet putus. Data dikirim ke Rasentra Central begitu koneksi kembali.</p></article>
       <article class="feat"><span class="tag">Pusat POS</span><h3>Rasentra Central</h3><p>Pusat POS di kantor pusat: menerima sinkronisasi dari semua outlet tanpa data ganda, menyebarkan versi harga, promo dan resep ke outlet, lalu memposting penjualan dan pembayaran ke SAP Business One.</p></article>
-      <article class="feat"><span class="tag">Admin kantor pusat</span><h3>Rasentra Core</h3><p>Aplikasi admin kantor pusat: master outlet, produk dan pengguna, harga, Promotion Designer, resep, monitoring 20 outlet, rekonsiliasi SAP dan laporan. <a href="/core/login">Buka Rasentra Core</a></p></article>
+      <article class="feat"><span class="tag">Admin kantor pusat</span><h3>Rasentra Core</h3><p>Aplikasi admin kantor pusat: master outlet, produk dan pengguna, harga, Promotion Designer, resep, monitoring outlet per perusahaan, rekonsiliasi SAP per instance dan laporan grup. <a href="/core/login">Buka Rasentra Core</a></p></article>
       <article class="feat"><span class="tag">Tamu</span><h3>QR meja & kiosk</h3><p>Menu untuk tamu lewat token meja atau kiosk, pada jaringan tamu terpisah. Pesanan masuk setelah disetujui pelayan.</p></article>
       <article class="feat"><span class="tag">Handheld inventory</span><h3>Rasentra Inventory</h3><p>Cek inventory dengan scanner barcode/QR: penerimaan barang, stok opname blind count, cek saldo per lokasi dan Pack ID. Bekerja lewat Wi-Fi outlet walau internet putus.</p></article>
     </div>
@@ -230,10 +230,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <article class="feat"><span class="tag">Rasentra Kitchen</span><h3>Order management di dapur</h3><p>Tiket dari POS, Mobile Terminal, QR meja dan kiosk masuk ke station yang tepat secara otomatis. Dapur bekerja dari layar, bukan kertas.</p><ul><li>Timer per tiket: hijau, kuning lalu merah saat melewati target waktu saji</li><li>Bump dengan sentuh atau scan barcode tiket; status Baru, Dimasak, Siap, Disajikan</li><li>Expeditor melihat kelengkapan per meja sebelum makanan keluar</li><li>Layar antrean pickup untuk takeaway dan kiosk: nomor dipanggil saat siap</li><li>Analisis waktu saji per station, menu dan jam sibuk</li><li>Bahasa layar Indonesia atau Inggris per station</li></ul></article>
       <article class="feat"><span class="tag">Cooking fee</span><h3>Pilih daging, dimasak di restoran</h3><p>Pelanggan memilih kemasan di etalase lalu minta dimasak. Harga daging dan jasa memasak tampil sebagai baris terpisah.</p><ul><li>Tarif per kg mentah, per pack, per porsi atau bertingkat</li><li>Daging sudah dibayar di kasir? Resto hanya menagih jasa</li><li>Satu pack bisa dibagi beberapa porsi</li></ul></article>
       <article class="feat"><span class="tag">Resep & produksi</span><h3>Konsumsi bahan sesuai resep berversi</h3><p>Resep per menu dengan yield, subresep dan modifier. Produksi batch saus, kaldu atau potongan steak dicatat dengan hasil aktual.</p><ul><li>Konsumsi teoretis vs aktual</li><li>Waste, complimentary, makan karyawan dan remake dipisah</li><li>Versi resep lama tidak mengubah histori</li></ul></article>
-      <article class="feat"><span class="tag">Promosi</span><h3>Promotion Designer di pusat, engine di outlet</h3><p>Diskon persen/nominal, harga khusus, beli X gratis Y, bundling, promo berat bertingkat, voucher dan membership.</p><ul><li>Target: semua outlet, wilayah (mis. Lampung) atau outlet tertentu</li><li>Simulasi keranjang sebelum publikasi</li><li>Pusat melihat outlet mana yang sudah menerima versi promo</li></ul></article>
+      <article class="feat"><span class="tag">Promosi</span><h3>Promotion Designer di pusat, engine di outlet</h3><p>Diskon persen/nominal, harga khusus, beli X gratis Y, bundling, promo berat bertingkat, voucher dan membership.</p><ul><li>Target: semua outlet, perusahaan/wilayah (mis. Lombok) atau outlet tertentu</li><li>Simulasi keranjang sebelum publikasi</li><li>Pusat melihat outlet mana yang sudah menerima versi promo</li></ul></article>
       <article class="feat"><span class="tag">Inventory</span><h3>Stok opname dengan handheld</h3><p>Pindai QR lokasi, lalu produk atau Pack ID. Blind count menyembunyikan saldo sistem dari petugas hitung.</p><ul><li>Recount otomatis oleh petugas berbeda bila selisih melewati ambang</li><li>Ledger stok append-only per lokasi, batch dan Pack ID</li><li>Penerimaan barang parsial dan stok dalam perjalanan</li></ul></article>
       <article class="feat"><span class="tag">Kas & shift</span><h3>Shift, laci kas dan closing</h3><p>Saldo awal, cash in/out beralasan, hitungan aktual per metode bayar dan approval selisih.</p><ul><li>Closing lokal tetap bisa dilakukan tanpa pusat</li><li>Alarm anomali: void, refund, buka laci, selisih kas</li><li>Jejak audit tidak bisa dihapus kasir</li></ul></article>
-      <article class="feat"><span class="tag">Integrasi</span><h3>Sinkronisasi pusat dan SAP Business One</h3><p>Transaksi dikirim lewat antrean yang tahan putus koneksi, lalu diposting ke SAP sebagai A/R Invoice, Incoming Payment dan dokumen stok.</p><ul><li>Tidak ada dokumen ganda saat kirim ulang</li><li>Adapter XML MSI/MSR untuk jalur lama</li><li>Dashboard rekonsiliasi harian untuk Finance</li></ul></article>
+      <article class="feat"><span class="tag">Integrasi</span><h3>Sinkronisasi pusat dan SAP Business One</h3><p>Transaksi dikirim lewat antrean yang tahan putus koneksi, lalu diposting ke SAP milik CV pemilik outlet (sap_solo atau sap_lombok) sebagai A/R Invoice, Incoming Payment dan dokumen stok.</p><ul><li>Tidak ada dokumen ganda saat kirim ulang</li><li>Adapter XML MSI/MSR untuk jalur lama</li><li>Dashboard rekonsiliasi harian untuk Finance</li></ul></article>
     </div>
 
     <div class="calc">
@@ -501,7 +501,7 @@ flowchart LR
         <h3>Sinkronisasi, promo dan posting SAP</h3>
         <p>Dipakai admin pusat, tim pemasaran dan Finance.</p>
         <ol>
-          <li>Pemasaran menyusun promo, memilih target (contoh: hanya 4 outlet Lampung), lalu menjalankan simulasi keranjang.</li>
+          <li>Pemasaran menyusun promo, memilih target (contoh: hanya outlet Lombok), lalu menjalankan simulasi keranjang.</li>
           <li>Penyetuju berbeda menyetujui dan menerbitkan. Dashboard menampilkan outlet yang belum menerima versi.</li>
           <li>Transaksi outlet tiba di pusat dalam sekitar 60 detik bila jaringan sehat; saat putus, tersimpan di antrean outlet.</li>
           <li>Finance memantau status posting: menunggu, terposting, sebagian, gagal, perlu pemeriksaan.</li>
@@ -572,7 +572,7 @@ flowchart LR
 
 <footer>
   <div class="wrap">
-    <span>Rasentra untuk CV Pasar Tani · berdasarkan spesifikasi v1.3, 29 Oktober 2026</span>
+    <span>Rasentra untuk Indoguna Group · berdasarkan spesifikasi v2.0, 29 Oktober 2026</span>
     <span>Rasentra POS · Mobile Terminal · Inventory · Kitchen · Lokal · Central · Core</span>
   </div>
 </footer>

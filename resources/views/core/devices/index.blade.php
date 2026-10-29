@@ -13,7 +13,7 @@
   @csrf
   <label class="f"><span>Outlet</span><select name="outlet_id">@foreach ($outlets as $o)<option value="{{ $o->id }}">{{ $o->code }} {{ $o->name }}</option>@endforeach</select></label>
   <label class="f"><span>Aplikasi</span><select name="app">@foreach ($apps as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></label>
-  <label class="f"><span>Kode</span><input name="code" placeholder="SRV-JMS / POS-JMS-03" required></label>
+  <label class="f"><span>Kode</span><input name="code" placeholder="SRV-LBK / POS-LBK-02" required></label>
   <label class="f"><span>Nama</span><input name="name" placeholder="Kasir 3" required></label>
   <button class="btn">Daftarkan & buat token</button>
 </form>

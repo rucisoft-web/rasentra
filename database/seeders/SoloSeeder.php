@@ -11,7 +11,6 @@ use App\Domain\Kitchen\KitchenService;
 use App\Domain\Recipe\RecipeService;
 use App\Domain\Sales\OrderService;
 use App\Domain\Sales\PaymentService;
-use App\Models\BusinessUnit;
 use App\Models\CookingFeeRule;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
@@ -27,7 +26,6 @@ use App\Models\PromotionTarget;
 use App\Models\PromotionVersion;
 use App\Models\Recipe;
 use App\Models\RecipeVersion;
-use App\Models\Region;
 use App\Models\Shift;
 use App\Models\TicketItem;
 use App\Models\Uom;
@@ -39,14 +37,14 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * Outlet demo "J&M Solo": meatshop, ikan laut dan aneka makanan di depan, restoran grill &
- * seafood di belakang. Selain master (produk, harga, resep, promo, cooking fee, meja,
+ * Outlet demo Solo (CV Solo Kulina Utama): Meatshop & Grocery (daging, ikan laut dan aneka
+ * makanan) di depan, restoran R&B Solo (grill & seafood) di belakang. Selain master (produk, harga, resep, promo, cooking fee, meja,
  * petugas), seeder ini memutar satu hari operasional lewat service domain yang sama
  * dengan aplikasi: penjualan retail, pesanan resto yang sudah selesai dan yang sedang
  * dimasak, antrean takeaway, kiriman gudang pusat dan sesi opname. Semua harga, resep
  * dan nama petugas adalah data contoh.
  */
-class JmSoloSeeder extends Seeder
+class SoloSeeder extends Seeder
 {
     private Outlet $outlet;
 
@@ -60,7 +58,7 @@ class JmSoloSeeder extends Seeder
 
     public function run(): void
     {
-        if (Outlet::where('code', 'JMS')->exists()) {
+        if (User::where('email', 'kasir@solo.test')->exists()) {
             return; // data demo hanya dibuat sekali; jalankan migrate:fresh --seed untuk mengulang
         }
 
@@ -74,17 +72,13 @@ class JmSoloSeeder extends Seeder
 
     private function master(): void
     {
-        $bu = BusinessUnit::firstOrCreate(['code' => 'CVPT'], ['name' => 'CV Pasar Tani']);
-        $region = Region::firstOrCreate(['code' => 'SLO'], ['name' => 'Solo', 'business_unit_id' => $bu->id]);
-        $this->outlet = Outlet::create([
-            'business_unit_id' => $bu->id, 'region_id' => $region->id, 'code' => 'JMS', 'name' => 'J&M Solo',
-            'sap_warehouse_code' => 'WH-JMS', 'has_retail' => true, 'has_restaurant' => true, 'has_cooking_fee' => true,
-        ]);
+        $this->outlet = Outlet::where('code', 'SLO')->firstOrFail();
         foreach ([['ETL', 'Etalase daging', 'sales'], ['ESF', 'Etalase es ikan laut', 'sales'], ['RAK', 'Rak makanan & bumbu', 'sales'],
             ['CHL', 'Chiller belakang', 'storage'], ['FRZ', 'Freezer -18°C', 'storage'], ['GDG', 'Gudang kering', 'storage'],
             ['DPR', 'Dapur resto', 'kitchen'], ['BAR', 'Bar minuman', 'kitchen'], ['KRT', 'Karantina', 'quarantine']] as [$c, $n, $t]) {
-            Location::create(['outlet_id' => $this->outlet->id, 'code' => $c, 'name' => $n, 'type' => $t]);
+            Location::updateOrCreate(['outlet_id' => $this->outlet->id, 'code' => $c], ['name' => $n, 'type' => $t]);
         }
+        Location::where('outlet_id', $this->outlet->id)->where('code', 'ETL')->update(['name' => 'Etalase daging']);
 
         foreach ([['KG', 'Kilogram', 3], ['PCS', 'Pieces', 0], ['PORSI', 'Porsi', 0], ['LTR', 'Liter', 3], ['PAK', 'Pak', 0], ['BTL', 'Botol', 0]] as [$c, $n, $s]) {
             Uom::firstOrCreate(['code' => $c], ['name' => $n, 'display_scale' => $s]);
@@ -116,7 +110,7 @@ class JmSoloSeeder extends Seeder
         ];
         foreach ($list as $key => [$name, $role, $pin, $limit]) {
             $this->users[$key] = User::create([
-                'name' => $name, 'email' => $key.'@jms.test', 'password' => Hash::make('password'), 'role' => $role,
+                'name' => $name, 'email' => $key.'@solo.test', 'password' => Hash::make('password'), 'role' => $role,
                 'outlet_id' => $this->outlet->id, 'pin_hash' => Hash::make($pin), 'approval_limit' => $limit, 'is_active' => true,
             ]);
         }
@@ -174,7 +168,7 @@ class JmSoloSeeder extends Seeder
             ['2305001', 'Air Mineral 600 ml', 'retail', 'PCS', 'Minuman Kemasan', 5000, ['barcode' => '8992305001003']],
             ['2305002', 'Teh Botol 450 ml', 'retail', 'PCS', 'Minuman Kemasan', 7500, ['barcode' => '8992305002000']],
 
-            // Menu Resto J&M Solo (grill & seafood) dengan station dapur.
+            // Menu restoran R&B Solo (grill & seafood) dengan station dapur.
             ['2501001', 'Sirloin Steak 200 g', 'menu', 'PORSI', 'Steak', 128000, ['kitchen_station' => 'grill']],
             ['2501002', 'Tenderloin Steak 200 g', 'menu', 'PORSI', 'Steak', 189000, ['kitchen_station' => 'grill']],
             ['2501003', 'Ribeye Steak 250 g', 'menu', 'PORSI', 'Steak', 215000, ['kitchen_station' => 'grill']],
@@ -209,7 +203,7 @@ class JmSoloSeeder extends Seeder
             ['2901003', 'Jasa Masak Seafood (Cooking Fee)', 'service', 'PCS', null, null, ['kitchen_station' => 'hot', 'is_stocked' => false]],
         ];
 
-        $pv = PriceVersion::create(['code' => 'JMS-2026-10', 'outlet_id' => $this->outlet->id, 'effective_from' => $this->now->copy()->subDays(7), 'status' => 'published']);
+        $pv = PriceVersion::create(['code' => 'SLO-2026-10', 'outlet_id' => $this->outlet->id, 'effective_from' => $this->now->copy()->subDays(7), 'status' => 'published']);
         foreach ($items as $row) {
             [$code, $name, $type, $uom, $category, $price] = $row;
             $opts = $row[6] ?? [];
@@ -310,14 +304,14 @@ class JmSoloSeeder extends Seeder
         $base = ['outlet_id' => $this->outlet->id, 'effective_from' => $this->now->copy()->subDays(7)];
 
         // Tanpa metode khusus: steak dari daging etalase, per kg berat mentah.
-        CookingFeeRule::create($base + ['code' => 'JMS-CF-STEAK', 'method' => null, 'basis' => 'per_kg', 'rate' => 45000, 'minimum_fee' => 35000,
+        CookingFeeRule::create($base + ['code' => 'SLO-CF-STEAK', 'method' => null, 'basis' => 'per_kg', 'rate' => 45000, 'minimum_fee' => 35000,
             'service_product_id' => $this->products['2901001']->id, 'recipe_version_id' => $svc('2901001'), 'included_items' => ['butter', 'saus lada hitam']]);
-        CookingFeeRule::create($base + ['code' => 'JMS-CF-BAKAR', 'method' => 'bakar', 'basis' => 'tiered', 'rate' => 35000, 'minimum_fee' => 30000,
+        CookingFeeRule::create($base + ['code' => 'SLO-CF-BAKAR', 'method' => 'bakar', 'basis' => 'tiered', 'rate' => 35000, 'minimum_fee' => 30000,
             'tiers' => [['up_to' => '1.000', 'rate' => 45000], ['up_to' => '2.000', 'rate' => 40000]],
             'service_product_id' => $this->products['2901002']->id, 'recipe_version_id' => $svc('2901002'), 'included_items' => ['bumbu jimbaran', 'sambal matah']]);
-        CookingFeeRule::create($base + ['code' => 'JMS-CF-GORENG', 'method' => 'goreng', 'basis' => 'per_kg', 'rate' => 35000, 'minimum_fee' => 25000,
+        CookingFeeRule::create($base + ['code' => 'SLO-CF-GORENG', 'method' => 'goreng', 'basis' => 'per_kg', 'rate' => 35000, 'minimum_fee' => 25000,
             'service_product_id' => $this->products['2901003']->id, 'recipe_version_id' => $svc('2901003'), 'included_items' => ['tepung bumbu', 'sambal']]);
-        CookingFeeRule::create($base + ['code' => 'JMS-CF-PADANG', 'method' => 'saus_padang', 'basis' => 'per_portion', 'rate' => 30000, 'minimum_fee' => 30000,
+        CookingFeeRule::create($base + ['code' => 'SLO-CF-PADANG', 'method' => 'saus_padang', 'basis' => 'per_portion', 'rate' => 30000, 'minimum_fee' => 30000,
             'service_product_id' => $this->products['2901003']->id, 'recipe_version_id' => $svc('2901003'), 'included_items' => ['saus padang']]);
     }
 
@@ -333,17 +327,17 @@ class JmSoloSeeder extends Seeder
     {
         $id = fn (string $code) => $this->products[$code]->id;
         $promos = [
-            ['JMS-DAGING-2KG', 'Borong Daging Sapi: ≥2 kg hemat 10%, ≥4 kg hemat 15%', 'weight_tier', 'item', 'exclusive', 10,
+            ['SLO-DAGING-2KG', 'Borong Daging Sapi: ≥2 kg hemat 10%, ≥4 kg hemat 15%', 'weight_tier', 'item', 'exclusive', 10,
                 ['categories' => ['Daging Sapi'], 'tiers' => [['min_weight' => '2.000', 'percent' => 10], ['min_weight' => '4.000', 'percent' => 15]]], null],
-            ['JMS-SEAFOOD-JUMAT', 'Seafood Segar diskon 12%', 'percent', 'item', 'exclusive', 20,
+            ['SLO-SEAFOOD-JUMAT', 'Seafood Segar diskon 12%', 'percent', 'item', 'exclusive', 20,
                 ['categories' => ['Ikan Laut'], 'percent' => 12], ['retail']],
-            ['JMS-SOSIS-B2G1', 'Sosis Bratwurst beli 2 gratis 1', 'buy_x_get_y', 'item', 'exclusive', 30,
+            ['SLO-SOSIS-B2G1', 'Sosis Bratwurst beli 2 gratis 1', 'buy_x_get_y', 'item', 'exclusive', 30,
                 ['buy_product_id' => $id('2301001'), 'buy_qty' => 2, 'get_product_id' => $id('2301001'), 'get_qty' => 1, 'product_ids' => [$id('2301001')]], null],
-            ['JMS-KENTANG-HEMAT', 'Harga spesial Kentang Shoestring Rp45.000', 'special_price', 'item', 'exclusive', 40,
+            ['SLO-KENTANG-HEMAT', 'Harga spesial Kentang Shoestring Rp45.000', 'special_price', 'item', 'exclusive', 40,
                 ['product_ids' => [$id('2301004')], 'price' => 45000], null],
-            ['JMS-STEAK-DINEIN', 'Steak dine-in hemat 10%', 'percent', 'item', 'exclusive', 15,
+            ['SLO-STEAK-DINEIN', 'Steak dine-in hemat 10%', 'percent', 'item', 'exclusive', 15,
                 ['categories' => ['Steak'], 'percent' => 10, 'max_discount' => 40000], ['dine_in']],
-            ['JMS-BELANJA-1JT', 'Belanja ≥ Rp1.000.000 potongan Rp50.000', 'amount', 'basket', 'stackable', 90,
+            ['SLO-BELANJA-1JT', 'Belanja ≥ Rp1.000.000 potongan Rp50.000', 'amount', 'basket', 'stackable', 90,
                 ['min_spend' => 1000000, 'amount' => 50000, 'line_types' => ['retail_product']], ['retail']],
         ];
         foreach ($promos as [$code, $name, $type, $scope, $stacking, $priority, $rules, $channels]) {
@@ -391,7 +385,7 @@ class JmSoloSeeder extends Seeder
                 $n++;
                 $pack = Pack::create([
                     'pack_code' => 'PK-'.$n, 'product_id' => $product->id, 'net_weight' => $weight, 'uom_code' => 'KG',
-                    'weigh_source' => $fresh ? 'SCALE-JMS-ESF' : 'SCALE-GDG-01', 'packed_at' => $at->copy()->subDay(),
+                    'weigh_source' => $fresh ? 'SCALE-SLO-ESF' : 'SCALE-GDG-01', 'packed_at' => $at->copy()->subDay(),
                     'expires_at' => $at->copy()->addDays($fresh ? 3 : 7)->toDateString(), 'location_type' => 'outlet',
                     'outlet_id' => $this->outlet->id, 'status' => 'received',
                 ]);
@@ -402,7 +396,7 @@ class JmSoloSeeder extends Seeder
         // Pack khusus untuk mencoba blokir: ditahan QC dan sudah kedaluwarsa (butuh PIN kepala outlet).
         foreach ([['PK-109001', '2101001', '1.300', 'hold', 5], ['PK-109002', '2201003', '0.640', 'received', -1]] as [$code, $p, $w, $status, $days]) {
             $pack = Pack::create([
-                'pack_code' => $code, 'product_id' => $this->products[$p]->id, 'net_weight' => $w, 'uom_code' => 'KG', 'weigh_source' => 'SCALE-JMS-ESF',
+                'pack_code' => $code, 'product_id' => $this->products[$p]->id, 'net_weight' => $w, 'uom_code' => 'KG', 'weigh_source' => 'SCALE-SLO-ESF',
                 'packed_at' => $at->copy()->subDays(4), 'expires_at' => $at->copy()->addDays($days)->toDateString(), 'location_type' => 'outlet',
                 'outlet_id' => $this->outlet->id, 'status' => $status,
             ]);

@@ -41,7 +41,7 @@ final class OrderService
             'channel' => $channel,
             'user_id' => $user->id,
             'status' => 'draft',
-            'business_date' => now()->toDateString(),
+            'business_date' => Outlet::businessDate($outletId),
         ]);
     }
 

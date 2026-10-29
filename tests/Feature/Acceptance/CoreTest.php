@@ -34,7 +34,7 @@ class CoreTest extends AcceptanceTestCase
     public function test_login_and_role_based_access(): void
     {
         $this->get('/core')->assertRedirect(route('core.login'));
-        $this->post('/core/login', ['email' => 'kasir@pjt.test', 'password' => 'password'])->assertSessionHasErrors('email');
+        $this->post('/core/login', ['email' => 'kasir@uji.test', 'password' => 'password'])->assertSessionHasErrors('email');
         $this->post('/core/login', ['email' => 'admin@hq.test', 'password' => 'rahasia'])->assertRedirect(route('core.dashboard'));
         $this->get('/core')->assertOk()->assertSee('Penjualan bersih hari ini');
 
@@ -90,7 +90,7 @@ class CoreTest extends AcceptanceTestCase
         $this->actingAs($this->merch)->get(route('core.promotions.show', $version))->assertOk()->assertSee('UJI-15');
 
         $this->actingAs($this->merch)->post(route('core.promotions.publish', $version), ['target' => 'all'])->assertSessionHas('error');
-        $this->actingAs($this->admin)->post(route('core.promotions.publish', $version), ['target' => 'outlets', 'outlets' => ['PJT']])->assertRedirect();
+        $this->actingAs($this->admin)->post(route('core.promotions.publish', $version), ['target' => 'outlets', 'outlets' => ['UJI']])->assertRedirect();
 
         $version->refresh();
         $this->assertSame('published', $version->status);
@@ -124,12 +124,12 @@ class CoreTest extends AcceptanceTestCase
     public function test_device_token_is_shown_once_and_stored_hashed(): void
     {
         $this->actingAs($this->admin)->post(route('core.devices.store'), [
-            'outlet_id' => $this->outlet->id, 'code' => 'POS-PJT-09', 'app' => 'pos', 'name' => 'Kasir 9',
+            'outlet_id' => $this->outlet->id, 'code' => 'POS-UJI-09', 'app' => 'pos', 'name' => 'Kasir 9',
         ])->assertRedirect()->assertSessionHas('token');
 
         $token = session('token');
         $plain = is_array($token) ? $token['token'] : $token;
-        $device = Device::where('code', 'POS-PJT-09')->firstOrFail();
+        $device = Device::where('code', 'POS-UJI-09')->firstOrFail();
         $this->assertSame(hash('sha256', $plain), $device->token_hash);
 
         $this->actingAs($this->admin)->post(route('core.devices.revoke', $device))->assertRedirect();

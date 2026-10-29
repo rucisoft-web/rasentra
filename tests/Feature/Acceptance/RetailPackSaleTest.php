@@ -6,6 +6,7 @@ use App\Domain\Inventory\StockLedger;
 use App\Models\OutboxEvent;
 use App\Models\Outlet;
 use App\Models\Product;
+use App\Support\Decimal;
 use App\Support\DomainException;
 
 class RetailPackSaleTest extends AcceptanceTestCase
@@ -22,18 +23,18 @@ class RetailPackSaleTest extends AcceptanceTestCase
         $order->refresh();
 
         $this->assertSame('650000.00', (string) $order->gross_amount);
-        // Promo Jakarta "hemat 2 kg" aktif: total 3,250 kg memenuhi syarat 10%.
+        // Promo outlet uji "hemat 2 kg" aktif: total 3,250 kg memenuhi syarat 10%.
         $this->assertSame('65000.00', (string) $order->discount_amount);
         $this->assertSame('585000.00', (string) $order->net_amount);
 
         $order = $this->payAndFinalize($order);
 
         $this->assertSame('paid', $order->status);
-        $this->assertMatchesRegularExpression('/^PJT-\d{6}-00001$/', $order->doc_no);
+        $this->assertMatchesRegularExpression('/^UJI-\d{6}-00001$/', $order->doc_no);
         $this->assertSame('sold', $this->pack('PK-000184')->status);
         $this->assertSame('sold', $this->pack('PK-000191')->status);
         $after = StockLedger::balance($this->outlet->id, $sirloin->id);
-        $this->assertSame('3.250000', (string) \App\Support\Decimal::of($before)->minus(\App\Support\Decimal::of($after))->toScale(6));
+        $this->assertSame('3.250000', (string) Decimal::of($before)->minus(Decimal::of($after))->toScale(6));
         $this->assertSame(1, OutboxEvent::where('event_type', 'order.finalized')->count());
 
         // Finalisasi ulang tidak memotong stok lagi.

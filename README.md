@@ -1,6 +1,11 @@
 # Rasentra
 
-Platform POS untuk CV Pasar Tani (Toko Tani Indoguna): meatshop, ikan laut, aneka makanan dan restoran dalam satu codebase Laravel 13 + MySQL, dengan SAP Business One sebagai pembukuan resmi.
+Platform POS untuk Indoguna Group: meatshop, grocery dan restoran dalam satu codebase Laravel 13 + MySQL, dengan SAP Business One (versi SQL Server) sebagai pembukuan resmi tiap perusahaan.
+
+| Perusahaan | Instance SAP B1 | Outlet | Usaha di outlet | Zona waktu |
+| --- | --- | --- | --- | --- |
+| CV Solo Kulina Utama | `sap_solo` | `SLO` Solo | Meatshop & Grocery (retail), R&B Solo (restoran) | WIB |
+| CV Lombok Kulina Utama | `sap_lombok` | `LBK` Lombok | Meatshop (retail), El Primo (restoran) | WITA |
 
 | Aplikasi | Untuk | Alamat / profil |
 | --- | --- | --- |
@@ -9,24 +14,25 @@ Platform POS untuk CV Pasar Tani (Toko Tani Indoguna): meatshop, ikan laut, anek
 | Rasentra Kitchen | Layar dapur per station, expeditor, layar antrean pickup | `/kitchen` |
 | Rasentra Inventory | Handheld: penerimaan barang, stok opname, cek stok | `/inventory` |
 | Rasentra Lokal | Server lokal di setiap outlet untuk semua perangkat di atas; tetap jalan saat internet putus | profil `lokal` |
-| Rasentra Central | Pusat POS di kantor pusat: menerima sinkronisasi semua outlet, menyebarkan harga/promo/resep, posting ke SAP | profil `central` |
-| Rasentra Core | Aplikasi admin kantor pusat: master outlet/produk/pengguna, harga, Promotion Designer, monitoring, laporan | `/core`, berjalan di instalasi `central` |
+| Rasentra Central | Pusat POS di kantor pusat: menerima sinkronisasi semua outlet, menyebarkan harga/promo/resep, posting ke instance SAP tiap CV | profil `central` |
+| Rasentra Core | Aplikasi admin kantor pusat grup: master perusahaan/outlet/produk/pengguna, harga, Promotion Designer, monitoring, laporan | `/core`, berjalan di instalasi `central` |
 
 Spesifikasi lengkap v2.0 ada di [Spesifikasi Lengkap Rasentra v2.0](https://claude.ai/artifact/MidWQUchfyxN2rsywyT8aw); rancangan teknis awal di [docs/RANCANGAN.md](docs/RANCANGAN.md). Landing page dengan penjelasan fitur dan diagram alur kerja retail/resto ada di `/`.
 
 ## Arsitektur singkat
 
-- **Satu codebase, dua profil.** `RASENTRA_PROFILE=lokal` menjalankan Rasentra Lokal di tiap outlet (18 outlet + J&M Solo, kapasitas 20). `RASENTRA_PROFILE=central` menjalankan Rasentra Central beserta Rasentra Core di kantor pusat.
+- **Satu codebase, dua profil.** `RASENTRA_PROFILE=lokal` menjalankan Rasentra Lokal di tiap outlet (Solo dan Lombok). `RASENTRA_PROFILE=central` menjalankan Rasentra Central beserta Rasentra Core di kantor pusat Indoguna Group.
+- **Multi-perusahaan.** Setiap CV (`business_units`) menyimpan nama database SAP-nya (`sap_company_db`). Penjualan outlet diposting ke instance milik CV pemiliknya, dengan mapping item, gudang dan akun sendiri. Tanggal bisnis mengikuti zona waktu outlet, jadi Lombok berganti hari pada pukul 00.00 WITA.
 - **Offline-first.** Semua transaksi inti berjalan di Rasentra Lokal. Data dikirim ke Rasentra Central lewat outbox/inbox yang idempoten (unik per `source_id` + `event_id`), dengan backoff eksponensial.
 - **Pack ID.** Setiap kemasan daging atau ikan punya berat aktual (DECIMAL 18,6). `packs.sold_order_line_id` UNIQUE plus `lockForUpdate` menjamin satu pack hanya terjual sekali, walau dua kasir memindai bersamaan.
 - **Uang tanpa float.** Semua hitungan memakai `brick/math` lewat `App\Support\Decimal`.
-- **SAP B1.** `SapPostingService` mengecek `U_POS_SRC` sebelum posting, menandai `needs_review` saat timeout, dan hanya mengulang pembayaran pada posting parsial. Adapter XML NMEXML (MSI/MSR) aman dari XXE.
+- **SAP B1 (SQL Server).** Integrasi lewat Service Layer, yang tersedia untuk SAP B1 versi SQL Server sejak 10.0 FP 2008 (server Windows). `SapClientFactory` memilih koneksi per instance. `SapPostingService` mengecek `U_POS_SRC` sebelum posting, menandai `needs_review` saat timeout, dan hanya mengulang pembayaran pada posting parsial. Adapter XML NMEXML (MSI/MSR) aman dari XXE.
 
 ## Menjalankan di lokal
 
 ```bash
 composer install
-cp .env.example .env          # RASENTRA_OUTLET_CODE=JMS: layar login menampilkan petugas J&M Solo
+cp .env.example .env          # RASENTRA_OUTLET_CODE=SLO: layar login menampilkan petugas Solo (LBK untuk Lombok)
 php artisan key:generate
 # Untuk coba cepat tanpa MySQL: set DB_CONNECTION=sqlite lalu
 touch database/database.sqlite
@@ -36,7 +42,9 @@ php artisan serve
 
 Data demo memutar satu hari operasional relatif terhadap jam saat seeder dijalankan, jadi timer dapur dan antrean terlihat "hidup". Jalankan ulang `migrate:fresh --seed` untuk menyegarkan. Untuk produksi gunakan MySQL 8.4, Redis untuk antrean dan Laravel Reverb untuk layar dapur. Scheduler (`php artisan schedule:work`) mengirim outbox tiap 5 detik di profil lokal dan memposting ke SAP di profil central.
 
-## Demo utama: J&M Solo (meatshop, ikan laut, aneka makanan dan resto)
+Koneksi SAP diatur di `.env` server Central. `SAP_SL_URL`, `SAP_USERNAME` dan `SAP_PASSWORD` adalah nilai bawaan. Nilai `SAP_SOLO_*` dan `SAP_LOMBOK_*` menimpanya bila kedua instance berada di server berbeda atau memakai pengguna berbeda. Nama database (`sap_solo`, `sap_lombok`) diatur per perusahaan di Rasentra Core → Perusahaan & outlet. Selama URL belum diisi, posting memakai SAP tiruan.
+
+## Demo utama: outlet Solo (Meatshop & Grocery dan R&B Solo)
 
 Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan ke aplikasinya.
 
@@ -56,7 +64,7 @@ Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan k
   - Daging sapi, kambing dan unggas per Pack ID: sirloin, tenderloin, ribeye, wagyu MB5, iga, buntut, ayam kampung.
   - Ikan laut segar per Pack ID: kakap merah, kerapu macan, bawal, salmon, tuna, udang vaname, cumi, kepiting bakau, kerang hijau.
   - Seafood beku, olahan, bumbu dan saus, sembako (beras Rojolele Delanggu), oleh-oleh Solo (abon sapi, serundeng, intip), dan minuman kemasan.
-- **Resto J&M Solo.** 30 menu dengan resep dan station dapur:
+- **Restoran R&B Solo.** 30 menu dengan resep dan station dapur:
   - Steak dan bakaran: Sirloin hingga Wagyu, iga bakar madu, sate kambing, kakap bakar Jimbaran.
   - Seafood dan khas Solo: Selat Solo, tengkleng, sop buntut, nasi liwet.
   - Minuman (wedang uwuh) dan dessert (serabi Notosuman).
@@ -93,6 +101,8 @@ Login di `/pos/login`: sentuh nama, ketik PIN. Setiap peran langsung diarahkan k
 | `PK-120001` – `PK-120005` | Kiriman dalam perjalanan | Terima lewat Rasentra Inventory |
 | `8992301001009` | Barcode Sosis Bratwurst | Scan 3 kali: beli 2 gratis 1 |
 
+**Outlet Lombok (Meatshop dan El Primo).** Set `RASENTRA_OUTLET_CODE=LBK`. Katalog dan resep sama dengan Solo, sedangkan harga (Solo + 5%), promo, meja El Primo, cooking fee dan petugas milik Lombok sendiri: Baiq Nurul kasir Meatshop 1111, Lalu Ahmad kasir El Primo 1212, Made kepala outlet 9999, Wayan pelayan 3333, Chef Rizal 2222, Hamdi gudang 4444.
+
 ## Rasentra Core (admin kantor pusat)
 
 Login di `/core/login` dengan email dan kata sandi `password`:
@@ -105,21 +115,20 @@ Login di `/core/login` dengan email dan kata sandi `password`:
 
 **Menu:**
 
-- **Dashboard.** Penjualan hari ini dan 7 hari, kesehatan sinkronisasi tiap outlet, dan pekerjaan yang menunggu tindakan.
-- **Master.** Outlet dan lokasi (QR rak), pengguna outlet (PIN, limit approval) dan pusat, perangkat dengan token yang hanya tampil sekali dan bisa dicabut.
+- **Dashboard.** Ringkasan per perusahaan (penjualan dan status SAP), penjualan 7 hari, kesehatan sinkronisasi tiap outlet, dan pekerjaan yang menunggu tindakan.
+- **Master.** Perusahaan dan database SAP-nya, outlet (nama usaha retail dan restoran, zona waktu) dan lokasi (QR rak), pengguna outlet (PIN, limit approval) dan pusat, perangkat dengan token yang hanya tampil sekali dan bisa dicabut.
 - **Katalog.**
   - Produk.
   - Versi harga: draft, ubah harga, lalu terbitkan oleh orang lain (maker-checker).
   - Promotion Designer: susun aturan, simulasikan pada keranjang contoh, lalu terbitkan oleh orang lain ke semua outlet, wilayah atau outlet tertentu.
   - Resep berversi dan aturan cooking fee berversi.
-- **Monitoring.** Antrean sinkronisasi per outlet, posting SAP (perlu review, gagal, parsial, posting ulang), masalah integrasi, mapping SAP, impor XML NMEXML.
-- **Laporan.** Penjualan (unduh CSV), promo per penanggung biaya, waktu saji dapur, opname dan waste, serta audit log.
+- **Monitoring.** Antrean sinkronisasi per outlet, posting SAP per instance (perlu review, gagal, parsial, posting ulang), masalah integrasi, mapping SAP per instance, impor XML NMEXML.
+- **Laporan.** Penjualan per perusahaan dan outlet (unduh CSV), promo per penanggung biaya, waktu saji dapur, opname dan waste, serta audit log.
 
 **Data demo pusat:**
 
-- Riwayat penjualan 7 hari dari J&M Solo dan sembilan outlet lain, dikirim lewat inbox seperti event sinkronisasi asli.
-- Dua outlet berstatus terlambat, dan dua event J&M Solo masih antre (satu gagal kirim).
-- Posting ke SAP tiruan dengan satu dokumen perlu review, satu pembayaran gagal, satu invoice gagal, dan tiga struk yang tertahan karena Kepiting Bakau belum dimapping.
+- Riwayat penjualan 7 hari dari Solo dan Lombok, dikirim lewat inbox seperti event sinkronisasi asli. Dua event Solo masih antre (satu gagal kirim).
+- Posting ke SAP tiruan per instance. Di `sap_solo` ada satu dokumen perlu review, satu pembayaran gagal, satu invoice gagal, dan tiga struk tertahan karena Kepiting Bakau belum dimapping. `sap_lombok` memakai akun kas/bank sendiri dan terposting semua.
 - Laras sudah menyiapkan promo kambing (draft), promo salmon yang ditanggung supplier (sudah disimulasikan), dan versi harga November. Masuk sebagai Rahman untuk menyetujui dan menerbitkannya.
 
 Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbox menerima `order.finalized`. Jalankan `php artisan rasentra:rebuild-sales` untuk membangun ulang proyeksi.
@@ -132,7 +141,7 @@ Laporan penjualan dibaca dari proyeksi `hq_orders` yang diisi otomatis saat inbo
 4. **Penerimaan barang.** Login Wawan di handheld, buka tab Terima, lalu scan `PK-120001`. Untuk pack rusak, pilih Tolak dan isi alasan; stoknya masuk karantina.
 5. **Stok opname.** Lanjutkan sesi yang sedang berjalan: scan QR lokasi (`RAK`, `ESF`, `FRZ`, ...), lalu scan barang. Hendra menekan Review. Selisih di atas ambang wajib dihitung ulang oleh petugas lain (Yuni) sebelum disetujui.
 
-Outlet Pangkalan Jati (PJT) juga punya data kecil yang dipakai oleh uji otomatis (kasir Sari 1111, kepala Budi 9999, chef Andi 2222, gudang Dewi 4444). Set `RASENTRA_OUTLET_CODE=PJT` untuk melihat petugasnya di layar login.
+Uji otomatis memakai outlet terpisah `UJI` (DemoSeeder, di bawah CV Solo Kulina Utama) yang tidak ikut `migrate:fresh --seed`.
 
 ## Pengujian
 
@@ -149,7 +158,8 @@ Uji mencakup skenario UAT spesifikasi:
 - Shift dan selisih kas.
 - Alur HTTP POS, papan dapur dan antrean.
 - Penerimaan barang dan opname.
-- Seeder demo J&M Solo dan seluruh halaman Rasentra Core.
+- Seeder demo Indoguna Group dan seluruh halaman Rasentra Core.
+- Posting ke instance SAP milik tiap perusahaan, koneksi per instance, dan tanggal bisnis WITA untuk Lombok.
 - Rasentra Core: hak akses per peran, maker-checker harga dan promo, proyeksi penjualan, dan token perangkat.
 
 ## Struktur kode
@@ -165,11 +175,11 @@ app/Domain/
   CookingService/ CookingService
   Cash/           ShiftService
   Sync/           Outbox, OutboxDispatcher, InboxReceiver
-  Integration/    Sap/* (Service Layer), Xml/* (NMEXML)
+  Integration/    Sap/* (Service Layer per instance), Xml/* (NMEXML)
   Core/           CoreAccess (peran pusat), SalesProjector, SalesReport
   Catalog/        PricePublisher (maker-checker versi harga)
   Promotion/      PromotionDesigner (simulasi, terbit, hentikan)
 app/Http/Controllers/  PosController, KitchenController, InventoryController, SyncController, Core/* (Rasentra Core)
-database/seeders/      OutletSeeder, DemoSeeder (PJT, untuk uji), JmSoloSeeder (demo lengkap), CoreSeeder (data pusat)
+database/seeders/      OutletSeeder (dua CV), SoloSeeder (demo lengkap), LombokSeeder, CoreSeeder (data pusat), DemoSeeder (outlet UJI untuk uji)
 public/assets/         pos, kitchen, inventory, core (JS/CSS lokal tanpa CDN agar jalan saat internet putus)
 ```

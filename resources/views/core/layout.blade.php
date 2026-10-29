@@ -6,7 +6,7 @@
             ['dashboard', 'core.dashboard', 'Dashboard'],
         ],
         'Master' => [
-            ['master', 'core.outlets.index', 'Outlet & lokasi'],
+            ['master', 'core.outlets.index', 'Perusahaan & outlet'],
             ['master', 'core.users.index', 'Pengguna'],
             ['master', 'core.devices.index', 'Perangkat & token'],
         ],
@@ -46,7 +46,7 @@
 <div class="shell">
   <nav class="side">
     <div class="brand"><i></i>Rasentra Core</div>
-    <div class="sub">Admin kantor pusat</div>
+    <div class="sub">Admin kantor pusat {{ config('rasentra.group_name') }}</div>
     @foreach ($nav as $group => $items)
       @php $visible = array_filter($items, fn ($i) => CoreAccess::allows($user, $i[0])); @endphp
       @if ($visible)

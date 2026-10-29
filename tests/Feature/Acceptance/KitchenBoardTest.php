@@ -4,6 +4,7 @@ namespace Tests\Feature\Acceptance;
 
 use App\Domain\Kitchen\KitchenBoard;
 use App\Domain\Kitchen\KitchenService;
+use App\Models\ConsumptionEvent;
 use App\Models\KitchenTicket;
 use App\Models\Product;
 use App\Models\TicketItem;
@@ -18,7 +19,7 @@ class KitchenBoardTest extends AcceptanceTestCase
 {
     private function chef(): User
     {
-        return User::where('email', 'chef@pjt.test')->firstOrFail();
+        return User::where('email', 'chef@uji.test')->firstOrFail();
     }
 
     private function product(string $code): Product
@@ -130,7 +131,7 @@ class KitchenBoardTest extends AcceptanceTestCase
         $this->postJson("/kitchen/api/items/{$item->id}/cancel")->assertStatus(422);
         $this->postJson("/kitchen/api/items/{$item->id}/cancel", ['reason' => 'Tamu batal'])->assertOk();
         $this->assertSame('cancelled', $item->fresh()->status);
-        $this->assertTrue(\App\Models\ConsumptionEvent::where('source_id', $item->id)->where('reason', 'waste')->exists());
+        $this->assertTrue(ConsumptionEvent::where('source_id', $item->id)->where('reason', 'waste')->exists());
 
         $this->get('/kitchen')->assertOk()->assertSee('Expeditor');
         $this->get('/kitchen/s/grill')->assertOk()->assertSee('Grill');

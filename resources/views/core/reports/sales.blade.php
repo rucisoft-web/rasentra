@@ -34,7 +34,14 @@
   </div>
 </div>
 
-<div class="grid g3" style="margin-top:14px">
+<div class="grid g4" style="margin-top:14px">
+  <div class="card">
+    <h2>Per perusahaan</h2>
+    <table class="t">
+      <thead><tr><th>Perusahaan</th><th class="n">Struk</th><th class="n">Bersih</th></tr></thead>
+      <tbody>@forelse ($byCompany as $c)<tr><td>{{ $c->name }}<div class="muted small mono">{{ $c->sap_company_db }}</div></td><td class="n">{{ $c->orders }}</td><td class="n">{{ Fmt::money($c->net) }}</td></tr>@empty<tr><td colspan="3" class="muted">-</td></tr>@endforelse</tbody>
+    </table>
+  </div>
   <div class="card">
     <h2>Per outlet</h2>
     <table class="t">

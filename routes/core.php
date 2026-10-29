@@ -14,6 +14,7 @@ Route::prefix('core')->name('core.')->group(function () {
 
         Route::middleware('core:master')->group(function () {
             Route::get('outlets', [Core\OutletController::class, 'index'])->name('outlets.index');
+            Route::put('companies/{company}', [Core\OutletController::class, 'updateCompany'])->name('companies.update');
             Route::get('outlets/{outlet}', [Core\OutletController::class, 'edit'])->name('outlets.edit');
             Route::put('outlets/{outlet}', [Core\OutletController::class, 'update'])->name('outlets.update');
             Route::post('outlets/{outlet}/locations', [Core\OutletController::class, 'addLocation'])->name('outlets.locations.store');

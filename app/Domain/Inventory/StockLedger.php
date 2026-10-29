@@ -2,6 +2,7 @@
 
 namespace App\Domain\Inventory;
 
+use App\Models\Outlet;
 use App\Models\StockBalance;
 use App\Models\StockMovement;
 use App\Support\Decimal;
@@ -39,7 +40,7 @@ final class StockLedger
             'source_id' => $sourceId,
             'source_line_no' => $sourceLineNo,
             'occurred_at' => now(),
-            'business_date' => $businessDate ?? now()->toDateString(),
+            'business_date' => $businessDate ?? Outlet::businessDate($outletId),
         ]);
 
         $balance = StockBalance::query()

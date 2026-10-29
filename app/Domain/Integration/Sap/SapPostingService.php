@@ -4,6 +4,7 @@ namespace App\Domain\Integration\Sap;
 
 use App\Models\InboxEvent;
 use App\Models\IntegrationException;
+use App\Models\Outlet;
 use App\Models\SapDocument;
 use App\Models\SapMapping;
 use App\Support\Decimal;
@@ -13,15 +14,16 @@ use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * SAP Bridge di Rasentra Central. Satu sap_documents per objek SAP per sumber, sehingga
- * invoice dan pembayaran berhasil/gagal sendiri-sendiri. Sebelum membuat dokumen, cari dulu
- * berdasarkan referensi sumber agar timeout atau crash setelah commit SAP tidak menggandakan.
+ * SAP Bridge di Rasentra Central. Penjualan diposting ke instance SAP milik CV pemilik
+ * outlet (mis. sap_solo atau sap_lombok); mapping item, gudang dan akun juga per instance.
+ * Satu sap_documents per objek SAP per sumber, sehingga invoice dan pembayaran berhasil/gagal
+ * sendiri-sendiri. Sebelum membuat dokumen, cari dulu berdasarkan referensi sumber agar
+ * timeout atau crash setelah commit SAP tidak menggandakan.
  */
 final class SapPostingService
 {
-    public function __construct(private readonly SapClient $sap, private readonly string $companyDb = 'PASARTANI') {}
+    public function __construct(private readonly SapClientFactory $clients) {}
 
-    /** Posting penjualan (payload event order.finalized): A/R Invoice lalu Incoming Payment. */
     /**
      * Posting penjualan yang sudah diterima inbox Rasentra Central dan belum terposting.
      *
@@ -42,31 +44,41 @@ final class SapPostingService
         return $summary;
     }
 
+    /** Posting penjualan (payload event order.finalized): A/R Invoice lalu Incoming Payment. */
     public function postSale(array $order): array
     {
+        $companyDb = Outlet::sapCompanyDb((int) $order['outlet_id']);
+        if (! $companyDb) {
+            IntegrationException::updateOrCreate(
+                ['kind' => 'missing_mapping', 'source_type' => 'order', 'source_id' => $order['id'], 'status' => 'open'],
+                ['message' => 'Perusahaan pemilik outlet belum punya database SAP.'],
+            );
+
+            return ['status' => 'failed', 'missing' => ['company:sap_company_db']];
+        }
         $lock = Cache::lock("sap:order:{$order['id']}", 120);
         if (! $lock->get()) {
             return ['status' => 'locked'];
         }
 
         try {
-            $missing = $this->missingMappings($order);
+            $missing = $this->missingMappings($companyDb, $order);
             if ($missing !== []) {
                 // Satu catatan terbuka per order, agar posting berkala tidak menumpuk duplikat.
                 IntegrationException::updateOrCreate(
                     ['kind' => 'missing_mapping', 'source_type' => 'order', 'source_id' => $order['id'], 'status' => 'open'],
-                    ['message' => 'Mapping SAP belum ada: '.implode(', ', $missing)],
+                    ['message' => "Mapping SAP {$companyDb} belum ada: ".implode(', ', $missing)],
                 );
 
                 return ['status' => 'failed', 'missing' => $missing];
             }
 
-            $invoice = $this->post('order', $order['id'], 'Invoices', $this->invoicePayload($order));
+            $invoice = $this->post($companyDb, 'order', $order['id'], 'Invoices', $this->invoicePayload($companyDb, $order));
             if ($invoice->status !== 'posted') {
                 return ['status' => $invoice->status];
             }
 
-            $payment = $this->post('order', $order['id'], 'IncomingPayments', $this->paymentPayload($order, $invoice->doc_entry));
+            $payment = $this->post($companyDb, 'order', $order['id'], 'IncomingPayments', $this->paymentPayload($companyDb, $order, $invoice->doc_entry));
 
             return ['status' => $payment->status === 'posted' ? 'posted' : 'partially_posted'];
         } finally {
@@ -74,10 +86,10 @@ final class SapPostingService
         }
     }
 
-    private function post(string $sourceType, string $sourceId, string $object, array $payload): SapDocument
+    private function post(string $companyDb, string $sourceType, string $sourceId, string $object, array $payload): SapDocument
     {
         $doc = DB::transaction(fn () => SapDocument::firstOrCreate(
-            ['company_db' => $this->companyDb, 'source_type' => $sourceType, 'source_id' => $sourceId, 'sap_object' => $object],
+            ['company_db' => $companyDb, 'source_type' => $sourceType, 'source_id' => $sourceId, 'sap_object' => $object],
             ['status' => 'pending', 'request_payload' => $payload],
         ));
 
@@ -88,7 +100,7 @@ final class SapPostingService
         $ref = "{$sourceType}:{$sourceId}";
         try {
             // Pemeriksaan hasil sebelum (ulang) posting.
-            $existing = $this->sap->findBySourceRef($object, $ref);
+            $existing = $this->clients->for($companyDb)->findBySourceRef($object, $ref);
             if ($existing) {
                 $doc->update(['status' => 'posted', 'doc_entry' => $existing['DocEntry'], 'doc_num' => $existing['DocNum'], 'response_payload' => $existing]);
 
@@ -96,7 +108,7 @@ final class SapPostingService
             }
 
             $doc->update(['status' => 'posting', 'attempts' => $doc->attempts + 1]);
-            $result = $this->sap->create($object, $payload + ['U_POS_SRC' => $ref]);
+            $result = $this->clients->for($companyDb)->create($object, $payload + ['U_POS_SRC' => $ref]);
             $doc->update([
                 'status' => 'posted', 'doc_entry' => $result['DocEntry'], 'doc_num' => $result['DocNum'],
                 'response_payload' => $result, 'posted_amount' => $payload['DocTotal'] ?? null, 'posting_date' => now()->toDateString(),
@@ -111,16 +123,16 @@ final class SapPostingService
         return $doc->fresh();
     }
 
-    private function missingMappings(array $order): array
+    private function missingMappings(string $companyDb, array $order): array
     {
         $missing = [];
         foreach ($order['lines'] as $line) {
-            if (! SapMapping::where(['company_db' => $this->companyDb, 'entity_type' => 'product', 'entity_key' => (string) $line['product_id']])->exists()) {
+            if (! SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'product', 'entity_key' => (string) $line['product_id']])->exists()) {
                 $missing[] = 'product:'.$line['product_id'];
             }
         }
         foreach ($order['payments'] as $payment) {
-            if (! SapMapping::where(['company_db' => $this->companyDb, 'entity_type' => 'payment_method', 'entity_key' => $payment['method']])->exists()) {
+            if (! SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'payment_method', 'entity_key' => $payment['method']])->exists()) {
                 $missing[] = 'payment_method:'.$payment['method'];
             }
         }
@@ -128,11 +140,11 @@ final class SapPostingService
         return array_values(array_unique($missing));
     }
 
-    private function invoicePayload(array $order): array
+    private function invoicePayload(string $companyDb, array $order): array
     {
-        $item = fn ($id) => SapMapping::where(['company_db' => $this->companyDb, 'entity_type' => 'product', 'entity_key' => (string) $id])->first();
-        $warehouse = SapMapping::where(['company_db' => $this->companyDb, 'entity_type' => 'outlet', 'entity_key' => (string) $order['outlet_id']])->value('sap_code');
-        $customer = SapMapping::where(['company_db' => $this->companyDb, 'entity_type' => 'customer', 'entity_key' => 'walk_in'])->value('sap_code') ?? 'C-UMUM';
+        $item = fn ($id) => SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'product', 'entity_key' => (string) $id])->first();
+        $warehouse = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'outlet', 'entity_key' => (string) $order['outlet_id']])->value('sap_code');
+        $customer = SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'customer', 'entity_key' => 'walk_in'])->value('sap_code') ?? 'C-UMUM';
 
         return [
             'CardCode' => $customer,
@@ -152,9 +164,9 @@ final class SapPostingService
         ];
     }
 
-    private function paymentPayload(array $order, int $invoiceDocEntry): array
+    private function paymentPayload(string $companyDb, array $order, int $invoiceDocEntry): array
     {
-        $account = fn ($method) => SapMapping::where(['company_db' => $this->companyDb, 'entity_type' => 'payment_method', 'entity_key' => $method])->value('sap_code');
+        $account = fn ($method) => SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'payment_method', 'entity_key' => $method])->value('sap_code');
         $cash = Decimal::sum(collect($order['payments'])->where('method', 'cash')->pluck('amount'));
         $transfers = collect($order['payments'])->where('method', '!=', 'cash');
 

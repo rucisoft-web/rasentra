@@ -19,17 +19,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Data demo J&M Solo: seeder memutar satu hari operasional lewat service domain, jadi
+ * Data demo Solo: seeder memutar satu hari operasional lewat service domain, jadi
  * semua layar punya isi yang masuk akal.
  */
-class JmSoloDemoTest extends TestCase
+class IndogunaDemoTest extends TestCase
 {
     use RefreshDatabase;
 
     public function test_demo_day_fills_every_screen(): void
     {
         $this->seed(DatabaseSeeder::class);
-        $outlet = Outlet::where('code', 'JMS')->firstOrFail();
+        $outlet = Outlet::where('code', 'SLO')->firstOrFail();
         $board = app(KitchenBoard::class);
 
         $this->assertGreaterThanOrEqual(13, Order::where('outlet_id', $outlet->id)->where('channel', 'retail')->where('status', 'paid')->count());
@@ -43,12 +43,12 @@ class JmSoloDemoTest extends TestCase
         $this->assertSame(5, Pack::where('outlet_id', $outlet->id)->where('status', 'shipped')->count());
         $this->assertSame('counting', CountSession::where('outlet_id', $outlet->id)->value('status'));
 
-        // Katalog kasir J&M Solo hanya berisi produk berharga di outlet ini, tanpa bahan dapur.
-        $this->actingAs(User::where('email', 'kasir@jms.test')->firstOrFail());
+        // Katalog kasir Solo hanya berisi produk berharga di outlet ini, tanpa bahan dapur.
+        $this->actingAs(User::where('email', 'kasir@solo.test')->firstOrFail());
         $catalog = collect($this->getJson('/pos/api/catalog')->assertOk()->json());
         $this->assertTrue($catalog->contains('name', 'Kakap Merah Utuh'));
         $this->assertTrue($catalog->contains('name', 'Selat Solo'));
-        $this->assertFalse($catalog->contains('name', 'Sirloin Australia'), 'Produk PJT tidak tampil di J&M Solo');
+        $this->assertFalse($catalog->contains('name', 'Sirloin Australia'), 'Produk UJI tidak tampil di Solo');
         $this->assertFalse($catalog->contains('type', 'ingredient'));
         $boot = $this->getJson('/pos/api/bootstrap')->assertOk();
         $this->assertContains('bakar', collect($boot->json('cooking_methods'))->pluck('method')->all());
@@ -66,14 +66,14 @@ class JmSoloDemoTest extends TestCase
         foreach ($pages as $name) {
             $this->get(route($name))->assertOk();
         }
-        $this->get(route('core.outlets.edit', $outlet))->assertOk()->assertSee('J&amp;M Solo', false);
-        $this->get(route('core.prices.show', PriceVersion::where('code', 'JMS-2026-11')->firstOrFail()))->assertOk();
+        $this->get(route('core.outlets.edit', $outlet))->assertOk()->assertSee('R&amp;B Solo', false);
+        $this->get(route('core.prices.show', PriceVersion::where('code', 'SLO-2026-11')->firstOrFail()))->assertOk();
         $this->get(route('core.promotions.show', PromotionVersion::firstOrFail()))->assertOk();
         $this->get(route('core.recipes.show', Recipe::firstOrFail()))->assertOk();
         $this->get(route('core.cooking-fees.edit', CookingFeeRule::firstOrFail()))->assertOk();
         $this->get(route('core.monitor.sap.show', SapDocument::where('status', 'needs_review')->firstOrFail()))->assertOk();
         $this->get(route('core.products.edit', Product::firstOrFail()))->assertOk();
         $this->get(route('core.users.edit', User::firstOrFail()))->assertOk();
-        $this->get(route('core.reports.sales'))->assertSee('J&amp;M Solo', false);
+        $this->get(route('core.reports.sales'))->assertSee('CV Lombok Kulina Utama');
     }
 }

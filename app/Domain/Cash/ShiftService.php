@@ -4,6 +4,7 @@ namespace App\Domain\Cash;
 
 use App\Domain\Audit\Audit;
 use App\Domain\Sales\Approval;
+use App\Models\Outlet;
 use App\Models\Payment;
 use App\Models\Shift;
 use App\Models\User;
@@ -26,7 +27,7 @@ final class ShiftService
             'outlet_id' => $outletId,
             'device_id' => $deviceId,
             'user_id' => $user->id,
-            'business_date' => now()->toDateString(),
+            'business_date' => Outlet::businessDate($outletId),
             'opening_cash' => Decimal::money($openingCash),
             'status' => 'open',
             'opened_at' => now(),

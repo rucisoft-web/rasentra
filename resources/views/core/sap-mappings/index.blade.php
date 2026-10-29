@@ -1,7 +1,10 @@
 @extends('core.layout')
 @section('content')
 <div class="tabs">
-  @foreach ($types as $k => $v)<a href="{{ route('core.sap-mappings.index', ['type' => $k]) }}" @class(['on' => $type === $k])>{{ $v }}</a>@endforeach
+  @foreach ($companies as $c)<a href="{{ route('core.sap-mappings.index', ['company' => $c->sap_company_db, 'type' => $type]) }}" @class(['on' => $c->id === $company->id])>{{ $c->name }} · <span class="mono">{{ $c->sap_company_db }}</span></a>@endforeach
+</div>
+<div class="tabs">
+  @foreach ($types as $k => $v)<a href="{{ route('core.sap-mappings.index', ['company' => $companyDb, 'type' => $k]) }}" @class(['on' => $type === $k])>{{ $v }}</a>@endforeach
 </div>
 <div class="grid g2">
   <div>
@@ -32,7 +35,8 @@
     <form class="card" method="post" action="{{ route('core.sap-mappings.store') }}">
       @csrf
       <h2>Tambah atau ubah mapping</h2>
-      <p class="muted small">Company DB: <span class="mono">{{ $companyDb }}</span></p>
+      <input type="hidden" name="company" value="{{ $companyDb }}">
+      <p class="muted small">{{ $company->name }} · instance SAP <span class="mono">{{ $companyDb }}</span></p>
       <div class="fields">
         <label class="f"><span>Jenis</span><select name="entity_type">@foreach ($types as $k => $v)<option value="{{ $k }}" @selected($type === $k)>{{ $v }}</option>@endforeach</select></label>
         <label class="f"><span>Kode Rasentra</span><input name="entity_key" class="mono" required placeholder="kode produk / kode outlet / cash / walk_in"></label>

@@ -28,13 +28,26 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    // SAP Business One Service Layer. Hanya diisi pada profil central.
+    // SAP Business One Service Layer (SAP B1 versi SQL Server). Hanya diisi pada profil central.
+    // Setiap CV di Indoguna Group punya instance/database SAP sendiri; nilai di "companies"
+    // menimpa nilai bawaan untuk database tersebut, sehingga dua instance bisa berbeda server.
     'sap' => [
         'url' => env('SAP_SL_URL'),
-        'company_db' => env('SAP_COMPANY_DB'),
         'username' => env('SAP_USERNAME'),
         'password' => env('SAP_PASSWORD'),
         'verify' => env('SAP_SL_VERIFY_TLS', true),
+        'companies' => [
+            'sap_solo' => [
+                'url' => env('SAP_SOLO_SL_URL'),
+                'username' => env('SAP_SOLO_USERNAME'),
+                'password' => env('SAP_SOLO_PASSWORD'),
+            ],
+            'sap_lombok' => [
+                'url' => env('SAP_LOMBOK_SL_URL'),
+                'username' => env('SAP_LOMBOK_USERNAME'),
+                'password' => env('SAP_LOMBOK_PASSWORD'),
+            ],
+        ],
     ],
 
     'slack' => [

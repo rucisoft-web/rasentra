@@ -32,7 +32,7 @@ final class ServiceLayerClient implements SapClient
 
     private function http(): PendingRequest
     {
-        $session = Cache::remember('sap.b1session', 25 * 60, function () {
+        $session = Cache::remember('sap.b1session.'.$this->config['company_db'], 25 * 60, function () {
             $res = Http::withOptions(['verify' => $this->config['verify'] ?? true])
                 ->post(rtrim($this->config['url'], '/').'/Login', [
                     'CompanyDB' => $this->config['company_db'],

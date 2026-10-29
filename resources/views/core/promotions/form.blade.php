@@ -11,7 +11,7 @@
   <div class="card">
     <h2>Identitas dan aturan main</h2>
     <div class="fields">
-      <label class="f"><span>Kode promo</span><input name="code" value="{{ old('code', $promotion?->code) }}" @disabled($promotion) required placeholder="JMS-WAGYU-NOV" class="mono"></label>
+      <label class="f"><span>Kode promo</span><input name="code" value="{{ old('code', $promotion?->code) }}" @disabled($promotion) required placeholder="SLO-WAGYU-NOV" class="mono"></label>
       <label class="f wide"><span>Nama di struk dan laporan</span><input name="name" value="{{ old('name', $promotion?->name) }}" required></label>
       <label class="f"><span>Tipe</span><select name="type" data-promo-type>@foreach ($types as $k => $v)<option value="{{ $k }}" @selected(old('type', $version->type) === $k)>{{ $v }}</option>@endforeach</select></label>
       <label class="f" data-for-types="percent"><span>Berlaku pada</span><select name="scope"><option value="item" @selected(old('scope', $version->scope) === 'item')>Per barang</option><option value="basket" @selected(old('scope', $version->scope) === 'basket')>Total keranjang</option></select></label>

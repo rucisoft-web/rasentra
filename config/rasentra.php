@@ -12,6 +12,9 @@ return [
     */
     'profile' => env('RASENTRA_PROFILE', 'lokal'),
 
+    // Nama grup usaha yang membawahi semua CV (business unit).
+    'group_name' => env('RASENTRA_GROUP_NAME', 'Indoguna Group'),
+
     // Identitas instalasi; dipakai sebagai source_id pada event sinkronisasi.
     'source_id' => env('RASENTRA_SOURCE_ID', 'dev-local'),
 

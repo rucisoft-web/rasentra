@@ -33,6 +33,7 @@ class ReportController extends Controller
             'byPayment' => $report->byPayment(),
             'byCategory' => $report->byCategory(),
             'top' => $report->topProducts(20),
+            'byCompany' => $report->byCompany(),
             'outlets' => Outlet::orderBy('code')->get(),
         ]);
     }
@@ -121,6 +122,6 @@ class ReportController extends Controller
 
     private function report(Request $request, int $days = 7): SalesReport
     {
-        return SalesReport::range($request->query('from'), $request->query('to'), $request->integer('outlet') ?: null, $days);
+        return SalesReport::range($request->query('from'), $request->query('to'), $request->integer('outlet') ?: null, $days, $request->integer('company') ?: null);
     }
 }

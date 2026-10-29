@@ -3,6 +3,8 @@
 Oct 29, 2026 · @Jaya Martha
 
 > **Catatan:** spesifikasi terbaru (v2.0, nama aplikasi Rasentra POS, Mobile Terminal, Kitchen, Inventory, Lokal, Central dan Core) ada di [Spesifikasi Lengkap Rasentra v2.0](https://claude.ai/artifact/MidWQUchfyxN2rsywyT8aw). Dokumen di bawah ini adalah rancangan awal dan masih memakai nama lama (server outlet, Rasentra Mobile).
+>
+> **Pemakai sekarang: Indoguna Group.** Rasentra dipakai CV Solo Kulina Utama (instance SAP `sap_solo`, outlet Solo: Meatshop & Grocery dan restoran R&B Solo) dan CV Lombok Kulina Utama (instance SAP `sap_lombok`, outlet Lombok: Meatshop dan restoran El Primo, zona waktu WITA). SAP B1 berjalan di SQL Server dan diakses lewat Service Layer. Rujukan ke CV Pasar Tani dan 20 outlet di bawah adalah konteks rancangan awal.
 
 Rancangan ini menerjemahkan Spesifikasi POS CV Pasar Tani v1.3 menjadi arsitektur, skema data, kontrak API dan rencana uji untuk Laravel 13 dan MySQL 8.4, dengan satu server lokal per outlet dan SAP B1 sebagai pembukuan resmi.
 

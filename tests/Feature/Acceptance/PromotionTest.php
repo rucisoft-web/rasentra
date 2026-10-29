@@ -4,36 +4,38 @@ namespace Tests\Feature\Acceptance;
 
 use App\Domain\Promotion\ActivePromotions;
 use App\Domain\Promotion\PromotionPublisher;
+use App\Models\DiscountAllocation;
 use App\Models\Outlet;
 use App\Models\Promotion;
 use App\Models\PromotionVersion;
 use App\Models\User;
+use App\Support\Decimal;
 
 class PromotionTest extends AcceptanceTestCase
 {
-    /** U05: promo Lampung hanya diterapkan di Antasari, Diponegoro, Citraland dan Kemiling. */
-    public function test_u05_lampung_promotion_targets_only_lampung(): void
+    /** U05: promo wilayah Lombok hanya diterapkan di outlet CV Lombok Kulina Utama. */
+    public function test_u05_lombok_promotion_targets_only_lombok(): void
     {
         $creator = User::factory()->create(['role' => 'merchandiser']);
         $admin = User::factory()->create(['role' => 'admin']);
-        $promo = Promotion::create(['code' => 'LPG-BBQ', 'name' => 'Promo Lampung']);
+        $promo = Promotion::create(['code' => 'LBK-BBQ', 'name' => 'Promo Lombok']);
         $version = PromotionVersion::create([
             'promotion_id' => $promo->id, 'version' => 1, 'type' => 'percent', 'scope' => 'item',
             'rules' => ['categories' => ['Bumbu & Saus'], 'percent' => 20], 'starts_at' => now()->subHour(),
             'created_by' => $creator->id,
         ]);
 
-        $this->assertDomainError('approval_self', fn () => app(PromotionPublisher::class)->publish($version, $creator, ['regions' => ['LPG']]));
-        $published = app(PromotionPublisher::class)->publish($version, $admin, ['regions' => ['LPG']]);
+        $this->assertDomainError('approval_self', fn () => app(PromotionPublisher::class)->publish($version, $creator, ['regions' => ['LOMBOK']]));
+        $published = app(PromotionPublisher::class)->publish($version, $admin, ['regions' => ['LOMBOK']]);
 
         $codes = Outlet::whereIn('id', $published->targets->pluck('outlet_id'))->orderBy('code')->pluck('code')->all();
-        $this->assertSame(['ANT', 'CTL', 'DPN', 'KML'], $codes);
+        $this->assertSame(['LBK'], $codes);
 
         $active = app(ActivePromotions::class);
-        $this->assertContains($version->id, array_column($active->for(Outlet::where('code', 'KML')->value('id'), 'retail'), 'id'));
-        $jakarta = array_column($active->for($this->outlet->id, 'retail'), 'id');
-        $this->assertNotContains($version->id, $jakarta);
-        $this->assertNotEmpty($jakarta, 'Promo Jakarta tetap berlaku');
+        $this->assertContains($version->id, array_column($active->for(Outlet::where('code', 'LBK')->value('id'), 'retail'), 'id'));
+        $solo = array_column($active->for($this->outlet->id, 'retail'), 'id');
+        $this->assertNotContains($version->id, $solo);
+        $this->assertNotEmpty($solo, 'Promo outlet uji (wilayah Solo) tetap berlaku');
 
         $this->assertDomainError('already_published', fn () => app(PromotionPublisher::class)->publish($published, $admin, ['all' => true]));
     }
@@ -51,8 +53,8 @@ class PromotionTest extends AcceptanceTestCase
         $this->assertSame('49700.00', (string) $order->discount_amount);
 
         // Alokasi diskon tersimpan per baris untuk retur dan posting SAP.
-        $this->assertSame('49700.00', \App\Support\Decimal::money(\App\Support\Decimal::sum(
-            \App\Models\DiscountAllocation::whereIn('order_line_id', $order->lines()->pluck('id'))->pluck('amount')
+        $this->assertSame('49700.00', Decimal::money(Decimal::sum(
+            DiscountAllocation::whereIn('order_line_id', $order->lines()->pluck('id'))->pluck('amount')
         )));
     }
 }

@@ -29,7 +29,7 @@
   <summary><b>Tarif baru</b></summary>
   <form method="post" action="{{ route('core.cooking-fees.store') }}" style="margin-top:12px">
     @csrf
-    <label class="f" style="max-width:260px;margin-bottom:12px"><span>Kode</span><input name="code" class="mono" required placeholder="PJT-CF-BAKAR"></label>
+    <label class="f" style="max-width:260px;margin-bottom:12px"><span>Kode</span><input name="code" class="mono" required placeholder="LBK-CF-BAKAR"></label>
     @include('core.cooking-fees._fields', ['rule' => null])
     <p><button class="btn">Simpan tarif</button></p>
   </form>

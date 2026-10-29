@@ -14,6 +14,21 @@
 </div>
 
 <div class="grid g2" style="margin-top:14px">
+  @foreach ($companies as $c)
+    @php $issues = ($c->sap['needs_review'] ?? 0) + ($c->sap['failed'] ?? 0) + ($c->sap['partially_posted'] ?? 0); @endphp
+    <div class="card">
+      <h2>{{ $c->company->name }}</h2>
+      <p class="muted small" style="margin-top:-6px">Instance SAP <span class="mono">{{ $c->company->sap_company_db ?? 'belum diatur' }}</span> · {{ $c->outlets->map(fn ($r) => $r->outlet->name.' ('.collect([$r->outlet->retail_name, $r->outlet->restaurant_name])->filter()->implode(' & ').')')->implode(', ') }}</p>
+      <dl class="dl">
+        <dt>Penjualan bersih hari ini</dt><dd><b>{{ Fmt::money($c->net) }}</b> <span class="muted small">· {{ $c->orders }} struk</span></dd>
+        <dt>SAP terposting</dt><dd>{{ $c->sap['posted'] ?? 0 }} dokumen</dd>
+        <dt>SAP perlu tindakan</dt><dd>{{ $issues }} @if($issues && \App\Domain\Core\CoreAccess::allows(auth()->user(), 'monitoring'))<a class="b warn" href="{{ route('core.monitor.sap', ['company' => $c->company->sap_company_db]) }}">cek</a>@endif</dd>
+      </dl>
+    </div>
+  @endforeach
+</div>
+
+<div class="grid g2" style="margin-top:14px">
   <div class="card">
     <h2>Penjualan 7 hari</h2>
     <div class="bars">
@@ -43,12 +58,12 @@
 <h2>Outlet</h2>
 <div class="tablewrap">
 <table class="t">
-  <thead><tr><th>Outlet</th><th>Wilayah</th><th class="n">Struk hari ini</th><th class="n">Penjualan bersih</th><th>Sinkron terakhir</th><th class="n">Antre kirim</th><th>Status</th></tr></thead>
+  <thead><tr><th>Outlet</th><th>Perusahaan</th><th class="n">Struk hari ini</th><th class="n">Penjualan bersih</th><th>Sinkron terakhir</th><th class="n">Antre kirim</th><th>Status</th></tr></thead>
   <tbody>
   @foreach ($outlets as $r)
     <tr>
-      <td><b>{{ $r->outlet->code }}</b> {{ $r->outlet->name }}</td>
-      <td>{{ $r->outlet->region->name }}</td>
+      <td><b>{{ $r->outlet->code }}</b> {{ $r->outlet->name }}<div class="muted small">{{ collect([$r->outlet->retail_name, $r->outlet->restaurant_name])->filter()->implode(' · ') }}</div></td>
+      <td>{{ $r->outlet->businessUnit->name }}<div class="muted small mono">{{ $r->outlet->businessUnit->sap_company_db }}</div></td>
       <td class="n">{{ $r->orders }}</td>
       <td class="n">{{ Fmt::money($r->net) }}</td>
       <td>{{ $r->last_sync ? Fmt::dt($r->last_sync) : '-' }}</td>

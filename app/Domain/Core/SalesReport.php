@@ -18,9 +18,10 @@ final class SalesReport
         private readonly Carbon $from,
         private readonly Carbon $to,
         private readonly ?int $outletId = null,
+        private readonly ?int $companyId = null,
     ) {}
 
-    public static function range(?string $from, ?string $to, ?int $outletId = null, int $defaultDays = 7): self
+    public static function range(?string $from, ?string $to, ?int $outletId = null, int $defaultDays = 7, ?int $companyId = null): self
     {
         $today = Carbon::now(config('rasentra.display_timezone'))->startOfDay();
         $toDate = $to ? Carbon::parse($to) : $today;
@@ -29,7 +30,7 @@ final class SalesReport
             [$fromDate, $toDate] = [$toDate, $fromDate];
         }
 
-        return new self($fromDate->startOfDay(), $toDate->startOfDay(), $outletId);
+        return new self($fromDate->startOfDay(), $toDate->startOfDay(), $outletId, $companyId);
     }
 
     public function from(): Carbon
@@ -46,7 +47,17 @@ final class SalesReport
     {
         return DB::table('hq_orders as o')
             ->whereBetween('o.business_date', [$this->from->toDateString(), $this->to->toDateString()])
-            ->when($this->outletId, fn ($q, $id) => $q->where('o.outlet_id', $id));
+            ->when($this->outletId, fn ($q, $id) => $q->where('o.outlet_id', $id))
+            ->when($this->companyId, fn ($q, $id) => $q->whereIn('o.outlet_id', DB::table('outlets')->where('business_unit_id', $id)->select('id')));
+    }
+
+    /** Per perusahaan (CV) di grup, beserta instance SAP-nya. */
+    public function byCompany(): Collection
+    {
+        return $this->orders()->join('outlets', 'outlets.id', '=', 'o.outlet_id')->join('business_units as bu', 'bu.id', '=', 'outlets.business_unit_id')
+            ->groupBy('bu.id', 'bu.name', 'bu.sap_company_db')
+            ->selectRaw('bu.id, bu.name, bu.sap_company_db, COUNT(*) as orders, SUM(o.discount_amount) as discount, SUM(o.net_amount) as net')
+            ->orderByDesc('net')->get();
     }
 
     /** @return object{orders:int, gross:string, discount:string, net:string} */

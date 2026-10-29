@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Domain\Inventory\StockLedger;
 use App\Models\CookingFeeRule;
 use App\Models\DiningTable;
+use App\Models\Location;
 use App\Models\Outlet;
 use App\Models\Pack;
 use App\Models\PriceItem;
@@ -15,6 +16,7 @@ use App\Models\PromotionTarget;
 use App\Models\PromotionVersion;
 use App\Models\Recipe;
 use App\Models\RecipeVersion;
+use App\Models\StockMovement;
 use App\Models\Uom;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -28,20 +30,27 @@ class DemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $outlet = Outlet::where('code', 'PJT')->firstOrFail();
-        $outlet->update(['has_restaurant' => true, 'has_cooking_fee' => true, 'sap_warehouse_code' => 'WH-PJT']);
+        // Outlet khusus uji otomatis, di bawah CV Solo Kulina Utama (instance sap_solo).
+        $solo = Outlet::where('code', 'SLO')->firstOrFail();
+        $outlet = Outlet::updateOrCreate(['code' => 'UJI'], [
+            'business_unit_id' => $solo->business_unit_id, 'region_id' => $solo->region_id, 'name' => 'Outlet Uji',
+            'has_restaurant' => true, 'has_cooking_fee' => true, 'sap_warehouse_code' => 'WH-UJI', 'timezone' => 'Asia/Jakarta',
+        ]);
+        foreach ([['ETL', 'Etalase & chiller', 'sales'], ['GDG', 'Gudang outlet', 'storage'], ['DPR', 'Dapur', 'kitchen'], ['KRT', 'Karantina', 'quarantine']] as [$lc, $ln, $lt]) {
+            Location::firstOrCreate(['outlet_id' => $outlet->id, 'code' => $lc], ['name' => $ln, 'type' => $lt]);
+        }
 
         foreach ([['KG', 'Kilogram', 3], ['PCS', 'Pieces', 0], ['PORSI', 'Porsi', 0], ['LTR', 'Liter', 3]] as [$c, $n, $s]) {
             Uom::firstOrCreate(['code' => $c], ['name' => $n, 'display_scale' => $s]);
         }
 
         $users = [
-            ['Sari (Kasir)', 'kasir@pjt.test', 'cashier', '1111', 0],
-            ['Budi (Kepala Outlet)', 'kepala@pjt.test', 'outlet_head', '9999', 5000000],
-            ['Rudi (Pelayan)', 'pelayan@pjt.test', 'waiter', '3333', 0],
-            ['Chef Andi', 'chef@pjt.test', 'chef', '2222', 0],
-            ['Dewi (Gudang)', 'gudang@pjt.test', 'storekeeper', '4444', 0],
-            ['Eko (Gudang)', 'gudang2@pjt.test', 'storekeeper', '5555', 0],
+            ['Sari (Kasir)', 'kasir@uji.test', 'cashier', '1111', 0],
+            ['Budi (Kepala Outlet)', 'kepala@uji.test', 'outlet_head', '9999', 5000000],
+            ['Rudi (Pelayan)', 'pelayan@uji.test', 'waiter', '3333', 0],
+            ['Chef Andi', 'chef@uji.test', 'chef', '2222', 0],
+            ['Dewi (Gudang)', 'gudang@uji.test', 'storekeeper', '4444', 0],
+            ['Eko (Gudang)', 'gudang2@uji.test', 'storekeeper', '5555', 0],
         ];
         foreach ($users as [$name, $email, $role, $pin, $limit]) {
             User::updateOrCreate(['email' => $email], [
@@ -94,7 +103,7 @@ class DemoSeeder extends Seeder
             ]);
         }
         foreach ([[$wings, 40], [$sausage, 30], [$bbq, 24], [$potatoRaw, 25], [$veg, 10], [$butter, 3], [$sauce, 4], [$steakMeat, 8]] as $i => [$prod, $qty]) {
-            if (! \App\Models\StockMovement::where('source_type', 'opening')->where('product_id', $prod->id)->where('outlet_id', $outlet->id)->exists()) {
+            if (! StockMovement::where('source_type', 'opening')->where('product_id', $prod->id)->where('outlet_id', $outlet->id)->exists()) {
                 StockLedger::move($outlet->id, $prod->id, (string) $qty, $prod->uom_code, 'opening_balance', 'opening', '00000000-0000-7000-8000-'.str_pad((string) $prod->id, 12, '0', STR_PAD_LEFT));
             }
         }
@@ -129,15 +138,13 @@ class DemoSeeder extends Seeder
             DiningTable::firstOrCreate(['outlet_id' => $outlet->id, 'code' => $t], ['area' => str_starts_with($t, 'A') ? 'Indoor' : 'Teras', 'capacity' => $t === 'VIP' ? 10 : 4]);
         }
 
-        // Promo contoh: diskon 10% daging sapi untuk pembelian total minimal 2 kg di Jakarta.
-        $promo = Promotion::firstOrCreate(['code' => 'JKT-SAPI-2KG'], ['name' => 'Hemat Daging Sapi 2 kg']);
+        // Promo contoh: diskon 10% daging sapi untuk pembelian total minimal 2 kg di outlet uji.
+        $promo = Promotion::firstOrCreate(['code' => 'UJI-SAPI-2KG'], ['name' => 'Hemat Daging Sapi 2 kg']);
         $version = PromotionVersion::firstOrCreate(['promotion_id' => $promo->id, 'version' => 1], [
             'type' => 'weight_tier', 'scope' => 'item', 'stacking' => 'exclusive', 'priority' => 10,
             'rules' => ['categories' => ['Daging Sapi'], 'tiers' => [['min_weight' => '2.000', 'percent' => 10]]],
             'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(), 'status' => 'published', 'published_at' => now(),
         ]);
-        foreach (Outlet::whereHas('region', fn ($q) => $q->where('code', 'JKT'))->get() as $o) {
-            PromotionTarget::firstOrCreate(['promotion_version_id' => $version->id, 'outlet_id' => $o->id]);
-        }
+        PromotionTarget::firstOrCreate(['promotion_version_id' => $version->id, 'outlet_id' => $outlet->id]);
     }
 }
