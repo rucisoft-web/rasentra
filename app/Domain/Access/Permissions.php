@@ -23,6 +23,7 @@ final class Permissions
         'promotions' => 'Promotion Designer',
         'recipes' => 'Resep & cooking fee',
         'members' => 'Membership & poin',
+        'crm' => 'Rasentra CRM (pelanggan, segmentasi, WhatsApp)',
         'operations' => 'Meja, metode bayar, shift staf',
         'settings' => 'Pengaturan umum',
         'access' => 'Peran & izin',
