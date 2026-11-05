@@ -10,6 +10,9 @@ Panduan ini memasang Rasentra di hosting cPanel memakai **Terminal** cPanel. Pak
 - MySQL 8 / MariaDB 10.6 ke atas.
 - Akses **Terminal** di cPanel (menu Advanced → Terminal).
 
+Ada dua cara memasang: **A. paket zip** (langkah 2 di bawah, tanpa Composer) atau **B. Git + Composer
+lewat Terminal** (lihat bagian "Cara B"). Langkah lain sama untuk keduanya.
+
 ## 1. Siapkan database
 
 Di cPanel → **MySQL® Databases**:
@@ -28,6 +31,25 @@ unzip -q rasentra-cpanel-*.zip      # menghasilkan folder ~/rasentra
 cd ~/rasentra
 php -v                              # pastikan 8.3+; jika bukan, pakai /opt/cpanel/ea-php83/root/usr/bin/php
 ```
+
+### Cara B: Git + Composer lewat Terminal
+
+Bila hosting menyediakan Git dan Composer (cek dengan `git --version` dan `composer -V`):
+
+```sh
+cd ~
+git clone https://github.com/rucisoft-web/rasentra.git rasentra
+cd ~/rasentra
+git checkout feature/rasentra-mvp     # atau branch rilis yang dipakai
+composer install --no-dev --optimize-autoloader
+```
+
+Repo bersifat privat: gunakan *Personal Access Token* GitHub sebagai kata sandi saat `git clone`, atau
+pasang SSH key di cPanel → **SSH Access**. Bila `composer` tidak ada, unduh dulu:
+`curl -sS https://getcomposer.org/installer | php` lalu jalankan `php composer.phar install --no-dev --optimize-autoloader`.
+
+Pembaruan versi dengan cara B: `git pull`, `composer install --no-dev --optimize-autoloader`,
+`php artisan migrate --force`, `php artisan optimize`.
 
 ## 3. Konfigurasi `.env`
 
@@ -104,7 +126,44 @@ cd ~/rasentra && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 Di profil central jadwal ini memposting penjualan ke SAP, mengecek koneksi SAP dan menjalankan
-rekonsiliasi tutup hari.
+rekonsiliasi tutup hari. Untuk Rasentra CRM jadwal yang sama juga mengirim kampanye WhatsApp bertahap,
+menjalankan workflow otomatis, menarik data Accurate Online tiap jam dan menilai lead AI tiap jam.
+Cukup satu cron ini; jangan buat cron terpisah per perintah.
+
+## 7. Rasentra CRM (profil central)
+
+1. **Ekstensi PHP**: pastikan `curl` dan `openssl` aktif (dipakai Accurate, WhatsApp dan Claude API).
+2. **`.env`** (lalu `php artisan optimize`):
+
+   ```ini
+   WHATSAPP_VERIFY_TOKEN=isi-teks-acak-bebas
+   WHATSAPP_APP_SECRET=app-secret-dari-meta
+   ANTHROPIC_API_KEY=sk-ant-...          # kosongkan bila fitur AI belum dipakai
+   ```
+
+3. **Media iklan**: `php artisan storage:link` wajib berhasil, karena Meta mengambil gambar/video iklan
+   dari URL publik `https://domain/storage/...`. Bila hosting melarang symlink, minta penyedia hosting
+   mengaktifkannya atau isi URL materi iklan dari tempat lain.
+4. **Webhook WhatsApp** di Meta for Developers → aplikasi → WhatsApp → Configuration:
+   - Callback URL: `https://domain-anda/api/crm/whatsapp/webhook`
+   - Verify token: sama dengan `WHATSAPP_VERIFY_TOKEN`
+   - Subscribe field **messages**.
+   Domain harus HTTPS (AutoSSL).
+5. **Nomor dan template**: masuk Central sebagai admin atau `crm@...`, buka Rasentra CRM → Nomor &
+   template, isi Phone number ID, WABA ID dan access token (System User token permanen), lalu
+   **Sinkron template**. Di sini pula mode Asisten AI dipilih per nomor.
+6. **Accurate Online**: Rasentra CRM → Accurate Online, isi API Token dan Signature Secret per CV,
+   klik **Tes koneksi**, lalu **Sinkron sekarang**.
+7. **Knowledge base AI**: ganti empat artikel bertanda CONTOH dengan informasi resmi sebelum
+   mengaktifkan mode AI otomatis.
+
+Cek cepat dari Terminal:
+
+```sh
+php artisan schedule:list | grep crm        # crm-campaigns, crm-workflows, crm-accurate-sync, crm-ai-leads
+php artisan rasentra:crm-accurate-sync      # tarik data Accurate sekarang
+tail -n 50 storage/logs/laravel.log         # bila ada error webhook / API
+```
 
 ## Memperbarui versi
 
@@ -125,3 +184,7 @@ php artisan optimize
 | `could not find driver` | Aktifkan ekstensi `pdo_mysql` di cPanel → Select PHP Version |
 | Perubahan `.env` tidak terbaca | `php artisan optimize:clear && php artisan optimize` |
 | Halaman tampil daftar file / 404 | *Document Root* belum mengarah ke `rasentra/public` |
+| Verifikasi webhook Meta gagal | `WHATSAPP_VERIFY_TOKEN` beda dengan isian Meta, atau `.env` belum dibaca (`php artisan optimize`) |
+| Chat masuk tidak muncul di Inbox | `WHATSAPP_APP_SECRET` salah (webhook ditolak 401) atau field **messages** belum di-subscribe |
+| Iklan bergambar gagal terkirim | `storage:link` belum ada atau URL media tidak bisa dibuka publik |
+| Kampanye/workflow tidak berjalan | Cron `schedule:run` belum dipasang atau salah folder |

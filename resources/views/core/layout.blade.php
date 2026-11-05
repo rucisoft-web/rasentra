@@ -23,9 +23,32 @@
                 ['monitoring', 'core.sap-mappings.index', 'Mapping SAP'],
             ],
         ],
+        'Rasentra CRM' => [
+            'Pelanggan' => [
+                ['crm', 'core.crm.customers.index', 'Pelanggan'],
+                ['crm', 'core.crm.segments.index', 'Segmen'],
+                ['crm', 'core.crm.imports.index', 'Impor member outlet'],
+            ],
+            'WhatsApp' => [
+                ['crm', 'core.crm.inbox.index', 'Inbox'],
+                ['crm', 'core.crm.communities.index', 'Komunitas'],
+                ['crm', 'core.crm.campaigns.index', 'Kampanye & iklan'],
+                ['crm', 'core.crm.workflows.index', 'Workflow otomatis'],
+                ['crm', 'core.crm.whatsapp.index', 'Nomor & template'],
+            ],
+            'AI' => [
+                ['crm', 'core.crm.leads.index', 'Lead dari WhatsApp'],
+                ['crm', 'core.crm.knowledge.index', 'Knowledge base AI'],
+            ],
+            'Integrasi' => [
+                ['crm', 'core.crm.branches.index', 'Perusahaan & cabang'],
+                ['crm', 'core.crm.accurate.index', 'Accurate Online'],
+            ],
+        ],
         'Rasentra Core' => [
             'Ringkasan' => [
                 ['dashboard', 'core.dashboard', 'Dashboard'],
+                ['dashboard', 'core.migration-guide', 'Panduan migrasi POS'],
             ],
             'Master' => [
                 ['master', 'core.outlets.index', 'Perusahaan & outlet'],

@@ -50,7 +50,7 @@ class DashboardController extends Controller
 
         $companySales = $day->byCompany()->keyBy('id');
         $sapByCompany = SapDocument::groupBy('company_db', 'status')->selectRaw('company_db, status, COUNT(*) as n')->get()->groupBy('company_db');
-        $companies = BusinessUnit::orderBy('id')->get()->map(fn (BusinessUnit $c) => (object) [
+        $companies = BusinessUnit::has('outlets')->orderBy('id')->get()->map(fn (BusinessUnit $c) => (object) [ // CV tanpa outlet Rasentra (hanya CRM) tidak ditampilkan
             'company' => $c,
             'net' => $companySales[$c->id]->net ?? '0',
             'orders' => $companySales[$c->id]->orders ?? 0,

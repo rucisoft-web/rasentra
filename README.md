@@ -193,6 +193,11 @@ Login di `/core/login` dengan email dan kata sandi `password`:
 | Rahman Hidayat | Admin pusat | `admin@rasentra.test` | Semua menu |
 | Laras Wulandari | Merchandising | `merch@rasentra.test` | Dashboard, produk, harga, promo, resep, laporan |
 | Fajar Nugroho | Keuangan | `finance@rasentra.test` | Dashboard, monitoring sinkronisasi dan SAP, laporan, audit |
+| Nadia Putri | CRM & customer service | `crm@rasentra.test` | Dashboard, Rasentra CRM |
+
+### Modul Rasentra CRM
+
+Menu `/core/crm`: **Pelanggan** (satu profil per nomor WhatsApp yang dinormalkan ke `62…`, lintas outlet; riwayat belanja gabungan POS Rasentra dan Accurate Online; tag, status opt-in/opt-out WhatsApp, unduh CSV), **Segmen** (aturan: outlet, tag, tahap Baru/Loyal/Aktif/Berisiko/Tidur, belanja dalam/lebih dari N hari, minimal transaksi atau nilai, ulang tahun, kota, status WhatsApp; isi dihitung ulang setiap dibuka), **Impor member outlet** (Excel `.xlsx` atau CSV per outlet; duplikat antar outlet digabung, baris bermasalah dilaporkan per nomor baris) dan **Accurate Online** (API Token + Signature Secret per perusahaan, tersimpan terenkripsi; pelanggan dan faktur penjualan ditarik satu arah tiap jam lewat `rasentra:crm-accurate-sync`). Pesanan POS yang berisi nama dan HP pemesan otomatis masuk ke riwayat pelanggan saat diterima Central. WhatsApp resmi (inbox, komunitas, kirim iklan) dan **Workflow otomatis** (kata kunci, pelanggan baru, gabung komunitas, setelah belanja, ulang tahun, tidak belanja N hari) dijelaskan di [docs/CRM.md](docs/CRM.md), serta **asisten AI** (Claude API: knowledge base, saran/balasan otomatis, dan identifikasi lead; aktif bila `ANTHROPIC_API_KEY` diisi).
 
 ### Modul Sinkronisasi
 

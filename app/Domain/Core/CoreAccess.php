@@ -15,12 +15,14 @@ final class CoreAccess
         'admin' => 'Admin pusat',
         'hq_merch' => 'Merchandising pusat',
         'hq_finance' => 'Finance pusat',
+        'hq_crm' => 'CRM & customer service pusat',
     ];
 
     private const AREAS = [
         'admin' => ['*'],
         'hq_merch' => ['dashboard', 'catalog', 'promotions', 'recipes', 'reports'],
         'hq_finance' => ['dashboard', 'monitoring', 'reports', 'audit'],
+        'hq_crm' => ['dashboard', 'crm'],
     ];
 
     public static function isCoreUser(?User $user): bool
