@@ -39,13 +39,20 @@ class OutletController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'sap_company_db' => ['required', 'string', 'max:60', 'regex:/^[A-Za-z0-9_]+$/', Rule::unique('business_units')->ignore($company->id)],
+            'accounting_system' => ['nullable', Rule::in(array_keys(BusinessUnit::ACCOUNTING))],
+            'accurate_host' => ['nullable', 'url', 'max:120'],
         ]);
+        $secrets = $request->validate(['accurate_api_token' => ['nullable', 'string', 'max:500'], 'accurate_signature_secret' => ['nullable', 'string', 'max:500']]);
+        $data['accounting_system'] ??= $company->accounting_system ?? 'sap_b1';
         $before = $company->only(array_keys($data));
-        $company->update($data + ['legal_name' => $data['name']]);
+        // Token Accurate hanya diganti bila diisi; kosong berarti tetap memakai yang tersimpan.
+        $company->update($data + ['legal_name' => $data['name']] + array_filter($secrets));
         $company->outlets()->pluck('id')->each(fn ($id) => app(Publications::class)->master('outlet', $id));
         Audit::record('company.updated', $company, $request->user()->id, before: $before, after: $company->only(array_keys($data)));
 
-        return back()->with('ok', "Data {$company->name} disimpan. Pastikan kredensial Service Layer untuk {$company->sap_company_db} sudah diisi di server Central.");
+        return back()->with('ok', $company->usesAccurate()
+            ? "Data {$company->name} disimpan. Penjualan diposting ke Accurate Online".(blank($company->accurate_api_token) ? '; isi API Token dan Signature Secret agar posting berjalan.' : '.')
+            : "Data {$company->name} disimpan. Pastikan kredensial Service Layer untuk {$company->sap_company_db} sudah diisi di server Central.");
     }
 
     public function edit(Outlet $outlet): View

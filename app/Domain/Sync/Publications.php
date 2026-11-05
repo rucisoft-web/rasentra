@@ -41,7 +41,7 @@ final class Publications
     public const MEMBER_COLUMNS = ['id', 'code', 'phone', 'name', 'email', 'birth_date', 'home_outlet_id', 'member_tier_id', 'points_balance', 'member_spend', 'member_since', 'is_member', 'created_at', 'updated_at'];
 
     /** Kolom yang tidak pernah dikirim ke outlet. */
-    private const HIDDEN = ['users' => ['remember_token']];
+    private const HIDDEN = ['users' => ['remember_token'], 'business_units' => ['accurate_api_token', 'accurate_signature_secret']];
 
     /** Terbitkan baris master terbaru. Akun kantor pusat (tanpa outlet) tidak dikirim ke outlet. */
     public function master(string $type, int $id, array $alsoOutletIds = []): ?PublicationVersion
