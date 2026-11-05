@@ -3,6 +3,7 @@
 use App\Domain\Core\SalesProjector;
 use App\Domain\Core\StockProjector;
 use App\Domain\Crm\CampaignService;
+use App\Domain\Crm\WorkflowEngine;
 use App\Domain\Integration\Accurate\AccurateSync;
 use App\Domain\Integration\Sap\SapHealth;
 use App\Domain\Integration\Sap\SapPostingService;
@@ -42,6 +43,7 @@ Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->whe
 Schedule::command('rasentra:sap-check')->everyFifteenMinutes()->when($central);
 Schedule::command('rasentra:reconcile')->hourly()->when($central);
 Schedule::command('rasentra:crm-campaigns')->everyMinute()->withoutOverlapping()->when($central);
+Schedule::command('rasentra:crm-workflows')->everyMinute()->withoutOverlapping()->when($central);
 Schedule::command('rasentra:crm-accurate-sync')->hourlyAt(20)->withoutOverlapping()->when($central);
 
 // Server demo: data contoh dibangun ulang setiap hari agar tamu berikutnya mulai dari kondisi bersih.
@@ -126,6 +128,11 @@ Artisan::command('rasentra:crm-campaigns', function (CampaignService $campaigns)
     $s = $campaigns->dispatch();
     $this->line("mulai {$s['started']}, terkirim {$s['sent']}, gagal {$s['failed']}, dilewati {$s['skipped']}, selesai {$s['finished']}");
 })->purpose('Rasentra CRM: kirim kampanye WhatsApp terjadwal secara bertahap');
+
+Artisan::command('rasentra:crm-workflows', function (WorkflowEngine $engine) {
+    $s = $engine->tick();
+    $this->line("dilanjutkan {$s['resumed']}, dimulai {$s['started']}");
+})->purpose('Rasentra CRM: lanjutkan workflow yang menunggu dan jalankan pemicu harian (ulang tahun, tidak belanja)');
 
 Artisan::command('rasentra:crm-accurate-sync', function (AccurateSync $sync) {
     foreach (AccurateConnection::with('businessUnit')->get() as $conn) {

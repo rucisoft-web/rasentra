@@ -174,6 +174,12 @@ final class Messenger
                 $customer->update(['wa_status' => 'opted_in', 'wa_status_at' => now()]);
             }
             $this->autoReply($c, "Selamat bergabung di komunitas {$community->name}! Info dan promo khusus anggota akan kami kirim lewat WhatsApp ini. Kirim STOP untuk berhenti.");
+            app(WorkflowEngine::class)->fire('joined_community', $customer->fresh(), ['community_id' => $community->id]);
+
+            return;
+        }
+        if ($text !== '') {
+            app(WorkflowEngine::class)->fire('keyword', $customer, ['text' => $text]);
         }
     }
 

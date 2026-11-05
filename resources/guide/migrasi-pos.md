@@ -7,13 +7,13 @@ Panduan ini untuk CV di Indoguna Group yang sekarang memakai **Rene POS** (CV Ma
 | Sebelum | Sesudah |
 | --- | --- |
 | Kasir memakai Rene POS / Raptor | Kasir memakai Rasentra POS, Kitchen, Mobile Terminal dan Inventory |
-| Rene POS / Raptor mengirim (atau diinput ulang) penjualan ke Accurate | **Rasentra Central → modul Posting Accurate** mengirim penjualan harian ke Accurate per CV |
+| Rene POS / Raptor mengirim (atau diinput ulang) penjualan ke Accurate | **Rasentra Central → Posting Accurate** (antrean posting yang sama dengan SAP) mengirim penjualan harian ke Accurate per CV |
 | Master barang dan harga dikelola di POS lama dan Accurate | Barang tetap berinduk ke **kode barang Accurate**; harga, promo dan resep dikelola di Rasentra Core |
 | Data member tersebar di POS lama | Member masuk **Rasentra CRM** (sudah bisa diimpor sekarang dari menu Impor member outlet) |
 
 Yang tidak berubah: chart of accounts, pajak, pembelian, hutang/piutang, laporan keuangan dan tutup buku tetap dikerjakan tim akuntansi di Accurate Online.
 
-> **Prasyarat teknis.** Rasentra saat ini memposting penjualan ke SAP B1. Untuk CV yang tetap memakai Accurate dibutuhkan modul **Posting Accurate** di Rasentra Central (koneksi API Token per database Accurate sudah tersedia di Rasentra CRM → Accurate Online). Modul ini harus selesai dan lulus uji sebelum langkah 6 (uji paralel).
+> **Cara kerja posting.** Rasentra Central memposting penjualan lewat antrean posting yang sama untuk SAP B1 dan Accurate. CV yang diatur **Pembukuan = Accurate Online** di Rasentra Core → Perusahaan & outlet diposting ke Accurate memakai API Token dan signature secret yang diisi di Rasentra CRM → Accurate Online (satu koneksi untuk tarik data pelanggan dan untuk posting). Posting tetap harus lulus uji pada langkah 6 (uji paralel) sebelum go-live.
 
 ## Ringkasan langkah dan durasi
 
@@ -55,9 +55,9 @@ Dikerjakan tim akuntansi CV di database Accurate masing-masing:
 
 ## 3. Siapkan master di Rasentra Core
 
-1. **Perusahaan**: CV sudah ada di Rasentra CRM → Perusahaan & cabang. Tandai CV ini memakai pembukuan Accurate (bukan SAP) dan hubungkan database Accurate-nya.
+1. **Perusahaan**: CV sudah ada di Rasentra CRM → Perusahaan & cabang. Di Rasentra Core → Perusahaan & outlet, set **Pembukuan = Accurate Online**, lalu isi API Token dan signature secret database Accurate-nya di Rasentra CRM → Accurate Online.
 2. **Outlet & lokasi**: buat outlet di Rasentra Core → Perusahaan & outlet (kode, zona waktu, retail/restoran, cooking fee), lalu lokasi etalase, chiller, gudang, dapur dan karantina.
-3. **Mapping Accurate** per CV: kode barang Rasentra ↔ itemNo Accurate, outlet ↔ gudang dan departemen, metode bayar ↔ akun kas/bank, pajak, pelanggan umum.
+3. **Mapping Accurate** per CV di menu **Mapping SAP** (satu tabel untuk SAP dan Accurate): kode barang Rasentra ↔ itemNo Accurate, outlet ↔ gudang dan departemen, metode bayar ↔ akun kas/bank, pajak, pelanggan umum.
 4. **Produk & harga**: tarik daftar barang dari Accurate sebagai induk, lengkapi barcode, PLU timbangan, kategori dan station dapur, lalu terbitkan **versi harga** per outlet (maker-checker).
 5. **Menu restoran & resep**: buat menu, modifier dan resep (untuk pemotongan stok bahan), disetujui merchandising.
 6. **Promo** yang masih berjalan di POS lama: buat ulang di Promotion Designer dengan periode yang sama.
@@ -103,7 +103,7 @@ Dikerjakan tim akuntansi CV di database Accurate masing-masing:
 ## 8. Setelah go-live
 
 1. **Rekonsiliasi harian** di Rasentra Central (tutup hari) dan cocokkan dengan Accurate: omzet, kas/bank, pajak.
-2. Pantau **dokumen posting Accurate** yang gagal dan selesaikan dari antrean masalah integrasi.
+2. Pantau posting Accurate di **Status Central** dan **Antrean posting**; dokumen gagal diperbaiki mapping-nya lalu di-retry dari sana.
 3. Retur atas penjualan lama (sebelum cut-over) diproses sesuai kebijakan: dicatat manual di Accurate sebagai retur, bukan di Rasentra.
 4. Setelah 2 minggu tanpa selisih, hentikan langganan POS lama dan arsipkan ekspor datanya.
 
