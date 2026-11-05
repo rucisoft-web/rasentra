@@ -73,6 +73,7 @@ class CoreSeeder extends Seeder
         $this->postToSap();
         $this->pendingApprovals();
         $this->centralState();
+        $this->call(CrmSeeder::class);
     }
 
     private function users(): void
@@ -81,6 +82,7 @@ class CoreSeeder extends Seeder
             'admin' => ['Rahman Hidayat', 'admin@rasentra.test', 'admin'],
             'merch' => ['Laras Wulandari', 'merch@rasentra.test', 'hq_merch'],
             'finance' => ['Fajar Nugroho', 'finance@rasentra.test', 'hq_finance'],
+            'crm' => ['Nadia Putri', 'crm@rasentra.test', 'hq_crm'],
         ] as $key => [$name, $email, $role]) {
             $this->hq[$key] = User::create([
                 'name' => $name, 'email' => $email, 'password' => Hash::make('password'), 'role' => $role,

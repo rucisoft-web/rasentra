@@ -2,6 +2,7 @@
 
 namespace App\Domain\Core;
 
+use App\Domain\Crm\CustomerDirectory;
 use App\Models\InboxEvent;
 use App\Support\Decimal;
 use Illuminate\Support\Carbon;
@@ -75,6 +76,9 @@ final class SalesProjector
                 }
                 DB::table('hq_order_payments')->insert(['hq_order_id' => $o['id'], 'method' => $p['method'], 'amount' => $p['amount']]);
             }
+
+            // Rasentra CRM: pesanan dengan nama + HP pemesan masuk ke database pelanggan.
+            app(CustomerDirectory::class)->recordPosOrder($o, $event->outlet_id);
         });
     }
 

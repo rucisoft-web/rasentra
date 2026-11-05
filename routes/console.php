@@ -2,6 +2,7 @@
 
 use App\Domain\Core\SalesProjector;
 use App\Domain\Core\StockProjector;
+use App\Domain\Integration\Accurate\AccurateSync;
 use App\Domain\Integration\Sap\SapHealth;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Integration\Xml\NmexmlImporter;
@@ -11,6 +12,7 @@ use App\Domain\Sync\DayCloser;
 use App\Domain\Sync\DayReconciler;
 use App\Domain\Sync\HeartbeatSender;
 use App\Jobs\DispatchOutbox;
+use App\Models\Crm\AccurateConnection;
 use App\Models\DailyReconciliation;
 use App\Models\Outlet;
 use App\Support\SystemState;
@@ -38,6 +40,7 @@ Schedule::command('rasentra:backup')->dailyAt('02:00')->timezone(config('rasentr
 Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->when($central);
 Schedule::command('rasentra:sap-check')->everyFifteenMinutes()->when($central);
 Schedule::command('rasentra:reconcile')->hourly()->when($central);
+Schedule::command('rasentra:crm-accurate-sync')->hourlyAt(20)->withoutOverlapping()->when($central);
 
 // Server demo: data contoh dibangun ulang setiap hari agar tamu berikutnya mulai dari kondisi bersih.
 Schedule::command('rasentra:demo-reset --force')->dailyAt(config('rasentra.demo.reset_at'))
@@ -116,6 +119,20 @@ Artisan::command('rasentra:rebuild-sales', function (SalesProjector $projector, 
     $this->info('Proyeksi penjualan dibangun ulang dari '.$projector->rebuild().' event inbox.');
     $this->info('Proyeksi penyesuaian stok dibangun ulang dari '.$stock->rebuild().' event inbox.');
 })->purpose('Bangun ulang tabel laporan penjualan dan stok Rasentra Core dari inbox');
+
+Artisan::command('rasentra:crm-accurate-sync', function (AccurateSync $sync) {
+    foreach (AccurateConnection::with('businessUnit')->get() as $conn) {
+        if (! AccurateSync::configured($conn)) {
+            continue;
+        }
+        try {
+            $s = $sync->sync($conn);
+            $this->info("{$conn->businessUnit?->code}: {$s['customers']} pelanggan, {$s['invoices']} faktur baru");
+        } catch (Throwable $e) {
+            $this->error("{$conn->businessUnit?->code}: {$e->getMessage()}");
+        }
+    }
+})->purpose('Rasentra CRM: tarik pelanggan dan faktur penjualan dari Accurate Online');
 
 Artisan::command('rasentra:backup', function (Backup $backup) {
     $result = $backup->run();

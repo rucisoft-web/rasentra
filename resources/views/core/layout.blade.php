@@ -23,6 +23,14 @@
                 ['monitoring', 'core.sap-mappings.index', 'Mapping SAP'],
             ],
         ],
+        'Rasentra CRM' => [
+            '' => [
+                ['crm', 'core.crm.customers.index', 'Pelanggan'],
+                ['crm', 'core.crm.segments.index', 'Segmen'],
+                ['crm', 'core.crm.imports.index', 'Impor member outlet'],
+                ['crm', 'core.crm.accurate.index', 'Accurate Online'],
+            ],
+        ],
         'Rasentra Core' => [
             'Ringkasan' => [
                 ['dashboard', 'core.dashboard', 'Dashboard'],

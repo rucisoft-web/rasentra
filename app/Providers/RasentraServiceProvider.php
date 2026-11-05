@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\Integration\Accurate\AccurateClient;
+use App\Domain\Integration\Accurate\HttpAccurateClient;
 use App\Domain\Integration\Sap\FakeSapClient;
 use App\Domain\Integration\Sap\SapClient;
 use App\Domain\Integration\Sap\SapClientFactory;
@@ -19,6 +21,8 @@ class RasentraServiceProvider extends ServiceProvider
         // Klien bawaan saat instance SAP belum dikonfigurasi (pengembangan dan uji).
         $this->app->singleton(SapClient::class, fn () => new FakeSapClient);
         $this->app->singleton(SapClientFactory::class, fn () => new SapClientFactory);
+        // Rasentra CRM: Accurate Online lewat API Token per perusahaan (diatur di konsol CRM).
+        $this->app->singleton(AccurateClient::class, fn () => new HttpAccurateClient);
     }
 
     public function boot(): void
