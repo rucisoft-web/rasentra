@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Crm\AccurateConnection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Perusahaan (CV) di dalam Indoguna Group. Setiap CV membukukan ke sistemnya sendiri:
@@ -36,5 +38,28 @@ class BusinessUnit extends Model
     public function usesAccurate(): bool
     {
         return $this->accounting_system === 'accurate';
+    }
+
+    /**
+     * Kredensial Accurate untuk posting. Koneksi yang sudah dibuat di Rasentra CRM → Accurate Online
+     * dipakai lebih dulu agar satu CV tidak punya dua API Token; kolom di perusahaan hanya cadangan.
+     *
+     * @return array{token: ?string, secret: ?string, host: ?string}
+     */
+    public function accurateCredentials(): array
+    {
+        $conn = $this->id && Schema::hasTable('crm_accurate_connections') ? AccurateConnection::where('business_unit_id', $this->id)->first() : null;
+        if ($conn && filled($conn->api_token) && filled($conn->signature_secret)) {
+            return ['token' => $conn->api_token, 'secret' => $conn->signature_secret, 'host' => $this->accurate_host];
+        }
+
+        return ['token' => $this->accurate_api_token, 'secret' => $this->accurate_signature_secret, 'host' => $this->accurate_host];
+    }
+
+    public function hasAccurateCredentials(): bool
+    {
+        $c = $this->accurateCredentials();
+
+        return filled($c['token']) && filled($c['secret']);
     }
 }

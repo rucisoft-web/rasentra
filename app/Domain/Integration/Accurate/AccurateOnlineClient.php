@@ -24,7 +24,8 @@ use RuntimeException;
  * "sudah ada?" sebelum posting ulang cukup dengan mencari nomor tersebut.
  *
  * Autentikasi memakai API Token Accurate: header Authorization Bearer, X-Api-Timestamp dan
- * X-Api-Signature (HMAC-SHA256 timestamp dengan Signature Secret, base64).
+ * X-Api-Signature (HMAC-SHA256 timestamp dengan Signature Secret, base64). Kredensial diambil dari
+ * koneksi Rasentra CRM → Accurate Online untuk CV tersebut, sehingga satu API Token dipakai bersama.
  */
 final class AccurateOnlineClient implements SapClient
 {
@@ -40,7 +41,15 @@ final class AccurateOnlineClient implements SapClient
         'Invoices' => 'RSI', 'IncomingPayments' => 'RSR', 'CreditNotes' => 'RRT', 'InventoryGenExits' => 'RAO', 'InventoryGenEntries' => 'RAI',
     ];
 
+    private ?array $credentials = null;
+
     public function __construct(private readonly BusinessUnit $company) {}
+
+    /** Token & secret dari koneksi Rasentra CRM → Accurate Online bila ada (lihat BusinessUnit::accurateCredentials). */
+    private function credentials(): array
+    {
+        return $this->credentials ??= $this->company->accurateCredentials();
+    }
 
     /** Nomor dokumen Accurate yang stabil untuk satu sumber POS. */
     public static function number(string $object, string $sourceRef): string
@@ -209,17 +218,17 @@ final class AccurateOnlineClient implements SapClient
         $timestamp = now('Asia/Jakarta')->format('d/m/Y H:i:s');
 
         return Http::timeout(30)->acceptJson()->withHeaders([
-            'Authorization' => 'Bearer '.$this->company->accurate_api_token,
+            'Authorization' => 'Bearer '.$this->credentials()['token'],
             'X-Api-Timestamp' => $timestamp,
-            'X-Api-Signature' => base64_encode(hash_hmac('sha256', $timestamp, (string) $this->company->accurate_signature_secret, true)),
+            'X-Api-Signature' => base64_encode(hash_hmac('sha256', $timestamp, (string) $this->credentials()['secret'], true)),
         ]);
     }
 
     /** Host database Accurate (mis. https://zeus.accurate.id) dari token; disimpan di cache. */
     private function host(): string
     {
-        if (filled($this->company->accurate_host)) {
-            return rtrim($this->company->accurate_host, '/');
+        if (filled($this->credentials()['host'])) {
+            return rtrim($this->credentials()['host'], '/');
         }
 
         return Cache::remember('accurate:host:'.$this->company->id, now()->addHours(12), function () {

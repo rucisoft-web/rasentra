@@ -26,7 +26,7 @@ final class SapClientFactory
         // Perusahaan yang membukukan di Accurate Online memakai penerjemah dokumen ke API Accurate.
         $company = BusinessUnit::where('sap_company_db', $companyDb)->first();
         if ($company?->usesAccurate()) {
-            if (config('rasentra.profile') !== 'central' || blank($company->accurate_api_token) || blank($company->accurate_signature_secret)) {
+            if (config('rasentra.profile') !== 'central' || ! $company->hasAccurateCredentials()) {
                 return app(SapClient::class);
             }
 

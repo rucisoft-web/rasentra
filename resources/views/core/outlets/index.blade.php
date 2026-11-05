@@ -12,6 +12,9 @@
         <label class="f"><span>Pembukuan</span><select name="accounting_system">@foreach (\App\Models\BusinessUnit::ACCOUNTING as $k => $v)<option value="{{ $k }}" @selected(($c->accounting_system ?? 'sap_b1') === $k)>{{ $v }}</option>@endforeach</select></label>
         <label class="f"><span>Kode database (SAP / Accurate)</span><input name="sap_company_db" class="mono" value="{{ $c->sap_company_db }}" required></label>
         @if ($c->usesAccurate())
+          @if (\Illuminate\Support\Facades\Schema::hasTable('crm_accurate_connections') && \App\Models\Crm\AccurateConnection::where('business_unit_id', $c->id)->whereNotNull('api_token')->exists())
+            <p class="hint" style="grid-column:1/-1">Posting memakai API Token dari Rasentra CRM → Accurate Online untuk CV ini. Kolom di bawah hanya cadangan.</p>
+          @endif
           <label class="f"><span>Accurate API Token</span><input name="accurate_api_token" type="password" autocomplete="off" placeholder="{{ $c->accurate_api_token ? 'tersimpan, isi untuk mengganti' : 'belum diisi' }}"></label>
           <label class="f"><span>Accurate Signature Secret</span><input name="accurate_signature_secret" type="password" autocomplete="off" placeholder="{{ $c->accurate_signature_secret ? 'tersimpan, isi untuk mengganti' : 'belum diisi' }}"></label>
           <label class="f"><span>Host Accurate (opsional)</span><input name="accurate_host" value="{{ $c->accurate_host }}" placeholder="otomatis dari token"></label>

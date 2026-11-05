@@ -12,6 +12,8 @@ use App\Domain\Sales\TableService;
 use App\Domain\Settings\Settings;
 use App\Domain\Sync\PublicationApplier;
 use App\Domain\Sync\Publications;
+use App\Models\BusinessUnit;
+use App\Models\Crm\AccurateConnection;
 use App\Models\Delivery;
 use App\Models\DiningTable;
 use App\Models\KitchenTicket;
@@ -252,5 +254,16 @@ class OperationsTest extends AcceptanceTestCase
         $this->actingAs($this->cashier)->postJson("/pos/api/orders/{$order->id}/member", ['member_id' => $m['id']])->assertOk()->assertJsonPath('order.crm_customer_id', $m['id']);
         $chef = User::where('email', 'chef@uji.test')->first();
         $this->actingAs($chef)->postJson('/pos/api/members', ['name' => 'X', 'phone' => '0812999900010'])->assertForbidden();
+    }
+
+    public function test_accurate_posting_reuses_the_crm_connection_token(): void
+    {
+        $bu = BusinessUnit::query()->firstOrFail();
+        $bu->update(['accounting_system' => 'accurate']);
+        $this->assertFalse($bu->fresh()->hasAccurateCredentials());
+
+        AccurateConnection::create(['business_unit_id' => $bu->id, 'api_token' => 'crm-tok', 'signature_secret' => 'crm-sec']);
+        $creds = $bu->fresh()->accurateCredentials();
+        $this->assertSame(['crm-tok', 'crm-sec'], [$creds['token'], $creds['secret']]);
     }
 }
