@@ -43,6 +43,7 @@
         'Rasentra Core' => [
             'Ringkasan' => [
                 ['dashboard', 'core.dashboard', 'Dashboard'],
+                ['dashboard', 'core.migration-guide', 'Panduan migrasi POS'],
             ],
             'Master' => [
                 ['master', 'core.outlets.index', 'Perusahaan & outlet'],

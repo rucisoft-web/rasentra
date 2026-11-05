@@ -183,4 +183,11 @@ class CrmTest extends AcceptanceTestCase
         $this->actingAs($this->crm)->put(route('core.crm.customers.update', $tidur), ['name' => 'Tono Lama', 'wa_status' => 'opted_out'])->assertSessionHas('ok');
         $this->assertSame(0, SegmentQuery::apply(Customer::query(), $segment->rules)->count(), 'opt-out keluar dari segmen promosi');
     }
+
+    public function test_pos_migration_guide_is_available_to_hq(): void
+    {
+        $this->actingAs($this->crm)->get(route('core.migration-guide'))->assertOk()
+            ->assertSee('Catatan khusus Rene POS')->assertSee('Catatan khusus Raptor')->assertSee('Accurate')
+            ->assertSee('Panduan migrasi POS');
+    }
 }

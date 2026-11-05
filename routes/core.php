@@ -164,6 +164,8 @@ Route::prefix('core')->name('core.')->group(function () {
             Route::post('accurate/{company}/sync', [Core\Crm\AccurateController::class, 'sync'])->middleware('throttle:6,1')->name('accurate.sync');
         });
 
+        Route::get('panduan-migrasi-pos', [Core\MigrationGuideController::class, 'show'])->middleware('core:dashboard')->name('migration-guide');
+
         Route::get('audit', [Core\AuditController::class, 'index'])->middleware('core:audit')->name('audit');
     });
 });
