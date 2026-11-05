@@ -29,7 +29,20 @@ Catatan verifikasi: format endpoint Accurate (`customer/list.json`, `sales-invoi
 
 Media yang diunggah disimpan di disk `public` (`php artisan storage:link` di server Central) karena Meta mengambil media dari URL publik.
 
+## Tahap 3: workflow otomatis (sudah ada)
+
+Menu **Rasentra CRM → WhatsApp → Workflow otomatis** (`crm_workflows`, `crm_workflow_runs`). Satu workflow = satu pemicu + maksimal 8 langkah berurutan. Workflow baru tersimpan nonaktif; mematikan workflow membatalkan run yang sedang menunggu.
+
+| Pemicu | Kapan |
+|---|---|
+| Kata kunci | Pesan WhatsApp masuk berisi salah satu kata (dipisah koma, cocok per kata). STOP/START dan kata kunci komunitas diproses lebih dulu. |
+| Pelanggan baru | Tercatat dari chat WhatsApp, transaksi POS, atau input manual; bisa dibatasi per cabang. Impor file dan tarikan Accurate **tidak** memicu agar tidak ada kiriman massal tak sengaja. |
+| Bergabung ke komunitas | Lewat kata kunci WhatsApp; bisa dibatasi satu komunitas. |
+| Setelah belanja | Transaksi POS Rasentra atau faktur Accurate (CV Rene POS/Raptor) bertanggal kemarin/hari ini, dengan minimal nilai opsional. Riwayat lama yang ditarik ulang tidak memicu. |
+| Ulang tahun / tidak belanja N hari | Dipindai sekali sehari mulai pukul 09.00 WIB (`rasentra:crm-workflows`, tiap menit). Pelanggan opt-out dilewati. |
+
+Langkah: kirim template (MARKETING hanya ke opt-in, parameter `{name}`/`{first_name}`), kirim teks (hanya dalam jendela 24 jam), tunggu N jam, beri tag, masukkan ke komunitas, serahkan percakapan ke CS. Semua pemicu bisa dibatasi ke satu segmen, dan jeda ulang per pelanggan mencegah pesan berulang. Halaman detail menampilkan riwayat run dan catatan tiap langkah, serta tombol uji coba ke satu nomor.
+
 ## Tahap berikutnya
 
-3. **Workflow & komunitas**: pemicu (pesan masuk berkata kunci, member baru, ulang tahun, tidak belanja N hari) → syarat → aksi (kirim template, beri tag, serahkan ke CS, tunggu); komunitas per outlet/minat.
 4. **AI (Claude API)**: knowledge base (FAQ, katalog, promo aktif dari Promotion Designer) dengan pencarian teks MySQL, asisten chat yang menyarankan/mengirim balasan dengan alih ke CS, dan skor lead dari percakapan.

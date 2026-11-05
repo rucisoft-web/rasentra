@@ -148,6 +148,15 @@ Route::prefix('core')->name('core.')->group(function () {
             Route::post('campaigns/{campaign}/launch', [Core\Crm\CampaignController::class, 'launch'])->name('campaigns.launch');
             Route::post('campaigns/{campaign}/cancel', [Core\Crm\CampaignController::class, 'cancel'])->name('campaigns.cancel');
 
+            Route::get('workflows', [Core\Crm\WorkflowController::class, 'index'])->name('workflows.index');
+            Route::get('workflows/create', [Core\Crm\WorkflowController::class, 'create'])->name('workflows.create');
+            Route::post('workflows', [Core\Crm\WorkflowController::class, 'store'])->name('workflows.store');
+            Route::get('workflows/{workflow}', [Core\Crm\WorkflowController::class, 'show'])->name('workflows.show');
+            Route::get('workflows/{workflow}/edit', [Core\Crm\WorkflowController::class, 'edit'])->name('workflows.edit');
+            Route::put('workflows/{workflow}', [Core\Crm\WorkflowController::class, 'update'])->name('workflows.update');
+            Route::post('workflows/{workflow}/toggle', [Core\Crm\WorkflowController::class, 'toggle'])->name('workflows.toggle');
+            Route::post('workflows/{workflow}/test', [Core\Crm\WorkflowController::class, 'test'])->middleware('throttle:10,1')->name('workflows.test');
+
             Route::get('whatsapp', [Core\Crm\WhatsAppController::class, 'index'])->name('whatsapp.index');
             Route::post('whatsapp', [Core\Crm\WhatsAppController::class, 'store'])->name('whatsapp.store');
             Route::put('whatsapp/{channel}', [Core\Crm\WhatsAppController::class, 'update'])->name('whatsapp.update');

@@ -33,6 +33,7 @@
                 ['crm', 'core.crm.inbox.index', 'Inbox'],
                 ['crm', 'core.crm.communities.index', 'Komunitas'],
                 ['crm', 'core.crm.campaigns.index', 'Kampanye & iklan'],
+                ['crm', 'core.crm.workflows.index', 'Workflow otomatis'],
                 ['crm', 'core.crm.whatsapp.index', 'Nomor & template'],
             ],
             'Integrasi' => [

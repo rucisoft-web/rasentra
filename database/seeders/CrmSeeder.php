@@ -9,6 +9,7 @@ use App\Models\Crm\Community;
 use App\Models\Crm\Customer;
 use App\Models\Crm\Segment;
 use App\Models\Crm\Tag;
+use App\Models\Crm\Workflow;
 use App\Models\Outlet;
 use Illuminate\Database\Seeder;
 
@@ -76,6 +77,23 @@ class CrmSeeder extends Seeder
         ] as [$name, $desc, $rules]) {
             Segment::firstOrCreate(['name' => $name], ['description' => $desc, 'rules' => $rules]);
         }
+
+        // Contoh workflow (nonaktif): staf CRM tinggal memilih template yang sudah disetujui Meta lalu mengaktifkan.
+        Workflow::firstOrCreate(['name' => 'Balas otomatis MENU'], [
+            'trigger' => 'keyword', 'trigger_config' => ['keywords' => 'menu, daftar menu, harga'], 'cooldown_days' => 0,
+            'steps' => [
+                ['type' => 'send_text', 'body' => 'Halo {first_name}! Menu lengkap dan harga terbaru ada di https://indoguna.co.id/menu. Balas RESERVASI bila ingin pesan meja, CS kami akan membantu.'],
+                ['type' => 'add_tag', 'tag_id' => $tags['Pecinta steak']],
+            ],
+        ]);
+        Workflow::firstOrCreate(['name' => 'Sambut anggota komunitas, serahkan ke CS'], [
+            'trigger' => 'joined_community', 'trigger_config' => [], 'cooldown_days' => 30,
+            'steps' => [
+                ['type' => 'wait', 'hours' => 2],
+                ['type' => 'send_text', 'body' => 'Terima kasih sudah bergabung, {first_name}. Ada menu favorit yang ingin Anda coba minggu ini? Balas saja pesan ini.'],
+                ['type' => 'assign', 'user_id' => null],
+            ],
+        ]);
     }
 
     /** CV grup yang masih memakai Accurate Online + Rene POS/Raptor: masuk CRM lewat Accurate dan impor member. */

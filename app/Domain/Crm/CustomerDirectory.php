@@ -16,13 +16,15 @@ use Illuminate\Support\Facades\DB;
  */
 final class CustomerDirectory
 {
+    public const BULK_SOURCES = ['import', 'accurate'];
+
     /**
      * @param  array{name?: ?string, email?: ?string, birth_date?: ?string, city?: ?string, member_code?: ?string, joined_on?: ?string}  $data
      * @return array{0: Customer, 1: bool} pelanggan dan apakah baru dibuat
      */
     public function upsert(string $phone, array $data, ?int $branchId, string $source): array
     {
-        return DB::transaction(function () use ($phone, $data, $branchId, $source) {
+        $result = DB::transaction(function () use ($phone, $data, $branchId, $source) {
             $customer = Customer::where('phone', $phone)->lockForUpdate()->first();
             $created = $customer === null;
             $name = trim((string) ($data['name'] ?? ''));
@@ -56,6 +58,13 @@ final class CustomerDirectory
 
             return [$customer, $created];
         });
+
+        // Impor massal dan tarikan Accurate tidak memicu workflow agar tidak ada kiriman ribuan pesan sekaligus.
+        if ($result[1] && ! in_array($source, self::BULK_SOURCES, true)) {
+            app(WorkflowEngine::class)->fire('new_customer', $result[0], ['crm_branch_id' => $branchId]);
+        }
+
+        return $result;
     }
 
     /** Catat satu transaksi sumber (idempoten per source + source_ref) lalu hitung ulang ringkasan belanja. */
@@ -74,6 +83,10 @@ final class CustomerDirectory
         );
         if ($purchase->wasRecentlyCreated) {
             $this->refreshStats($customer);
+            // Hanya transaksi baru (bukan riwayat lama yang ditarik ulang) yang memicu workflow "setelah belanja".
+            if ($purchase->purchased_on->gte(now()->subDay()->startOfDay())) {
+                app(WorkflowEngine::class)->fire('purchase', $customer, ['amount' => (float) $amount]);
+            }
         }
 
         return $purchase->wasRecentlyCreated;
