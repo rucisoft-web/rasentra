@@ -9,7 +9,7 @@
     <label class="f"><span>Nama segmen</span><input name="name" value="{{ old('name', $segment->name) }}" required maxlength="80"></label>
     <label class="f"><span>Keterangan</span><input name="description" value="{{ old('description', $segment->description) }}" maxlength="255"></label>
     <div class="f wide"><span>Member outlet (salah satu)</span>
-      <div>@foreach ($outlets as $o)<label class="check" style="display:inline-flex;margin-right:12px"><input type="checkbox" name="outlet_ids[]" value="{{ $o->id }}" @checked(in_array($o->id, array_map('intval', (array) $r('outlet_ids', []))))> {{ $o->code }} {{ $o->name }}</label>@endforeach</div>
+      <div>@foreach ($outlets as $o)<label class="check" style="display:inline-flex;margin-right:12px"><input type="checkbox" name="branch_ids[]" value="{{ $o->id }}" @checked(in_array($o->id, array_map('intval', (array) $r('branch_ids', []))))> {{ $o->code }} {{ $o->name }}</label>@endforeach</div>
     </div>
     <div class="f wide"><span>Punya tag (salah satu)</span>
       <div>@forelse ($tags as $t)<label class="check" style="display:inline-flex;margin-right:12px"><input type="checkbox" name="tag_ids[]" value="{{ $t->id }}" @checked(in_array($t->id, array_map('intval', (array) $r('tag_ids', []))))> {{ $t->name }}</label>@empty<span class="muted small">Belum ada tag.</span>@endforelse</div>

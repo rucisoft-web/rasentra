@@ -8,7 +8,7 @@ use App\Domain\Integration\Accurate\AccurateSync;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessUnit;
 use App\Models\Crm\AccurateConnection;
-use App\Models\Outlet;
+use App\Models\Crm\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -18,6 +18,7 @@ class AccurateController extends Controller
 {
     public function index(): View
     {
+        Branch::syncFromOutlets();
         $companies = BusinessUnit::orderBy('code')->get();
         $connections = AccurateConnection::whereIn('business_unit_id', $companies->pluck('id'))->get()->keyBy('business_unit_id');
 
@@ -25,7 +26,7 @@ class AccurateController extends Controller
             'title' => 'Integrasi Accurate Online',
             'companies' => $companies,
             'connections' => $connections,
-            'outlets' => Outlet::orderBy('code')->get(['id', 'code', 'name', 'business_unit_id']),
+            'outlets' => Branch::orderBy('code')->get(['id', 'code', 'name', 'business_unit_id']),
         ]);
     }
 
@@ -34,13 +35,13 @@ class AccurateController extends Controller
         $data = $request->validate([
             'api_token' => ['nullable', 'string', 'max:500'],
             'signature_secret' => ['nullable', 'string', 'max:500'],
-            'default_outlet_id' => ['nullable', 'exists:outlets,id'],
+            'default_branch_id' => ['nullable', 'exists:crm_branches,id'],
             'sync_customers' => ['boolean'],
             'sync_invoices' => ['boolean'],
             'clear' => ['boolean'],
         ]);
         $conn = AccurateConnection::firstOrNew(['business_unit_id' => $company->id]);
-        $conn->default_outlet_id = $data['default_outlet_id'] ?? null;
+        $conn->default_branch_id = $data['default_branch_id'] ?? null;
         $conn->sync_customers = (bool) ($data['sync_customers'] ?? false);
         $conn->sync_invoices = (bool) ($data['sync_invoices'] ?? false);
         // Token tidak pernah ditampilkan ulang: kosong berarti tetap memakai yang tersimpan.

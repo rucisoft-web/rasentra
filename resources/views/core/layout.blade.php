@@ -24,10 +24,19 @@
             ],
         ],
         'Rasentra CRM' => [
-            '' => [
+            'Pelanggan' => [
                 ['crm', 'core.crm.customers.index', 'Pelanggan'],
                 ['crm', 'core.crm.segments.index', 'Segmen'],
                 ['crm', 'core.crm.imports.index', 'Impor member outlet'],
+            ],
+            'WhatsApp' => [
+                ['crm', 'core.crm.inbox.index', 'Inbox'],
+                ['crm', 'core.crm.communities.index', 'Komunitas'],
+                ['crm', 'core.crm.campaigns.index', 'Kampanye & iklan'],
+                ['crm', 'core.crm.whatsapp.index', 'Nomor & template'],
+            ],
+            'Integrasi' => [
+                ['crm', 'core.crm.branches.index', 'Perusahaan & cabang'],
                 ['crm', 'core.crm.accurate.index', 'Accurate Online'],
             ],
         ],

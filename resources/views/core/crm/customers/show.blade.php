@@ -3,7 +3,10 @@
 @use('App\Domain\Crm\Phone')
 @use('App\Domain\Crm\SegmentQuery')
 @section('content')
-<p><a href="{{ route('core.crm.customers.index') }}">&larr; Semua pelanggan</a></p>
+<div class="bar"><a href="{{ route('core.crm.customers.index') }}">&larr; Semua pelanggan</a>
+  <form method="post" action="{{ route('core.crm.inbox.start', $customer) }}">@csrf<button class="btn alt sm">Chat WhatsApp</button></form>
+  @if ($customer->communities->isNotEmpty())<span class="small">Komunitas: @foreach ($customer->communities as $cm)<a class="b info" href="{{ route('core.crm.communities.show', $cm) }}">{{ $cm->name }}</a> @endforeach</span>@endif
+</div>
 <div class="grid g4">
   <div class="card kpi"><div class="label">Tahap</div><div class="value" style="font-size:1.2rem">{{ strtok(SegmentQuery::LIFECYCLES[$stage], '(') }}</div><div class="note">{{ SegmentQuery::LIFECYCLES[$stage] }}</div></div>
   <div class="card kpi"><div class="label">Transaksi</div><div class="value">{{ $customer->purchase_count }}</div><div class="note">sejak {{ $customer->first_purchase_on?->translatedFormat('j M Y') ?? '—' }}</div></div>
@@ -43,7 +46,7 @@
       <thead><tr><th>Outlet</th><th>Kode member</th><th>Sumber</th><th>Bergabung</th></tr></thead>
       <tbody>
       @forelse ($customer->memberships as $m)
-        <tr><td>{{ $m->outlet->code }} {{ $m->outlet->name }}</td><td class="mono">{{ $m->member_code ?? '—' }}</td><td>{{ ['import' => 'Impor', 'pos' => 'POS', 'accurate' => 'Accurate', 'manual' => 'Manual'][$m->source] ?? $m->source }}</td><td>{{ $m->joined_on?->translatedFormat('j M Y') ?? '—' }}</td></tr>
+        <tr><td>{{ $m->branch->code }} {{ $m->branch->name }}</td><td class="mono">{{ $m->member_code ?? '—' }}</td><td>{{ ['import' => 'Impor', 'pos' => 'POS', 'accurate' => 'Accurate', 'manual' => 'Manual', 'whatsapp' => 'WhatsApp'][$m->source] ?? $m->source }}</td><td>{{ $m->joined_on?->translatedFormat('j M Y') ?? '—' }}</td></tr>
       @empty
         <tr><td colspan="4" class="muted">Belum terdaftar di outlet mana pun.</td></tr>
       @endforelse
@@ -65,7 +68,7 @@
   <thead><tr><th>Tanggal</th><th>Sumber</th><th>Outlet</th><th>Dokumen</th><th class="n">Nilai</th></tr></thead>
   <tbody>
   @forelse ($purchases as $p)
-    <tr><td>{{ $p->purchased_on->translatedFormat('j M Y') }}</td><td><span class="b {{ $p->source === 'pos' ? 'ok' : 'info' }}">{{ $p->source === 'pos' ? 'POS Rasentra' : 'Accurate' }}</span></td><td>{{ $p->outlet?->code ?? '—' }}</td><td class="mono">{{ $p->doc_no ?? '—' }}</td><td class="n">{{ Fmt::money($p->amount) }}</td></tr>
+    <tr><td>{{ $p->purchased_on->translatedFormat('j M Y') }}</td><td><span class="b {{ $p->source === 'pos' ? 'ok' : 'info' }}">{{ $p->source === 'pos' ? 'POS Rasentra' : 'Accurate' }}</span></td><td>{{ $p->branch?->code ?? '—' }}</td><td class="mono">{{ $p->doc_no ?? '—' }}</td><td class="n">{{ Fmt::money($p->amount) }}</td></tr>
   @empty
     <tr><td colspan="5" class="muted">Belum ada riwayat belanja.</td></tr>
   @endforelse

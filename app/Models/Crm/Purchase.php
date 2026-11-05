@@ -2,7 +2,6 @@
 
 namespace App\Models\Crm;
 
-use App\Models\Outlet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,8 +16,8 @@ class Purchase extends Model
         return ['purchased_on' => 'date', 'amount' => 'decimal:2'];
     }
 
-    public function outlet(): BelongsTo
+    public function branch(): BelongsTo
     {
-        return $this->belongsTo(Outlet::class);
+        return $this->belongsTo(Branch::class, 'crm_branch_id');
     }
 }

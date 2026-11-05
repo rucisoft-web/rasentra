@@ -2,7 +2,6 @@
 
 namespace App\Models\Crm;
 
-use App\Models\Outlet;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,9 +17,9 @@ class Import extends Model
         return ['errors' => 'array'];
     }
 
-    public function outlet(): BelongsTo
+    public function branch(): BelongsTo
     {
-        return $this->belongsTo(Outlet::class);
+        return $this->belongsTo(Branch::class, 'crm_branch_id');
     }
 
     public function user(): BelongsTo

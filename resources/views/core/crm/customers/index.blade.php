@@ -19,7 +19,7 @@
   <label class="f"><span>WhatsApp</span><select name="wa"><option value="">Semua</option><option value="opted_in" @selected(request('wa') === 'opted_in')>Opt-in</option><option value="reachable" @selected(request('wa') === 'reachable')>Belum opt-out</option><option value="opted_out" @selected(request('wa') === 'opted_out')>Opt-out</option></select></label>
   <button class="btn">Tampilkan</button>
   <a class="btn alt" href="{{ route('core.crm.customers.export', request()->query()) }}">Unduh CSV</a>
-  <a class="btn alt" href="{{ route('core.crm.segments.create', array_filter(['outlet_ids' => request('outlet') ? [request('outlet')] : null, 'tag_ids' => request('tag') ? [request('tag')] : null, 'lifecycle' => request('stage'), 'wa' => request('wa')])) }}">Simpan sebagai segmen</a>
+  <a class="btn alt" href="{{ route('core.crm.segments.create', array_filter(['branch_ids' => request('outlet') ? [request('outlet')] : null, 'tag_ids' => request('tag') ? [request('tag')] : null, 'lifecycle' => request('stage'), 'wa' => request('wa')])) }}">Simpan sebagai segmen</a>
 </form>
 
 <div class="tablewrap" style="margin-top:14px">
@@ -30,7 +30,7 @@
     <tr>
       <td><a href="{{ route('core.crm.customers.show', $c) }}">{{ $c->name }}</a>@if($c->city)<div class="muted small">{{ $c->city }}</div>@endif</td>
       <td class="mono">{{ Phone::display($c->phone) }}</td>
-      <td>{{ $c->outlets->pluck('code')->implode(', ') ?: '—' }}</td>
+      <td>{{ $c->branches->pluck('code')->implode(', ') ?: '—' }}</td>
       <td>@foreach ($c->tags as $t)<span class="b info">{{ $t->name }}</span> @endforeach</td>
       <td>@include('core.crm.customers._wa', ['status' => $c->wa_status])</td>
       <td class="n">{{ $c->purchase_count }}</td>
@@ -50,7 +50,7 @@
     @csrf
     <label class="f"><span>Nama</span><input name="name" required maxlength="120"></label>
     <label class="f"><span>No HP</span><input name="phone" required placeholder="0812…"></label>
-    <label class="f"><span>Outlet</span><select name="outlet_id"><option value="">—</option>@foreach ($outlets as $o)<option value="{{ $o->id }}">{{ $o->code }}</option>@endforeach</select></label>
+    <label class="f"><span>Outlet</span><select name="crm_branch_id"><option value="">—</option>@foreach ($outlets as $o)<option value="{{ $o->id }}">{{ $o->code }}</option>@endforeach</select></label>
     <button class="btn alt">Tambah pelanggan</button>
   </form>
   <form class="card bar" method="post" action="{{ route('core.crm.tags.store') }}">

@@ -2,13 +2,12 @@
 
 namespace App\Models\Crm;
 
-use App\Models\Outlet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CustomerOutlet extends Model
+class Membership extends Model
 {
-    protected $table = 'crm_customer_outlets';
+    protected $table = 'crm_memberships';
 
     protected $guarded = [];
 
@@ -17,8 +16,8 @@ class CustomerOutlet extends Model
         return ['joined_on' => 'date'];
     }
 
-    public function outlet(): BelongsTo
+    public function branch(): BelongsTo
     {
-        return $this->belongsTo(Outlet::class);
+        return $this->belongsTo(Branch::class, 'crm_branch_id');
     }
 }

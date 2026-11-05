@@ -62,7 +62,7 @@ final class AccurateSync
                     'email' => filter_var($row['email'] ?? '', FILTER_VALIDATE_EMAIL) ?: null,
                     'city' => $row['city'] ?? null,
                     'member_code' => $row['customer_no'],
-                ], $conn->default_outlet_id, 'accurate');
+                ], $conn->default_branch_id, 'accurate');
                 DB::table('crm_external_ids')->updateOrInsert(
                     ['system' => 'accurate', 'scope_id' => $conn->business_unit_id, 'external_id' => $row['customer_no']],
                     ['crm_customer_id' => $customer->id, 'updated_at' => now(), 'created_at' => now()],
@@ -89,7 +89,7 @@ final class AccurateSync
                     continue;
                 }
                 $customer = Customer::find($customerId);
-                if ($customer && $this->directory->recordPurchase($customer, 'accurate', $conn->business_unit_id.':'.$inv['id'], $inv['date'], $inv['amount'], $conn->default_outlet_id, $conn->business_unit_id, $inv['number'])) {
+                if ($customer && $this->directory->recordPurchase($customer, 'accurate', $conn->business_unit_id.':'.$inv['id'], $inv['date'], $inv['amount'], $conn->default_branch_id, $conn->business_unit_id, $inv['number'])) {
                     $summary['invoices']++;
                 }
             }

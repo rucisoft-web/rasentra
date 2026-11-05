@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Core\Crm;
 use App\Domain\Audit\Audit;
 use App\Domain\Crm\MemberImporter;
 use App\Http\Controllers\Controller;
+use App\Models\Crm\Branch;
 use App\Models\Crm\Import;
 use App\Models\Crm\Tag;
-use App\Models\Outlet;
 use App\Support\DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,10 +19,12 @@ class ImportController extends Controller
 {
     public function index(): View
     {
+        Branch::syncFromOutlets();
+
         return view('core.crm.imports.index', [
             'title' => 'Impor member outlet',
             'imports' => Import::with(['outlet:id,code,name', 'user:id,name'])->latest()->paginate(30),
-            'outlets' => Outlet::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
+            'outlets' => Branch::where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
             'tags' => Tag::orderBy('name')->get(),
         ]);
     }
@@ -30,13 +32,13 @@ class ImportController extends Controller
     public function store(Request $request, MemberImporter $importer): RedirectResponse
     {
         $data = $request->validate([
-            'outlet_id' => ['required', 'exists:outlets,id'],
+            'crm_branch_id' => ['required', 'exists:crm_branches,id'],
             'tag_id' => ['nullable', 'exists:crm_tags,id'],
             'file' => ['required', 'file', 'max:20480', 'mimes:xlsx,csv,txt'],
         ]);
         $file = $data['file'];
         try {
-            $import = $importer->import($file->getRealPath(), $file->getClientOriginalName(), (int) $data['outlet_id'], $request->user()->id, $data['tag_id'] ?? null);
+            $import = $importer->import($file->getRealPath(), $file->getClientOriginalName(), (int) $data['crm_branch_id'], $request->user()->id, $data['tag_id'] ?? null);
         } catch (DomainException $e) {
             return back()->withInput()->withErrors(['file' => $e->getMessage()]);
         }
@@ -48,7 +50,7 @@ class ImportController extends Controller
 
     public function show(Import $import): View
     {
-        return view('core.crm.imports.show', ['title' => "Impor {$import->file_name}", 'import' => $import->load('outlet', 'user')]);
+        return view('core.crm.imports.show', ['title' => "Impor {$import->file_name}", 'import' => $import->load('branch', 'user')]);
     }
 
     public function template(): StreamedResponse

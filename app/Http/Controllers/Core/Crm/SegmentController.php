@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Core\Crm;
 use App\Domain\Audit\Audit;
 use App\Domain\Crm\SegmentQuery;
 use App\Http\Controllers\Controller;
+use App\Models\Crm\Branch;
 use App\Models\Crm\Customer;
 use App\Models\Crm\Segment;
 use App\Models\Crm\Tag;
-use App\Models\Outlet;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,7 +27,7 @@ class SegmentController extends Controller
                 'segment' => $s,
                 'count' => SegmentQuery::apply(Customer::query(), $s->rules)->count(),
             ]),
-            'outlets' => Outlet::pluck('code', 'id')->all(),
+            'outlets' => Branch::pluck('code', 'id')->all(),
             'tags' => Tag::pluck('name', 'id')->all(),
         ]);
     }
@@ -69,12 +69,14 @@ class SegmentController extends Controller
 
     private function form(Segment $segment): View
     {
+        Branch::syncFromOutlets();
+
         return view('core.crm.segments.form', [
             'title' => $segment->exists ? "Ubah segmen {$segment->name}" : 'Segmen baru',
             'segment' => $segment,
             'rules' => $segment->rules ?? [],
             'preview' => $segment->exists || $segment->rules ? SegmentQuery::apply(Customer::query(), $segment->rules ?? [])->count() : null,
-            'outlets' => Outlet::orderBy('code')->get(['id', 'code', 'name']),
+            'outlets' => Branch::orderBy('code')->get(['id', 'code', 'name']),
             'tags' => Tag::orderBy('name')->get(),
         ]);
     }
@@ -84,7 +86,7 @@ class SegmentController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:80', Rule::unique('crm_segments', 'name')->ignore($segment?->id)],
             'description' => ['nullable', 'string', 'max:255'],
-            'outlet_ids' => ['array'], 'outlet_ids.*' => ['integer', 'exists:outlets,id'],
+            'branch_ids' => ['array'], 'branch_ids.*' => ['integer', 'exists:crm_branches,id'],
             'tag_ids' => ['array'], 'tag_ids.*' => ['integer', 'exists:crm_tags,id'],
             'lifecycle' => ['nullable', Rule::in(array_keys(SegmentQuery::LIFECYCLES))],
             'wa' => ['nullable', Rule::in(['opted_in', 'reachable', 'opted_out'])],

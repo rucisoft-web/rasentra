@@ -8,6 +8,7 @@ use App\Domain\Integration\Accurate\FakeAccurateClient;
 use App\Domain\Sync\InboxReceiver;
 use App\Models\BusinessUnit;
 use App\Models\Crm\AccurateConnection;
+use App\Models\Crm\Branch;
 use App\Models\Crm\Customer;
 use App\Models\Crm\Import;
 use App\Models\Crm\Segment;
@@ -25,10 +26,13 @@ class CrmTest extends AcceptanceTestCase
 {
     private User $crm;
 
+    private Branch $branch;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->crm = User::create(['name' => 'CS Pusat', 'email' => 'crm@hq.test', 'password' => Hash::make('rahasia'), 'role' => 'hq_crm', 'is_active' => true]);
+        $this->branch = Branch::forOutlet($this->outlet->id);
     }
 
     private function csv(string $content, string $name = 'member.csv'): UploadedFile
@@ -47,12 +51,12 @@ class CrmTest extends AcceptanceTestCase
 
     public function test_import_members_per_outlet_merges_duplicates_across_outlets(): void
     {
-        $other = Outlet::where('id', '!=', $this->outlet->id)->first()
-            ?? Outlet::create(['business_unit_id' => $this->outlet->business_unit_id, 'region_id' => $this->outlet->region_id, 'code' => 'UJ2', 'name' => 'Outlet Dua']);
+        // Cabang CV lain yang memakai Rene POS (bukan outlet Rasentra).
+        $other = Branch::create(['business_unit_id' => $this->outlet->business_unit_id, 'code' => 'MKS-01', 'name' => 'Outlet Makassar', 'pos_system' => 'rene']);
         $vip = Tag::create(['name' => 'VIP']);
 
         $first = "Kode Member;Nama;No HP;Tanggal Lahir;Kota\nM-1;Budi Santoso;0812-3456-7890;17/08/1985;Surakarta\nM-2;Sari;+62 813 1111 2222;;\nM-3;Rusak;12345;;\nM-4;Sari lagi;081311112222;;\n";
-        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['outlet_id' => $this->outlet->id, 'tag_id' => $vip->id, 'file' => $this->csv($first)])
+        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['crm_branch_id' => $this->branch->id, 'tag_id' => $vip->id, 'file' => $this->csv($first)])
             ->assertRedirect()->assertSessionHas('ok');
         $this->assertSame(2, Customer::count());
         $budi = Customer::where('phone', '6281234567890')->firstOrFail();
@@ -64,19 +68,19 @@ class CrmTest extends AcceptanceTestCase
 
         // Outlet lain mengimpor nomor yang sama dalam format berbeda: tetap satu pelanggan, dua keanggotaan.
         $second = "nama,whatsapp,email\nBudi S.,6281234567890,budi@contoh.id\nAni,0857 0000 1111,\n";
-        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['outlet_id' => $other->id, 'file' => $this->csv($second)])->assertRedirect();
+        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['crm_branch_id' => $other->id, 'file' => $this->csv($second)])->assertRedirect();
         $this->assertSame(3, Customer::count());
         $budi->refresh();
         $this->assertSame('Budi Santoso', $budi->name, 'nama lama tidak ditimpa');
         $this->assertSame('budi@contoh.id', $budi->email, 'data kosong dilengkapi');
-        $this->assertEqualsCanonicalizing([$this->outlet->id, $other->id], $budi->memberships()->pluck('outlet_id')->all());
-        $this->assertSame('M-1', $budi->memberships()->where('outlet_id', $this->outlet->id)->value('member_code'));
+        $this->assertEqualsCanonicalizing([$this->branch->id, $other->id], $budi->memberships()->pluck('crm_branch_id')->all());
+        $this->assertSame('M-1', $budi->memberships()->where('crm_branch_id', $this->branch->id)->value('member_code'));
 
         $this->actingAs($this->crm)->get(route('core.crm.customers.index', ['outlet' => $other->id]))->assertOk()->assertSee('Budi Santoso')->assertDontSee('Sari');
         $this->actingAs($this->crm)->get(route('core.crm.customers.show', $budi))->assertOk()->assertSee('M-1');
         $this->actingAs($this->crm)->get(route('core.crm.imports.show', $import))->assertOk()->assertSee('Nomor HP tidak valid');
 
-        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['outlet_id' => $this->outlet->id, 'file' => $this->csv("Nama;Alamat\nA;B\n")])
+        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['crm_branch_id' => $this->branch->id, 'file' => $this->csv("Nama;Alamat\nA;B\n")])
             ->assertSessionHasErrors();
     }
 
@@ -90,7 +94,7 @@ class CrmTest extends AcceptanceTestCase
         $zip->close();
         $file = new UploadedFile($path, 'member.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
 
-        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['outlet_id' => $this->outlet->id, 'file' => $file])->assertRedirect()->assertSessionHas('ok');
+        $this->actingAs($this->crm)->post(route('core.crm.imports.store'), ['crm_branch_id' => $this->branch->id, 'file' => $file])->assertRedirect()->assertSessionHas('ok');
         $this->assertSame('Dewi', Customer::where('phone', '6281299998888')->value('name'));
     }
 
@@ -108,7 +112,7 @@ class CrmTest extends AcceptanceTestCase
         $rudi = Customer::where('phone', '6281122334455')->firstOrFail();
         $this->assertSame(1, $rudi->purchase_count);
         $this->assertEquals($order->net_amount, $rudi->total_spent);
-        $this->assertTrue($rudi->memberships()->where('outlet_id', $this->outlet->id)->where('source', 'pos')->exists());
+        $this->assertTrue($rudi->memberships()->where('crm_branch_id', $this->branch->id)->where('source', 'pos')->exists());
 
         $this->artisan('rasentra:rebuild-sales')->assertSuccessful();
         $this->assertSame(1, $rudi->fresh()->purchase_count, 'bangun ulang proyeksi tidak menggandakan riwayat');
@@ -134,7 +138,7 @@ class CrmTest extends AcceptanceTestCase
         $this->actingAs($this->crm)->get(route('core.crm.accurate.index'))->assertOk()->assertSee('Belum terhubung');
         $this->actingAs($this->crm)->post(route('core.crm.accurate.sync', $company))->assertSessionHas('error');
         $this->actingAs($this->crm)->put(route('core.crm.accurate.update', $company), [
-            'api_token' => 'aat.demo', 'signature_secret' => 'rahasia', 'default_outlet_id' => $this->outlet->id, 'sync_customers' => 1, 'sync_invoices' => 1,
+            'api_token' => 'aat.demo', 'signature_secret' => 'rahasia', 'default_branch_id' => $this->branch->id, 'sync_customers' => 1, 'sync_invoices' => 1,
         ])->assertSessionHas('ok');
         $conn = AccurateConnection::firstOrFail();
         $this->assertNotSame('aat.demo', $conn->getRawOriginal('api_token'), 'token terenkripsi');

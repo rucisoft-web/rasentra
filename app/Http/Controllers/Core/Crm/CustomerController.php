@@ -7,10 +7,10 @@ use App\Domain\Crm\CustomerDirectory;
 use App\Domain\Crm\Phone;
 use App\Domain\Crm\SegmentQuery;
 use App\Http\Controllers\Controller;
+use App\Models\Crm\Branch;
 use App\Models\Crm\Customer;
 use App\Models\Crm\Segment;
 use App\Models\Crm\Tag;
-use App\Models\Outlet;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +24,8 @@ class CustomerController extends Controller
 {
     public function index(Request $request): View
     {
-        $customers = $this->filtered($request)->with(['outlets:id,code', 'tags'])
+        Branch::syncFromOutlets();
+        $customers = $this->filtered($request)->with(['branches:id,code', 'tags'])
             ->orderByDesc('last_purchase_on')->orderBy('name')->paginate(50)->withQueryString();
 
         $since = now()->subDays(30)->toDateString();
@@ -32,7 +33,7 @@ class CustomerController extends Controller
         return view('core.crm.customers.index', [
             'title' => 'Pelanggan',
             'customers' => $customers,
-            'outlets' => Outlet::orderBy('code')->get(['id', 'code', 'name']),
+            'outlets' => Branch::orderBy('code')->get(['id', 'code', 'name']),
             'tags' => Tag::orderBy('name')->get(),
             'segments' => Segment::orderBy('name')->get(['id', 'name']),
             'stats' => [
@@ -46,7 +47,7 @@ class CustomerController extends Controller
 
     public function export(Request $request): StreamedResponse
     {
-        $query = $this->filtered($request)->with('outlets:id,code')->orderBy('name');
+        $query = $this->filtered($request)->with('branches:id,code')->orderBy('name');
         Audit::record('crm.customers.exported', 'Customer:export', $request->user()->id, after: ['filter' => $request->query()]);
 
         return response()->streamDownload(function () use ($query) {
@@ -54,7 +55,7 @@ class CustomerController extends Controller
             fputcsv($out, ['Nama', 'No HP', 'Email', 'Kota', 'Outlet', 'Status WA', 'Transaksi', 'Total belanja', 'Terakhir belanja']);
             $query->chunk(1000, function ($rows) use ($out) {
                 foreach ($rows as $c) {
-                    fputcsv($out, [$c->name, $c->phone, $c->email, $c->city, $c->outlets->pluck('code')->implode(' '), $c->wa_status, $c->purchase_count, $c->total_spent, $c->last_purchase_on?->toDateString()]);
+                    fputcsv($out, [$c->name, $c->phone, $c->email, $c->city, $c->branches->pluck('code')->implode(' '), $c->wa_status, $c->purchase_count, $c->total_spent, $c->last_purchase_on?->toDateString()]);
                 }
             });
             fclose($out);
@@ -66,13 +67,13 @@ class CustomerController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'phone' => ['required', 'string', 'max:30'],
-            'outlet_id' => ['nullable', 'exists:outlets,id'],
+            'crm_branch_id' => ['nullable', 'exists:crm_branches,id'],
         ]);
         $phone = Phone::normalize($data['phone']);
         if ($phone === null) {
             return back()->withInput()->withErrors(['phone' => 'Nomor HP tidak valid. Contoh: 0812 3456 7890.']);
         }
-        [$customer, $created] = $directory->upsert($phone, ['name' => $data['name']], $data['outlet_id'] ?? null, 'manual');
+        [$customer, $created] = $directory->upsert($phone, ['name' => $data['name']], $data['crm_branch_id'] ?? null, 'manual');
         Audit::record('crm.customer.created', $customer, $request->user()->id, after: ['phone' => $phone]);
 
         return redirect()->route('core.crm.customers.show', $customer)->with('ok', $created ? 'Pelanggan ditambahkan.' : 'Nomor ini sudah terdaftar; profil yang ada ditampilkan.');
@@ -80,16 +81,16 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): View
     {
-        $customer->load(['memberships.outlet', 'tags']);
+        $customer->load(['memberships.branch', 'tags', 'communities']);
 
         return view('core.crm.customers.show', [
             'title' => $customer->name,
             'customer' => $customer,
             'stage' => SegmentQuery::stageOf($customer),
-            'purchases' => $customer->purchases()->with('outlet:id,code')->orderByDesc('purchased_on')->limit(50)->get(),
-            'byOutlet' => $customer->purchases()->leftJoin('outlets', 'outlets.id', '=', 'crm_purchases.outlet_id')
-                ->groupBy('outlets.code', 'crm_purchases.source')
-                ->get([DB::raw("COALESCE(outlets.code, '-') AS code"), 'crm_purchases.source', DB::raw('COUNT(*) AS n'), DB::raw('SUM(amount) AS total')]),
+            'purchases' => $customer->purchases()->with('branch:id,code')->orderByDesc('purchased_on')->limit(50)->get(),
+            'byOutlet' => $customer->purchases()->leftJoin('crm_branches', 'crm_branches.id', '=', 'crm_purchases.crm_branch_id')
+                ->groupBy('crm_branches.code', 'crm_purchases.source')
+                ->get([DB::raw("COALESCE(crm_branches.code, '-') AS code"), 'crm_purchases.source', DB::raw('COUNT(*) AS n'), DB::raw('SUM(amount) AS total')]),
             'externalIds' => DB::table('crm_external_ids')->leftJoin('business_units', 'business_units.id', '=', 'crm_external_ids.scope_id')
                 ->where('crm_customer_id', $customer->id)->get(['system', 'business_units.code AS company', 'external_id']),
             'tags' => Tag::orderBy('name')->get(),
@@ -137,7 +138,7 @@ class CustomerController extends Controller
                 ->orWhere('phone', 'like', '%'.($phone ?? preg_replace('/\D/', '', $term) ?: $term).'%'));
         }
         $rules = SegmentQuery::clean([
-            'outlet_ids' => array_filter([(int) $request->query('outlet')]),
+            'branch_ids' => array_filter([(int) $request->query('outlet')]),
             'tag_ids' => array_filter([(int) $request->query('tag')]),
             'lifecycle' => $request->query('stage'),
             'wa' => $request->query('wa'),

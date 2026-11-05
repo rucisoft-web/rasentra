@@ -3,12 +3,12 @@
 @section('content')
 <p><a href="{{ route('core.crm.imports.index') }}">&larr; Semua impor</a></p>
 <div class="grid g4">
-  <div class="card kpi"><div class="label">Baris dibaca</div><div class="value">{{ $import->row_count }}</div><div class="note">{{ $import->outlet->code }} {{ $import->outlet->name }}</div></div>
+  <div class="card kpi"><div class="label">Baris dibaca</div><div class="value">{{ $import->row_count }}</div><div class="note">{{ $import->branch->code }} {{ $import->branch->name }}</div></div>
   <div class="card kpi"><div class="label">Pelanggan baru</div><div class="value">{{ $import->created_count }}</div></div>
   <div class="card kpi"><div class="label">Digabung</div><div class="value">{{ $import->merged_count }}</div><div class="note">nomor sudah terdaftar sebelumnya</div></div>
   <div class="card kpi"><div class="label">Dilewati</div><div class="value">{{ $import->error_count }}</div><div class="note">perbaiki lalu impor ulang barisnya</div></div>
 </div>
-<p class="muted small">{{ $import->file_name }} · {{ Fmt::dt($import->created_at) }} · oleh {{ $import->user?->name ?? '—' }} · <a href="{{ route('core.crm.customers.index', ['outlet' => $import->outlet_id]) }}">lihat pelanggan outlet ini</a></p>
+<p class="muted small">{{ $import->file_name }} · {{ Fmt::dt($import->created_at) }} · oleh {{ $import->user?->name ?? '—' }} · <a href="{{ route('core.crm.customers.index', ['outlet' => $import->crm_branch_id]) }}">lihat pelanggan outlet ini</a></p>
 @if ($import->errors)
 <div class="tablewrap">
 <table class="t">

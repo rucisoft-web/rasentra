@@ -19,7 +19,7 @@
         <label class="f"><span>API Token</span><input name="api_token" autocomplete="off" placeholder="{{ $ok ? 'Tersimpan (kosongkan bila tidak diganti)' : 'aat.…' }}"></label>
         <label class="f"><span>Signature Secret</span><input type="password" name="signature_secret" autocomplete="new-password" placeholder="{{ $ok ? 'Tersimpan' : '' }}"></label>
         <label class="f"><span>Catat pelanggan Accurate sebagai member outlet</span>
-          <select name="default_outlet_id"><option value="">Tidak (tanpa outlet)</option>@foreach ($outlets->where('business_unit_id', $company->id) as $o)<option value="{{ $o->id }}" @selected($conn?->default_outlet_id == $o->id)>{{ $o->code }} {{ $o->name }}</option>@endforeach</select></label>
+          <select name="default_branch_id"><option value="">Tidak (tanpa outlet)</option>@foreach ($outlets->where('business_unit_id', $company->id) as $o)<option value="{{ $o->id }}" @selected($conn?->default_branch_id == $o->id)>{{ $o->code }} {{ $o->name }}</option>@endforeach</select></label>
         <div class="f"><span>Data yang ditarik</span>
           <label class="check"><input type="hidden" name="sync_customers" value="0"><input type="checkbox" name="sync_customers" value="1" @checked($conn?->sync_customers ?? true)> Pelanggan</label>
           <label class="check"><input type="hidden" name="sync_invoices" value="0"><input type="checkbox" name="sync_invoices" value="1" @checked($conn?->sync_invoices ?? true)> Faktur penjualan ({{ AccurateSync::INITIAL_DAYS }} hari ke belakang pada sinkron pertama)</label>

@@ -28,7 +28,7 @@ final class MemberImporter
 
     public function __construct(private readonly CustomerDirectory $directory, private readonly SpreadsheetReader $reader) {}
 
-    public function import(string $path, string $fileName, int $outletId, ?int $userId, ?int $tagId = null): Import
+    public function import(string $path, string $fileName, int $branchId, ?int $userId, ?int $tagId = null): Import
     {
         $rows = $this->reader->read($path, $fileName);
         $headerAt = $this->findHeader($rows);
@@ -70,13 +70,13 @@ final class MemberImporter
                 'city' => $get('city'),
                 'member_code' => $get('member_code'),
                 'joined_on' => $this->date($get('joined_on')),
-            ], $outletId, 'import');
+            ], $branchId, 'import');
             $isNew ? $created++ : $merged++;
             $tag?->id && $customer->tags()->syncWithoutDetaching([$tag->id]);
         }
 
         return Import::create([
-            'outlet_id' => $outletId,
+            'crm_branch_id' => $branchId,
             'user_id' => $userId,
             'file_name' => mb_substr($fileName, 0, 255),
             'sha256' => hash_file('sha256', $path),

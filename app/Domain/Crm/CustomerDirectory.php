@@ -2,8 +2,9 @@
 
 namespace App\Domain\Crm;
 
+use App\Models\Crm\Branch;
 use App\Models\Crm\Customer;
-use App\Models\Crm\CustomerOutlet;
+use App\Models\Crm\Membership;
 use App\Models\Crm\Purchase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,9 +20,9 @@ final class CustomerDirectory
      * @param  array{name?: ?string, email?: ?string, birth_date?: ?string, city?: ?string, member_code?: ?string, joined_on?: ?string}  $data
      * @return array{0: Customer, 1: bool} pelanggan dan apakah baru dibuat
      */
-    public function upsert(string $phone, array $data, ?int $outletId, string $source): array
+    public function upsert(string $phone, array $data, ?int $branchId, string $source): array
     {
-        return DB::transaction(function () use ($phone, $data, $outletId, $source) {
+        return DB::transaction(function () use ($phone, $data, $branchId, $source) {
             $customer = Customer::where('phone', $phone)->lockForUpdate()->first();
             $created = $customer === null;
             $name = trim((string) ($data['name'] ?? ''));
@@ -41,8 +42,8 @@ final class CustomerDirectory
                 }
             }
 
-            if ($outletId !== null) {
-                $membership = CustomerOutlet::firstOrNew(['crm_customer_id' => $customer->id, 'outlet_id' => $outletId]);
+            if ($branchId !== null) {
+                $membership = Membership::firstOrNew(['crm_customer_id' => $customer->id, 'crm_branch_id' => $branchId]);
                 if (! $membership->exists) {
                     $membership->source = $source;
                     $membership->joined_on = $data['joined_on'] ?? now()->toDateString();
@@ -58,13 +59,13 @@ final class CustomerDirectory
     }
 
     /** Catat satu transaksi sumber (idempoten per source + source_ref) lalu hitung ulang ringkasan belanja. */
-    public function recordPurchase(Customer $customer, string $source, string $ref, string $date, string $amount, ?int $outletId = null, ?int $businessUnitId = null, ?string $docNo = null): bool
+    public function recordPurchase(Customer $customer, string $source, string $ref, string $date, string $amount, ?int $branchId = null, ?int $businessUnitId = null, ?string $docNo = null): bool
     {
         $purchase = Purchase::firstOrCreate(
             ['source' => $source, 'source_ref' => $ref],
             [
                 'crm_customer_id' => $customer->id,
-                'outlet_id' => $outletId,
+                'crm_branch_id' => $branchId,
                 'business_unit_id' => $businessUnitId,
                 'purchased_on' => Carbon::parse($date)->toDateString(),
                 'amount' => $amount,
@@ -98,8 +99,9 @@ final class CustomerDirectory
         if ($phone === null) {
             return;
         }
-        [$customer] = $this->upsert($phone, ['name' => $order['customer']['name'] ?? null], $outletId, 'pos');
-        $this->recordPurchase($customer, 'pos', (string) $order['id'], $order['business_date'], (string) $order['net_amount'], $outletId, docNo: $order['doc_no'] ?? null);
+        $branch = Branch::forOutlet($outletId);
+        [$customer] = $this->upsert($phone, ['name' => $order['customer']['name'] ?? null], $branch->id, 'pos');
+        $this->recordPurchase($customer, 'pos', (string) $order['id'], $order['business_date'], (string) $order['net_amount'], $branch->id, $branch->business_unit_id, $order['doc_no'] ?? null);
     }
 
     private function optional(array $data): array
