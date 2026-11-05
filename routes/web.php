@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'landing')->name('landing');
 Route::get('/panduan', [GuideController::class, 'show'])->name('panduan');
 Route::get('/fitur', [GuideController::class, 'features'])->name('fitur');
+Route::get('/implementasi', [GuideController::class, 'implementation'])->name('implementasi');
 
 // Mode demo (RASENTRA_DEMO=true): tamu masuk ke tiap aplikasi dengan akun data contoh.
 Route::get('/demo', [DemoController::class, 'index'])->name('demo');

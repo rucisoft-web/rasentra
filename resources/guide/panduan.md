@@ -566,3 +566,59 @@ Keuangan memastikan setiap hari bisnis setiap outlet cocok antara kasir, Central
 - [ ] Harian: semua outlet kemarin berstatus Cocok; dokumen SAP gagal ditangani.
 - [ ] Mingguan: klaim promo supplier dari laporan promo; tinjau waste per outlet.
 - [ ] Bulanan: tidak ada dokumen SAP gagal atau perlu review sebelum tutup buku.
+
+## 10. Fitur operasional grup (semua peran)
+
+Bagian ini menjelaskan fitur yang diatur kantor pusat lalu dijalankan sama di setiap outlet: membership, self ordering QR, delivery order, roster dan absensi staf, metode bayar, pengaturan umum, serta peran dan izin. Semua master dibuat di Rasentra Central lalu dikirim otomatis ke setiap Rasentra Lokal, jadi outlet tidak perlu mengatur sendiri.
+
+### 10.1 Member dan poin di kasir (Rasentra POS)
+
+1. Sentuh tombol **+ Member** di bawah pilihan kanal.
+2. Ketik nomor HP atau kode member lalu **Cari**. Bila ketemu, sentuh **Pasang ke transaksi**; nama, tier dan saldo poin tampil di tombol member.
+3. Pelanggan baru: isi nama dan nomor HP di kolom **Daftar member baru** lalu **Daftarkan & pasang**. Nomor HP berlaku sebagai kunci member di semua outlet grup.
+4. Saat membayar, pilih metode **Poin member** untuk menukar poin. Nominal yang diketik dalam rupiah; sistem menghitung poinnya dari nilai tukar yang diatur pusat.
+5. Struk mencetak poin yang didapat, poin yang ditukar dan saldo akhir.
+
+Poin dihitung saat transaksi selesai: setiap kelipatan belanja (bawaan Rp10.000) memberi 1 poin dikali pengali tier. Bagian yang dibayar dengan poin tidak menghasilkan poin. Saldo resmi ada di Rasentra Central dan diperbarui ke semua outlet setelah transaksi terkirim.
+
+### 10.2 Pesanan mandiri dari QR meja (pelayan dan kasir resto)
+
+1. Tamu memindai QR di meja, memilih menu dari HP dan menekan **Kirim pesanan**. Tidak perlu aplikasi atau login.
+2. Pesanan masuk ke **Rasentra Lokal → Pesanan mandiri QR**. Halaman ini memuat ulang sendiri setiap 20 detik.
+3. Periksa item dan catatan tamu, lalu **Terima**. Bila meja masih kosong, meja otomatis dibuka; item masuk ke pesanan meja dan dikirim ke dapur (bila pengaturan pusat mengizinkan).
+4. Bila menu habis atau pesanan tidak masuk akal, isi alasan lalu **Tolak**. Tamu melihat alasannya di HP.
+
+Harga final, promo dan pembayaran tetap di kasir. QR yang hilang atau difoto orang luar bisa diganti dari Rasentra Core → Meja & QR self order.
+
+### 10.3 Delivery order (kasir, kurir, kepala outlet)
+
+1. Buat pesanan kanal **Delivery** di POS seperti biasa: isi pemesan, telepon dan alamat, lalu selesaikan pembayaran.
+2. Buka **Rasentra Lokal → Delivery order**. Pesanan delivery dua hari terakhir tampil dengan status **Menunggu kurir**.
+3. Pilih mitra (internal, GoFood, GrabFood, ShopeeFood), kurir internal, nomor order mitra dan ongkir, lalu **Tugaskan**.
+4. Kurir menekan **Berangkat** saat keluar dan **Terkirim** saat sampai. Bila gagal, isi alasan lalu **Gagal**; pesanan bisa dikirim ulang.
+
+Setiap perubahan status dikirim ke pusat, sehingga ketepatan waktu kirim semua outlet terlihat di laporan Delivery order.
+
+### 10.4 Roster dan absensi staf (kepala outlet dan semua staf)
+
+1. Kepala outlet membuka **Rasentra Lokal → Roster & kehadiran**, memilih shift (Pagi, Siang, Malam dari pusat) atau Libur untuk setiap staf per hari, lalu **Simpan roster**.
+2. Staf absen di **Absen staf** (`/absen`) pada perangkat outlet: pilih nama, ketik PIN, **Absen**. Absen pertama hari itu tercatat masuk, berikutnya pulang.
+3. Absen masuk setelah jam mulai shift ditambah toleransi (bawaan 10 menit) dihitung terlambat.
+4. Tabel **Kehadiran hari ini** menampilkan jam masuk, pulang, keterlambatan dan durasi kerja.
+
+### 10.5 Pengaturan pusat (admin kantor pusat)
+
+| Menu Rasentra Core | Untuk apa |
+| --- | --- |
+| Struktur organisasi | Melihat grup → CV → wilayah → outlet → lokasi, meja dan staf per peran; menambah wilayah. |
+| Peran & izin | Mencentang izin per peran untuk kantor pusat dan outlet; berlaku sama di semua outlet. |
+| Pengaturan umum | Struk, aturan poin, self ordering, ongkir bawaan, toleransi terlambat. Isi di level grup; level CV atau outlet hanya untuk pengecualian. |
+| Metode pembayaran | Daftar metode bayar di POS, akun SAP/Accurate, wajib nomor referensi, dan outlet yang boleh memakainya. |
+| Meja & QR self order | Menambah meja, area dan kapasitas; membuat, mengganti dan mencetak QR meja. |
+| Template shift staf | Jam kerja standar yang dipakai roster semua outlet. |
+| Membership & tier member | Daftar member grup, mutasi poin, penyesuaian poin, batas belanja dan pengali poin tiap tier. |
+| Laporan → Ringkasan grup | Perbandingan outlet dan CV: penjualan, struk, rata-rata, kanal, metode bayar, porsi member, delivery tepat waktu dan keterlambatan staf. |
+
+### 10.6 Pembukuan per CV: SAP Business One atau Accurate Online
+
+Di **Rasentra Core → Perusahaan & outlet**, pilih pembukuan setiap CV. CV dengan SAP B1 memposting lewat Service Layer seperti sebelumnya. CV dengan Accurate Online memposting faktur penjualan, penerimaan penjualan, retur penjualan dan penyesuaian persediaan ke database Accurate CV itu. Isi API Token dan Signature Secret dari Accurate (disimpan terenkripsi, tidak pernah dikirim ke outlet), lalu isi mapping item, gudang, pelanggan umum dan akun kas/bank di **Mapping SAP** dengan kode database CV tersebut. Dokumen gagal atau perlu dicek tampil di **Dokumen SAP** dan bisa diposting ulang tanpa dobel.

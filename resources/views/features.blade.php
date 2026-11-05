@@ -23,7 +23,8 @@
   <a class="brand" href="{{ route('landing') }}"><i></i>Rasentra</a>
   <nav class="links" aria-label="Navigasi">
     <a href="{{ route('landing') }}">Beranda</a>
-    <a href="{{ route('panduan') }}">Panduan Peran</a>
+    <a href="{{ route('panduan') }}">Panduan Pengguna</a>
+    <a href="{{ route('implementasi') }}">Langkah Implementasi</a>
     @if (config('rasentra.demo.enabled'))<a class="btn" href="{{ route('demo') }}">Coba demo</a>@endif
   </nav>
 </div></header>

@@ -13,10 +13,22 @@ class GuideController extends Controller
 {
     public function show(): View
     {
-        $markdown = file_get_contents(resource_path('guide/panduan.md'));
+        return $this->markdownPage('panduan.md', 'Panduan Operasional per Peran');
+    }
+
+    /** Langkah-langkah implementasi Rasentra dari kantor pusat sampai rollout outlet. */
+    public function implementation(): View
+    {
+        return $this->markdownPage('implementasi.md', 'Langkah-langkah Implementasi');
+    }
+
+    private function markdownPage(string $file, string $title): View
+    {
+        $markdown = file_get_contents(resource_path('guide/'.$file));
         // Judul halaman ada di header; gambar memakai asset() agar tetap jalan bila aplikasi di subfolder.
         $markdown = preg_replace('/\A# .*\n+/', '', $markdown);
         $markdown = str_replace('](/assets/guide/', ']('.asset('assets/guide').'/', $markdown);
+        $markdown = str_replace('](/panduan)', ']('.route('panduan').')', $markdown);
         $html = Str::markdown($markdown, ['html_input' => 'escape', 'allow_unsafe_links' => false]);
 
         // Gambar berdiri sendiri menjadi figure dengan keterangan dari alt; klik membuka ukuran penuh.
@@ -42,7 +54,7 @@ class GuideController extends Controller
             return "<h{$m[1]} id=\"{$id}\">{$m[2]}</h{$m[1]}>";
         }, $html);
 
-        return view('guide', ['html' => $html, 'toc' => $toc]);
+        return view('guide', ['html' => $html, 'toc' => $toc, 'title' => $title]);
     }
 
     public function features(): View

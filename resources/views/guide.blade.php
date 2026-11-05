@@ -5,7 +5,7 @@
 <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
 <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panduan Operasional per Peran · Rasentra</title>
+<title>{{ $title ?? 'Panduan Operasional per Peran' }} · Rasentra</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -17,6 +17,8 @@
   <nav class="links" aria-label="Navigasi">
     <a href="{{ route('landing') }}">Beranda</a>
     <a href="{{ route('fitur') }}">Fitur Aplikasi</a>
+    <a href="{{ route('panduan') }}">Panduan Pengguna</a>
+    <a href="{{ route('implementasi') }}">Langkah Implementasi</a>
     @if (config('rasentra.demo.enabled'))<a class="btn" href="{{ route('demo') }}">Coba demo</a>@endif
   </nav>
 </div></header>
@@ -37,8 +39,8 @@
   </aside>
 
   <article>
-    <p class="eyebrow">Panduan penggunaan</p>
-    <h1>Panduan Operasional Rasentra per Peran</h1>
+    <p class="eyebrow">{{ ($title ?? '') === 'Langkah-langkah Implementasi' ? 'Implementasi' : 'Panduan penggunaan' }}</p>
+    <h1>{{ ($title ?? '') === 'Langkah-langkah Implementasi' ? 'Langkah-langkah Implementasi Rasentra' : 'Panduan Operasional Rasentra per Peran' }}</h1>
     @if (config('rasentra.demo.enabled'))
       <p class="intro">Ingin mencoba langsung? Buka <a href="{{ route('demo') }}">mode tamu</a> dan masuk sebagai peran yang sedang Anda baca, tanpa PIN atau kata sandi.</p>
     @endif
