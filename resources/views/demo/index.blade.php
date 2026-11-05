@@ -66,7 +66,7 @@ h2{font-family:var(--display);font-size:1.3rem;margin:32px 0 12px}
 
   @php
     $groups = [
-        'Kantor pusat · Rasentra Central' => ['central', 'finance', 'merch'],
+        'Kantor pusat · Rasentra Central' => ['central', 'finance', 'merch', 'crm'],
         'Outlet Solo · Meatshop & Grocery dan restoran R&B' => ['pos-retail', 'pos-resto', 'mobile', 'kitchen', 'inventory', 'lokal'],
     ];
   @endphp

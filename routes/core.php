@@ -106,6 +106,33 @@ Route::prefix('core')->name('core.')->group(function () {
             Route::get('stock', [Core\ReportController::class, 'stock'])->name('stock');
         });
 
+        // Rasentra CRM: database pelanggan, impor member outlet, segmentasi, Accurate Online.
+        Route::middleware('core:crm')->prefix('crm')->name('crm.')->group(function () {
+            Route::get('/', [Core\Crm\CustomerController::class, 'index'])->name('customers.index');
+            Route::get('customers.csv', [Core\Crm\CustomerController::class, 'export'])->name('customers.export');
+            Route::post('customers', [Core\Crm\CustomerController::class, 'store'])->name('customers.store');
+            Route::get('customers/{customer}', [Core\Crm\CustomerController::class, 'show'])->name('customers.show');
+            Route::put('customers/{customer}', [Core\Crm\CustomerController::class, 'update'])->name('customers.update');
+            Route::post('tags', [Core\Crm\CustomerController::class, 'storeTag'])->name('tags.store');
+
+            Route::get('imports', [Core\Crm\ImportController::class, 'index'])->name('imports.index');
+            Route::get('imports/template.csv', [Core\Crm\ImportController::class, 'template'])->name('imports.template');
+            Route::post('imports', [Core\Crm\ImportController::class, 'store'])->name('imports.store');
+            Route::get('imports/{import}', [Core\Crm\ImportController::class, 'show'])->name('imports.show');
+
+            Route::get('segments', [Core\Crm\SegmentController::class, 'index'])->name('segments.index');
+            Route::get('segments/create', [Core\Crm\SegmentController::class, 'create'])->name('segments.create');
+            Route::post('segments', [Core\Crm\SegmentController::class, 'store'])->name('segments.store');
+            Route::get('segments/{segment}/edit', [Core\Crm\SegmentController::class, 'edit'])->name('segments.edit');
+            Route::put('segments/{segment}', [Core\Crm\SegmentController::class, 'update'])->name('segments.update');
+            Route::delete('segments/{segment}', [Core\Crm\SegmentController::class, 'destroy'])->name('segments.destroy');
+
+            Route::get('accurate', [Core\Crm\AccurateController::class, 'index'])->name('accurate.index');
+            Route::put('accurate/{company}', [Core\Crm\AccurateController::class, 'update'])->name('accurate.update');
+            Route::post('accurate/{company}/test', [Core\Crm\AccurateController::class, 'test'])->name('accurate.test');
+            Route::post('accurate/{company}/sync', [Core\Crm\AccurateController::class, 'sync'])->middleware('throttle:6,1')->name('accurate.sync');
+        });
+
         Route::get('audit', [Core\AuditController::class, 'index'])->middleware('core:audit')->name('audit');
     });
 });
