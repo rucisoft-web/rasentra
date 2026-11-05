@@ -247,7 +247,7 @@ final class StockCountService
 
     private function assertApproverRole(User $user): void
     {
-        if (! in_array($user->role, Approval::APPROVER_ROLES, true)) {
+        if (! in_array($user->role, Approval::approverRoles(), true)) {
             throw new DomainException('forbidden_role', 'Review dan persetujuan opname hanya oleh kepala outlet.', 403);
         }
     }

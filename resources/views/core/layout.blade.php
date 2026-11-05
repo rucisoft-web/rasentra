@@ -30,6 +30,16 @@
             'Master' => [
                 ['master', 'core.outlets.index', 'Perusahaan & outlet'],
                 ['master', 'core.users.index', 'Pengguna'],
+                ['organization', 'core.organization', 'Struktur organisasi'],
+                ['access', 'core.access.index', 'Peran & izin'],
+                ['settings', 'core.settings.index', 'Pengaturan umum'],
+            ],
+            'Operasional outlet' => [
+                ['operations', 'core.tables.index', 'Meja & QR self order'],
+                ['operations', 'core.payment-methods.index', 'Metode pembayaran'],
+                ['operations', 'core.shift-templates.index', 'Template shift staf'],
+                ['members', 'core.members.index', 'Membership'],
+                ['members', 'core.member-tiers.index', 'Tier member'],
             ],
             'Katalog' => [
                 ['catalog', 'core.products.index', 'Produk'],
@@ -39,10 +49,13 @@
                 ['recipes', 'core.cooking-fees.index', 'Cooking fee'],
             ],
             'Laporan' => [
+                ['reports', 'core.reports.group', 'Ringkasan grup'],
                 ['reports', 'core.reports.sales', 'Penjualan'],
                 ['reports', 'core.reports.promotions', 'Promo'],
                 ['reports', 'core.reports.kitchen', 'Waktu saji'],
                 ['reports', 'core.reports.stock', 'Opname & waste'],
+                ['reports', 'core.reports.deliveries', 'Delivery order'],
+                ['reports', 'core.reports.attendance', 'Kehadiran staf'],
                 ['audit', 'core.audit', 'Audit log'],
             ],
         ],

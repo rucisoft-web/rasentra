@@ -148,3 +148,5 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/core.php';
+
+require __DIR__.'/operations.php';

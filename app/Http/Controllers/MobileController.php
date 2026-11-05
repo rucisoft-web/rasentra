@@ -56,7 +56,7 @@ class MobileController extends Controller
                 ->where(fn ($q) => $q->whereNull('outlet_id')->orWhere('outlet_id', $outlet->id))
                 ->where('effective_from', '<=', now())->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>', now()))
                 ->pluck('method')->unique()->values() : [],
-            'approvers' => User::where('outlet_id', $outlet->id)->where('is_active', true)->whereIn('role', Approval::APPROVER_ROLES)
+            'approvers' => User::where('outlet_id', $outlet->id)->where('is_active', true)->whereIn('role', Approval::approverRoles())
                 ->where('id', '!=', $user->id)->orderBy('name')->get(['id', 'name']),
         ]);
     }

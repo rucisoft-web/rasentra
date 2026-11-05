@@ -206,6 +206,7 @@
       if ('resto' in btn.dataset && !b.outlet.has_restaurant) btn.hidden = true;
     });
     renderHeld();
+    renderMember();
     renderCategories();
     loadCatalog();
     if (b.outlet.has_restaurant) {
@@ -259,14 +260,85 @@
     if (data.order.channel) setChannel(data.order.channel, false);
     renderCart();
     renderCustomer();
+    renderMember();
+  }
+
+  // ---- Member --------------------------------------------------------------
+  function renderMember() {
+    const el = $('#member-chip');
+    if (!el) return;
+    el.hidden = !state.boot?.member?.enabled;
+    const m = state.member;
+    el.classList.toggle('set', !!state.order?.crm_customer_id);
+    el.textContent = state.order?.crm_customer_id && m
+      ? `Member ${m.code} · ${m.name}${m.tier ? ' · ' + m.tier : ''} · ${num(m.points)} poin`
+      : (state.order?.customer_code ? 'Member ' + state.order.customer_code : '+ Member');
+  }
+
+  async function memberSheet() {
+    try {
+      await ensureOrder();
+    } catch (e) {
+      return fail(e);
+    }
+    const canEnroll = state.boot.member?.can_enroll;
+    const root = openSheet('Member', `
+      <div class="pay-grid">
+        <div>
+          <div class="field"><label>Nomor HP atau kode member</label><input id="m-q" inputmode="tel" autocomplete="off"></div>
+          <button class="btn primary block" data-do="find">Cari</button>
+          <div id="m-result" style="margin-top:12px"></div>
+          ${state.order.crm_customer_id ? '<button class="btn ghost block" data-do="detach" style="margin-top:12px">Lepas member dari transaksi</button>' : ''}
+        </div>
+        <div ${canEnroll ? '' : 'hidden'}>
+          <b>Daftar member baru</b>
+          <div class="field"><label>Nama</label><input id="m-name" autocomplete="off"></div>
+          <div class="field"><label>Nomor HP / WhatsApp</label><input id="m-phone" inputmode="tel" autocomplete="off"></div>
+          <div class="field"><label>Tanggal lahir (opsional)</label><input id="m-birth" type="date"></div>
+          <button class="btn soft block" data-do="enroll">Daftarkan & pasang</button>
+        </div>
+      </div>`);
+    root.querySelector('#m-q').focus();
+    const attach = async (member) => {
+      const r = await api('POST', `orders/${state.order.id}/member`, { member_id: member ? member.id : null });
+      state.member = r.member;
+      state.order = { ...state.order, ...r.order };
+      renderMember();
+      closeSheet();
+      toast(member ? `Member ${member.name} dipasang.` : 'Member dilepas.', 'ok');
+    };
+    root.onclick = async (ev) => {
+      const act = ev.target.closest('[data-do]')?.dataset.do;
+      try {
+        if (act === 'find') {
+          const r = await api('GET', 'members?q=' + encodeURIComponent(root.querySelector('#m-q').value.trim()));
+          const box = root.querySelector('#m-result');
+          if (!r.member) { box.innerHTML = '<p class="muted">Member tidak ditemukan.</p>'; return; }
+          box.innerHTML = `<div class="summary"><div><span>${esc(r.member.name)}</span><b>${esc(r.member.code)}</b></div>
+            <div><span>Tier</span><b>${esc(r.member.tier || '-')}</b></div><div><span>Poin</span><b class="mono">${num(r.member.points)} (≈ ${rupiah(r.member.points_value)})</b></div></div>
+            <button class="btn primary block" data-do="use" style="margin-top:8px">Pasang ke transaksi</button>`;
+          box.dataset.member = JSON.stringify(r.member);
+        }
+        if (act === 'use') return attach(JSON.parse(root.querySelector('#m-result').dataset.member));
+        if (act === 'detach') return attach(null);
+        if (act === 'enroll') {
+          const r = await api('POST', 'members', { name: root.querySelector('#m-name').value.trim(), phone: root.querySelector('#m-phone').value.trim(), birth_date: root.querySelector('#m-birth').value || null });
+          return attach(r.member);
+        }
+      } catch (e) {
+        fail(e);
+      }
+    };
   }
 
   function resetOrder() {
     state.order = null;
     state.lines = [];
     state.payload = null;
+    state.member = null;
     renderCart();
     renderCustomer();
+    renderMember();
     focusScan();
   }
 
@@ -485,7 +557,14 @@
   }
 
   // ---- Pembayaran ----------------------------------------------------------
-  const METHODS = [['cash', 'Tunai'], ['qris', 'QRIS'], ['edc', 'EDC'], ['edc_manual', 'EDC manual'], ['voucher', 'Voucher']];
+  // Metode bayar diatur pusat per outlet (Rasentra Core → Metode pembayaran). Poin hanya bila member terpasang.
+  const METHODS_DEFAULT = [['cash', 'Tunai'], ['qris', 'QRIS'], ['edc', 'EDC'], ['edc_manual', 'EDC manual'], ['voucher', 'Voucher']];
+  const methods = () => {
+    const list = (state.boot.payment_methods || []).map((m) => [m.code, m.name]);
+    const base = (list.length ? list : METHODS_DEFAULT).filter(([v]) => v !== 'points');
+    if (state.order?.crm_customer_id && state.boot.member?.enabled && state.boot.member?.can_redeem) base.push(['points', 'Poin member']);
+    return base;
+  };
 
   function paySheet() {
     if (!state.order || !state.lines.length) return;
@@ -506,7 +585,7 @@
             </div>
             ${p.payments.map((x) => `<div class="muted mono">${esc(x.method)} ${num(x.amount)} · ${esc(x.status)}${x.change_amount ? ' · kembali ' + num(x.change_amount) : ''}
               ${['pending', 'uncertain'].includes(x.status) ? `<button class="btn ghost" data-check="${x.id}">Cek status</button>` : ''}</div>`).join('')}
-            <div class="methods" style="margin-top:12px">${METHODS.map(([v, t]) => `<button type="button" data-m="${v}" class="${v === method ? 'on' : ''}">${t}</button>`).join('')}</div>
+            <div class="methods" style="margin-top:12px">${methods().map(([v, t]) => `<button type="button" data-m="${v}" class="${v === method ? 'on' : ''}">${t}</button>`).join('')}</div>
             <div class="field" id="ref-field" style="margin-top:12px" ${method === 'cash' ? 'hidden' : ''}><label>No. referensi / approval code</label><input id="pay-ref"></div>
           </div>
           <div>
@@ -946,6 +1025,7 @@
       if (act === 'tables') return tablesSheet();
       if (act === 'history') return historySheet();
       if (act === 'customer') return customerSheet();
+      if (act === 'member') return memberSheet();
       if (act === 'shift') return shiftSheet();
       if (act === 'scan-submit') { const v = $('#scan').value; $('#scan').value = ''; return scan(v); }
       if (act === 'new') { if (state.lines.length) return toast('Tahan atau batalkan baris dulu.', 'err'); return resetOrder(); }

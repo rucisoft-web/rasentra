@@ -13,5 +13,6 @@ class DatabaseSeeder extends Seeder
         if (! app()->isProduction()) {
             $this->call([SoloSeeder::class, LombokSeeder::class, CoreSeeder::class]);
         }
+        $this->call(OperationsSeeder::class);
     }
 }

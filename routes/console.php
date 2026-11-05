@@ -16,6 +16,7 @@ use App\Models\Outlet;
 use App\Support\SystemState;
 use Database\Seeders\CoreSeeder;
 use Database\Seeders\LombokSeeder;
+use Database\Seeders\OperationsSeeder;
 use Database\Seeders\OutletSeeder;
 use Database\Seeders\SoloSeeder;
 use Illuminate\Support\Carbon;
@@ -132,7 +133,7 @@ Artisan::command('rasentra:demo-reset {--force : Jalankan tanpa konfirmasi}', fu
         return 1;
     }
     $this->call('migrate:fresh', ['--force' => true]);
-    foreach ([OutletSeeder::class, SoloSeeder::class, LombokSeeder::class, CoreSeeder::class] as $seeder) {
+    foreach ([OutletSeeder::class, SoloSeeder::class, LombokSeeder::class, CoreSeeder::class, OperationsSeeder::class] as $seeder) {
         $this->call('db:seed', ['--class' => $seeder, '--force' => true]);
     }
     $this->info('Data contoh demo siap.');

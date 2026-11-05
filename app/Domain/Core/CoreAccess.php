@@ -2,6 +2,7 @@
 
 namespace App\Domain\Core;
 
+use App\Domain\Access\Permissions;
 use App\Models\User;
 
 /**
@@ -32,6 +33,11 @@ final class CoreAccess
     {
         if (! self::isCoreUser($user)) {
             return false;
+        }
+        // Matriks di Rasentra Core → Peran & izin menimpa bawaan di bawah.
+        $override = Permissions::centralOverride($user->role, $area);
+        if ($override !== null) {
+            return $override;
         }
         $areas = self::AREAS[$user->role];
 

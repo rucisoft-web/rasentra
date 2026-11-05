@@ -9,6 +9,12 @@
         ['lokal.close-day', 'Tutup hari'],
         ['lokal.setup', 'Pemasangan'],
     ];
+    // Operasional outlet: tampil sesuai izin peran (Rasentra Core → Peran & izin).
+    $ops = array_filter([
+        ['self_order.accept', 'lokal.self-orders', 'Pesanan mandiri QR'],
+        ['delivery.manage', 'lokal.deliveries', 'Delivery order'],
+        ['staff.roster', 'lokal.staff', 'Roster & kehadiran'],
+    ], fn ($i) => \App\Domain\Access\Permissions::allows($user, $i[0]));
     $outletName = \App\Models\Outlet::where('code', config('rasentra.outlet_code'))->value('name');
 @endphp
 <!doctype html>
@@ -32,6 +38,15 @@
       @foreach ($nav as [$route, $label])
         <a href="{{ route($route) }}" @class(['on' => request()->routeIs($route)])>{{ $label }}</a>
       @endforeach
+    @endif
+    @if ($ops)
+      <h6>Operasional</h6>
+      @foreach ($ops as [, $route, $label])
+        <a href="{{ route($route) }}" @class(['on' => request()->routeIs($route)])>{{ $label }}</a>
+      @endforeach
+      <a href="{{ route('attendance') }}" @class(['on' => request()->routeIs('attendance')])>Absen staf</a>
+    @endif
+    @if ($canConsole)
       <h6>Aplikasi outlet</h6>
       <a href="{{ route('pos') }}">Rasentra POS</a>
       <a href="{{ route('kitchen') }}">Rasentra Kitchen</a>

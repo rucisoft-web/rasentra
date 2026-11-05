@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Access\Permissions;
 use App\Models\Outlet;
 use Closure;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class EnsureLokalAccess
 
     public static function allows($user): bool
     {
-        if ($user === null || ! ($user->is_active ?? true) || ! in_array($user->role, self::ROLES, true)) {
+        if ($user === null || ! ($user->is_active ?? true) || ! Permissions::allows($user, 'lokal.console')) {
             return false;
         }
         $outletId = Outlet::where('code', config('rasentra.outlet_code'))->value('id');

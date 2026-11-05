@@ -22,6 +22,8 @@ class Order extends Model
             'gross_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'net_amount' => 'decimal:2',
+            'points_earned' => 'decimal:2',
+            'points_redeemed' => 'decimal:2',
             'promotion_snapshot' => 'array',
             'finalized_at' => 'datetime',
             'promised_at' => 'datetime',

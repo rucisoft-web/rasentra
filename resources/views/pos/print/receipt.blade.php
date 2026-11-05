@@ -2,12 +2,15 @@
   $money = fn ($v) => number_format((float) $v, 0, ',', '.');
   $qty = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, ',', '.'), '0'), ',');
   $channels = ['retail' => 'Retail', 'dine_in' => 'Dine-in', 'takeaway' => 'Takeaway', 'pickup' => 'Pickup', 'delivery' => 'Delivery'];
-  $methods = ['cash' => 'Tunai', 'qris' => 'QRIS', 'edc' => 'EDC', 'edc_manual' => 'EDC manual', 'voucher' => 'Voucher'];
+  $methods = \App\Models\PaymentMethod::pluck('name', 'code')->all() + ['cash' => 'Tunai', 'qris' => 'QRIS', 'edc' => 'EDC', 'edc_manual' => 'EDC manual', 'voucher' => 'Voucher', 'points' => 'Poin member'];
+  $settings = app(\App\Domain\Settings\Settings::class);
+  $member = $order->crm_customer_id ? \App\Models\Member::find($order->crm_customer_id) : null;
   $tz = $outlet->timezone;
 @endphp
 @extends('pos.print.layout')
 @section('title', 'Struk '.$order->doc_no)
 @section('body')
+  @if ($settings->get('receipt.header', $outlet->id))<div class="c">{{ $settings->get('receipt.header', $outlet->id) }}</div>@endif
   @if ($copy > 0)<div class="stamp">SALINAN ke-{{ $copy }}</div>@endif
   <table>
     <tr><td>No</td><td class="r b">{{ $order->doc_no }}</td></tr>
@@ -54,8 +57,14 @@
       <div>Retur {{ $r->doc_no }}: -{{ $money($r->net_amount) }}</div>
     @endforeach
   @endif
+  @if ($member)
+    <hr>
+    <div>Member {{ $member->code }} · {{ $member->name }}</div>
+    @if ((float) $order->points_redeemed > 0)<div>Poin ditukar: {{ $money($order->points_redeemed) }}</div>@endif
+    <div>Poin didapat: {{ $money($order->points_earned) }} · saldo {{ $money($member->points_balance) }}</div>
+  @endif
   <hr>
-  <div class="c">{{ config('rasentra.pos.receipt_footer') }}</div>
+  <div class="c">{{ $settings->get('receipt.footer', $outlet->id) ?: config('rasentra.pos.receipt_footer') }}</div>
   <div class="c muted">Retur maks. {{ config('rasentra.pos.return_days') }} hari dengan struk ini.</div>
   <div class="c muted">Daging segar diretur utuh sesuai label Pack ID.</div>
 @endsection
