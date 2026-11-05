@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Domain\Integration\Accurate\AccurateClient;
 use App\Domain\Integration\Accurate\HttpAccurateClient;
+use App\Domain\Integration\Ai\AiClient;
+use App\Domain\Integration\Ai\ClaudeAiClient;
 use App\Domain\Integration\Sap\FakeSapClient;
 use App\Domain\Integration\Sap\SapClient;
 use App\Domain\Integration\Sap\SapClientFactory;
@@ -26,6 +28,7 @@ class RasentraServiceProvider extends ServiceProvider
         // Rasentra CRM: Accurate Online lewat API Token per perusahaan (diatur di konsol CRM).
         $this->app->singleton(AccurateClient::class, fn () => new HttpAccurateClient);
         $this->app->singleton(WhatsAppClient::class, fn () => new CloudApiClient);
+        $this->app->singleton(AiClient::class, fn () => new ClaudeAiClient);
     }
 
     public function boot(): void

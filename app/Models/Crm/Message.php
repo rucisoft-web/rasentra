@@ -14,7 +14,7 @@ class Message extends Model
 
     protected function casts(): array
     {
-        return ['status_at' => 'datetime'];
+        return ['status_at' => 'datetime', 'by_ai' => 'boolean'];
     }
 
     public function conversation(): BelongsTo

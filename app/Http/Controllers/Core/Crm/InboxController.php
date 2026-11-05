@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Core\Crm;
 
+use App\Domain\Crm\AiAssistant;
 use App\Domain\Crm\Messenger;
 use App\Http\Controllers\Controller;
 use App\Models\Crm\Conversation;
@@ -24,6 +25,7 @@ class InboxController extends Controller
         match ($filter) {
             'mine' => $q->where('assigned_to', $request->user()->id)->where('status', 'open'),
             'unread' => $q->where('unread_count', '>', 0),
+            'handoff' => $q->where('ai_handoff', true)->where('status', 'open'),
             'closed' => $q->where('status', 'closed'),
             'all' => null,
             default => $q->where('status', 'open'),
@@ -54,6 +56,7 @@ class InboxController extends Controller
             'windowOpen' => Messenger::windowOpen($conversation),
             'templates' => WaTemplate::where('crm_wa_channel_id', $conversation->crm_wa_channel_id)->where('status', 'APPROVED')->orderBy('name')->get(),
             'agents' => User::whereIn('role', ['admin', 'hq_crm'])->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'aiEnabled' => app(AiAssistant::class)->enabledFor($conversation),
         ]);
     }
 
@@ -71,9 +74,8 @@ class InboxController extends Controller
     {
         $data = $request->validate(['body' => ['required', 'string', 'max:4096']]);
         $messenger->sendText($conversation, $data['body'], $request->user()->id);
-        if (! $conversation->assigned_to) {
-            $conversation->update(['assigned_to' => $request->user()->id]);
-        }
+        $conversation->update(['ai_handoff' => false, 'ai_handoff_reason' => null, 'ai_suggestion' => null]
+            + ($conversation->assigned_to ? [] : ['assigned_to' => $request->user()->id]));
 
         return back();
     }
@@ -88,6 +90,16 @@ class InboxController extends Controller
         $messenger->sendTemplate($conversation->customer, WaTemplate::findOrFail($data['template_id']), array_values($data['params'] ?? []), $data['media_url'] ?? null, $request->user()->id);
 
         return back()->with('ok', 'Template terkirim.');
+    }
+
+    /** Minta saran balasan dan skor lead dari asisten AI (knowledge base + riwayat chat). */
+    public function assist(Conversation $conversation, AiAssistant $ai): RedirectResponse
+    {
+        $r = $ai->analyze($conversation);
+
+        return back()->with('ok', $r['needs_human']
+            ? 'Saran AI siap, tetapi AI menyarankan CS yang menjawab: '.($r['handoff_reason'] ?: 'informasi tidak ada di knowledge base').'.'
+            : 'Saran balasan AI siap. Periksa sebelum dikirim.');
     }
 
     public function update(Request $request, Conversation $conversation): RedirectResponse

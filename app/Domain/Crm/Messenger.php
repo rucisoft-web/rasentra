@@ -15,6 +15,8 @@ use App\Support\DomainException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
+use function Illuminate\Support\defer;
+
 /**
  * Pengiriman dan penerimaan WhatsApp untuk Rasentra CRM. Aturan Meta yang dijaga di sini:
  * pesan bebas (teks) hanya boleh dalam 24 jam sejak pesan terakhir pelanggan; di luar itu
@@ -148,10 +150,15 @@ final class Messenger
                 'unread_count' => $c->unread_count + 1, 'last_preview' => mb_substr($text, 0, 160),
             ]);
         });
-        $this->keywords($c->fresh(['customer', 'channel']), trim($text));
+        if (! $this->keywords($c->fresh(['customer', 'channel']), trim($text))) {
+            // Asisten AI berjalan setelah respons webhook terkirim agar Meta tidak menunggu.
+            $id = $c->id;
+            defer(fn () => app(AiAssistant::class)->handleInbound($id));
+        }
     }
 
-    private function keywords(Conversation $c, string $text): void
+    /** @return bool true bila pesan sudah ditangani kata kunci bawaan atau workflow */
+    private function keywords(Conversation $c, string $text): bool
     {
         $word = mb_strtoupper(preg_replace('/\s+/', ' ', $text));
         $customer = $c->customer;
@@ -159,13 +166,13 @@ final class Messenger
             $customer->update(['wa_status' => 'opted_out', 'wa_status_at' => now()]);
             $this->autoReply($c, 'Baik, Anda tidak akan menerima pesan promosi lagi dari kami. Kirim START kapan saja untuk berlangganan kembali.');
 
-            return;
+            return true;
         }
         if (in_array($word, self::OPT_IN, true)) {
             $customer->update(['wa_status' => 'opted_in', 'wa_status_at' => now()]);
             $this->autoReply($c, 'Terima kasih! Anda akan menerima info promo dan menu terbaru. Kirim STOP untuk berhenti.');
 
-            return;
+            return true;
         }
         $community = $word !== '' ? Community::whereRaw('UPPER(join_keyword) = ?', [$word])->first() : null;
         if ($community) {
@@ -176,11 +183,10 @@ final class Messenger
             $this->autoReply($c, "Selamat bergabung di komunitas {$community->name}! Info dan promo khusus anggota akan kami kirim lewat WhatsApp ini. Kirim STOP untuk berhenti.");
             app(WorkflowEngine::class)->fire('joined_community', $customer->fresh(), ['community_id' => $community->id]);
 
-            return;
+            return true;
         }
-        if ($text !== '') {
-            app(WorkflowEngine::class)->fire('keyword', $customer, ['text' => $text]);
-        }
+
+        return $text !== '' && app(WorkflowEngine::class)->fire('keyword', $customer, ['text' => $text]) > 0;
     }
 
     private function autoReply(Conversation $c, string $body): void

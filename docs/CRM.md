@@ -43,6 +43,14 @@ Menu **Rasentra CRM → WhatsApp → Workflow otomatis** (`crm_workflows`, `crm_
 
 Langkah: kirim template (MARKETING hanya ke opt-in, parameter `{name}`/`{first_name}`), kirim teks (hanya dalam jendela 24 jam), tunggu N jam, beri tag, masukkan ke komunitas, serahkan percakapan ke CS. Semua pemicu bisa dibatasi ke satu segmen, dan jeda ulang per pelanggan mencegah pesan berulang. Halaman detail menampilkan riwayat run dan catatan tiap langkah, serta tombol uji coba ke satu nomor.
 
-## Tahap berikutnya
+## Tahap 4: AI dengan Claude API (sudah ada)
 
-4. **AI (Claude API)**: knowledge base (FAQ, katalog, promo aktif dari Promotion Designer) dengan pencarian teks MySQL, asisten chat yang menyarankan/mengirim balasan dengan alih ke CS, dan skor lead dari percakapan.
+Memakai SDK resmi `anthropic-ai/sdk`, model `claude-opus-5-5` (ubah lewat `CRM_AI_MODEL`, tingkat `CRM_AI_EFFORT`). Fitur aktif bila `ANTHROPIC_API_KEY` diisi dan mode asisten AI dipilih per nomor WhatsApp (Mati / Saran / Otomatis). Permintaan memakai structured outputs (JSON Schema), prompt sistem yang di-cache, dan fallback server-side Anthropic (`fallbacks: "default"`) bila model menolak permintaan.
+
+| Fitur | Cara kerja |
+|---|---|
+| Knowledge base AI | Menu **AI → Knowledge base AI** (`crm_kb_articles`): artikel per topik, bisa khusus cabang. Untuk setiap chat, artikel paling relevan dipilih (pencocokan kata, judul dan kata kunci berbobot) lalu disertakan ke prompt. Ada uji pencarian. AI dilarang menjawab di luar artikel. |
+| Asisten chat | Setelah pesan masuk (setelah respons webhook), AI menulis saran balasan. Mode Saran: balasan muncul terisi di Inbox untuk diperiksa CS. Mode Otomatis: dikirim sendiri hanya bila keyakinan ≥ 0,75, tidak perlu CS, jendela 24 jam terbuka, belum ada CS yang menangani dalam 12 jam, dan maksimal 8 balasan AI per 24 jam. Komplain, refund, pesanan besar, atau info yang tidak ada diserahkan ke CS (tab Inbox "Perlu CS"). |
+| Identifikasi lead | Panggilan yang sama memberi niat (beli, katering, reseller, reservasi, tanya info, komplain), skor 0-100, tahap dingin/hangat/panas, minat, perkiraan nilai, dan langkah berikut. Menu **AI → Lead dari WhatsApp**; lead panas diberi tag "Lead panas" sehingga bisa jadi segmen atau pemicu workflow. Percakapan yang belum dianalisis dinilai tiap jam (`rasentra:crm-ai-leads`). |
+
+Pesan pelanggan diperlakukan sebagai data, bukan instruksi, dan AI tidak boleh mengarang harga, promo, atau diskon.

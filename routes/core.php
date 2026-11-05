@@ -157,6 +157,14 @@ Route::prefix('core')->name('core.')->group(function () {
             Route::post('workflows/{workflow}/toggle', [Core\Crm\WorkflowController::class, 'toggle'])->name('workflows.toggle');
             Route::post('workflows/{workflow}/test', [Core\Crm\WorkflowController::class, 'test'])->middleware('throttle:10,1')->name('workflows.test');
 
+            Route::post('inbox/{conversation}/assist', [Core\Crm\InboxController::class, 'assist'])->middleware('throttle:30,1')->name('inbox.assist');
+            Route::get('leads', [Core\Crm\LeadController::class, 'index'])->name('leads.index');
+            Route::get('knowledge', [Core\Crm\KnowledgeController::class, 'index'])->name('knowledge.index');
+            Route::post('knowledge', [Core\Crm\KnowledgeController::class, 'store'])->name('knowledge.store');
+            Route::get('knowledge/{article}/edit', [Core\Crm\KnowledgeController::class, 'edit'])->name('knowledge.edit');
+            Route::put('knowledge/{article}', [Core\Crm\KnowledgeController::class, 'update'])->name('knowledge.update');
+            Route::delete('knowledge/{article}', [Core\Crm\KnowledgeController::class, 'destroy'])->name('knowledge.destroy');
+
             Route::get('whatsapp', [Core\Crm\WhatsAppController::class, 'index'])->name('whatsapp.index');
             Route::post('whatsapp', [Core\Crm\WhatsAppController::class, 'store'])->name('whatsapp.store');
             Route::put('whatsapp/{channel}', [Core\Crm\WhatsAppController::class, 'update'])->name('whatsapp.update');

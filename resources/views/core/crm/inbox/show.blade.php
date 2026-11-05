@@ -11,7 +11,7 @@
         <div style="align-self:{{ $m->direction === 'in' ? 'flex-start' : 'flex-end' }};max-width:75%;padding:8px 12px;border-radius:10px;background:{{ $m->direction === 'in' ? 'var(--soft)' : 'var(--ok-bg)' }}">
           @if ($m->type === 'template')<div class="muted small">Template</div>@endif
           <div style="white-space:pre-wrap">{{ $m->body }}</div>
-          <div class="muted small">{{ Fmt::dt($m->created_at) }}@if($m->direction === 'out') · {{ $m->sender?->name ?? 'Sistem' }} · <span @class(['b', 'err' => $m->status === 'failed', 'ok' => $m->status === 'read', 'mute' => ! in_array($m->status, ['failed', 'read'])])>{{ $m->status }}</span>@endif</div>
+          <div class="muted small">{{ Fmt::dt($m->created_at) }}@if($m->direction === 'out') · {{ $m->by_ai ? 'Asisten AI' : ($m->sender?->name ?? 'Sistem') }} · <span @class(['b', 'err' => $m->status === 'failed', 'ok' => $m->status === 'read', 'mute' => ! in_array($m->status, ['failed', 'read'])])>{{ $m->status }}</span>@endif</div>
           @if ($m->error)<div class="small" style="color:var(--red)">{{ $m->error }}</div>@endif
         </div>
       @empty
@@ -21,7 +21,7 @@
     @if ($windowOpen)
       <form method="post" action="{{ route('core.crm.inbox.reply', $c) }}" class="bar" style="margin-top:10px">
         @csrf
-        <label class="f" style="flex:1"><span>Balas (jendela 24 jam terbuka sampai {{ Fmt::dt($c->last_inbound_at->copy()->addDay()) }})</span><textarea name="body" rows="2" required maxlength="4096"></textarea></label>
+        <label class="f" style="flex:1"><span>Balas (jendela 24 jam terbuka sampai {{ Fmt::dt($c->last_inbound_at->copy()->addDay()) }})</span><textarea name="body" rows="3" required maxlength="4096">{{ old('body', $c->ai_suggestion) }}</textarea>@if($c->ai_suggestion)<small>Terisi saran AI ({{ number_format(($c->ai_confidence ?? 0) * 100) }}% yakin). Periksa dan ubah bila perlu sebelum dikirim.</small>@endif</label>
         <button class="btn">Kirim</button>
       </form>
     @else
@@ -29,6 +29,26 @@
     @endif
   </div>
   <div>
+    @if ($aiEnabled || $c->lead_score !== null)
+    <div class="card" style="margin-bottom:14px">
+      <h3>Asisten AI</h3>
+      @if ($c->ai_handoff && $c->status === 'open')<p class="alert err small">Perlu CS: {{ $c->ai_handoff_reason }}</p>@endif
+      @if ($c->lead_score !== null)
+        <dl class="dl">
+          <dt>Lead</dt><dd><span @class(['b', 'ok' => $c->lead_stage === 'hot', 'warn' => $c->lead_stage === 'warm', 'mute' => $c->lead_stage === 'cold'])>{{ \App\Domain\Crm\AiAssistant::STAGES[$c->lead_stage] ?? $c->lead_stage }} · {{ $c->lead_score }}</span></dd>
+          <dt>Niat</dt><dd>{{ \App\Domain\Crm\AiAssistant::INTENTS[$c->lead_intent] ?? $c->lead_intent }}</dd>
+          @if($c->lead_interest)<dt>Minat</dt><dd>{{ $c->lead_interest }}</dd>@endif
+          @if($c->lead_value)<dt>Perkiraan nilai</dt><dd>{{ Fmt::money($c->lead_value) }}</dd>@endif
+          @if($c->lead_summary)<dt>Ringkasan</dt><dd>{{ $c->lead_summary }}</dd>@endif
+          @if($c->lead_next_action)<dt>Langkah berikut</dt><dd>{{ $c->lead_next_action }}</dd>@endif
+          <dt>Dianalisis</dt><dd class="small">{{ Fmt::dt($c->lead_scored_at) }}</dd>
+        </dl>
+      @endif
+      @if ($aiEnabled)
+        <form method="post" action="{{ route('core.crm.inbox.assist', $c) }}">@csrf<button class="btn alt sm">{{ $c->ai_suggested_at ? 'Analisis ulang & saran balasan' : 'Saran balasan AI' }}</button></form>
+      @endif
+    </div>
+    @endif
     <form class="card" method="post" action="{{ route('core.crm.inbox.update', $c) }}">
       @csrf @method('put')
       <h3>Penanganan</h3>

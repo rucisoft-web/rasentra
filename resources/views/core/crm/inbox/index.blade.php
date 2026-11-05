@@ -4,7 +4,7 @@
 @section('content')
 @if (! $channels)<div class="alert err">Belum ada nomor WhatsApp. Tambahkan di <a href="{{ route('core.crm.whatsapp.index') }}">Nomor & template</a>.</div>@endif
 <div class="tabs">
-  @foreach (['open' => 'Terbuka', 'mine' => 'Ditugaskan ke saya', 'unread' => 'Belum dibaca', 'closed' => 'Selesai', 'all' => 'Semua'] as $k => $v)
+  @foreach (['open' => 'Terbuka', 'mine' => 'Ditugaskan ke saya', 'unread' => 'Belum dibaca', 'handoff' => 'Perlu CS (dari AI)', 'closed' => 'Selesai', 'all' => 'Semua'] as $k => $v)
     <a href="{{ route('core.crm.inbox.index', ['filter' => $k]) }}" @class(['on' => $filter === $k])>{{ $v }}</a>
   @endforeach
 </div>
@@ -15,7 +15,7 @@
   <tbody>
   @forelse ($conversations as $c)
     <tr>
-      <td><a href="{{ route('core.crm.inbox.show', $c) }}"><b>{{ $c->customer->name }}</b></a> @if($c->unread_count)<span class="b err">{{ $c->unread_count }}</span>@endif<div class="muted small mono">{{ Phone::display($c->customer->phone) }}</div></td>
+      <td><a href="{{ route('core.crm.inbox.show', $c) }}"><b>{{ $c->customer->name }}</b></a> @if($c->unread_count)<span class="b err">{{ $c->unread_count }}</span>@endif @if($c->ai_handoff && $c->status === 'open')<span class="b warn">Perlu CS</span>@endif @if($c->lead_stage === 'hot')<span class="b ok">Lead panas {{ $c->lead_score }}</span>@endif<div class="muted small mono">{{ Phone::display($c->customer->phone) }}</div></td>
       <td class="small">{{ \Illuminate\Support\Str::limit($c->last_preview, 90) }}</td>
       <td class="small">{{ $c->channel->name }}</td>
       <td class="small">{{ $c->assignee?->name ?? '—' }}</td>
