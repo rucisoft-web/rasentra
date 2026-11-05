@@ -38,7 +38,7 @@ return new class extends Migration
             $table->string('error', 500)->nullable();
             $table->timestamps();
             $table->index(['status', 'resume_at']);
-            $table->index(['crm_workflow_id', 'crm_customer_id', 'created_at']);
+            $table->index(['crm_workflow_id', 'crm_customer_id', 'created_at'], 'crm_wf_runs_wf_customer_created_idx');
         });
     }
 
