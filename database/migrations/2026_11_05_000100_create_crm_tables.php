@@ -14,6 +14,21 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Cabang/outlet untuk CRM: outlet Rasentra (outlet_id terisi) dan outlet CV lain yang masih
+        // memakai POS lain (Rene POS, Raptor) dan Accurate Online. Dipisah dari tabel outlets agar
+        // outlet non-Rasentra tidak ikut ke POS, sinkronisasi, harga, promo dan posting SAP.
+        Schema::create('crm_branches', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('business_unit_id')->constrained();
+            $table->foreignId('outlet_id')->nullable()->unique()->constrained();
+            $table->string('code', 20)->unique();
+            $table->string('name', 120);
+            $table->string('pos_system', 20)->default('rasentra'); // rasentra, rene, raptor, lainnya
+            $table->string('city', 80)->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
         Schema::create('crm_customers', function (Blueprint $table) {
             $table->id();
             $table->string('phone', 20)->unique();
@@ -33,16 +48,16 @@ return new class extends Migration
             $table->index('last_purchase_on');
         });
 
-        Schema::create('crm_customer_outlets', function (Blueprint $table) {
+        Schema::create('crm_memberships', function (Blueprint $table) {
             $table->id();
             $table->foreignId('crm_customer_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('outlet_id')->constrained();
+            $table->foreignId('crm_branch_id')->constrained();
             $table->string('member_code', 40)->nullable();
             $table->string('source', 20); // import, pos, accurate, manual
             $table->date('joined_on')->nullable();
             $table->timestamps();
-            $table->unique(['crm_customer_id', 'outlet_id']);
-            $table->index(['outlet_id', 'member_code']);
+            $table->unique(['crm_customer_id', 'crm_branch_id']);
+            $table->index(['crm_branch_id', 'member_code']);
         });
 
         Schema::create('crm_tags', function (Blueprint $table) {
@@ -75,7 +90,7 @@ return new class extends Migration
             $table->foreignId('crm_customer_id')->constrained()->cascadeOnDelete();
             $table->string('source', 20); // pos, accurate
             $table->string('source_ref', 80);
-            $table->foreignId('outlet_id')->nullable()->constrained();
+            $table->foreignId('crm_branch_id')->nullable()->constrained();
             $table->foreignId('business_unit_id')->nullable()->constrained();
             $table->date('purchased_on');
             $table->decimal('amount', 18, 2);
@@ -87,7 +102,7 @@ return new class extends Migration
 
         Schema::create('crm_imports', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('outlet_id')->constrained();
+            $table->foreignId('crm_branch_id')->constrained();
             $table->foreignId('user_id')->nullable()->constrained();
             $table->string('file_name');
             $table->char('sha256', 64);
@@ -114,7 +129,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('business_unit_id')->unique()->constrained();
             $table->string('database_id', 40)->nullable();
-            $table->foreignId('default_outlet_id')->nullable()->constrained('outlets'); // pelanggan Accurate dicatat sebagai member outlet ini
+            $table->foreignId('default_branch_id')->nullable()->constrained('crm_branches'); // pelanggan Accurate dicatat sebagai member cabang ini
             $table->text('api_token')->nullable();
             $table->text('signature_secret')->nullable();
             $table->boolean('sync_customers')->default(true);
@@ -129,7 +144,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        foreach (['crm_accurate_connections', 'crm_segments', 'crm_imports', 'crm_purchases', 'crm_external_ids', 'crm_customer_tag', 'crm_tags', 'crm_customer_outlets', 'crm_customers'] as $t) {
+        foreach (['crm_accurate_connections', 'crm_segments', 'crm_imports', 'crm_purchases', 'crm_external_ids', 'crm_customer_tag', 'crm_tags', 'crm_memberships', 'crm_customers', 'crm_branches'] as $t) {
             Schema::dropIfExists($t);
         }
     }

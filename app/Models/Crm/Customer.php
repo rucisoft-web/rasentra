@@ -2,7 +2,6 @@
 
 namespace App\Models\Crm;
 
-use App\Models\Outlet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,12 +25,12 @@ class Customer extends Model
 
     public function memberships(): HasMany
     {
-        return $this->hasMany(CustomerOutlet::class, 'crm_customer_id');
+        return $this->hasMany(Membership::class, 'crm_customer_id');
     }
 
-    public function outlets(): BelongsToMany
+    public function branches(): BelongsToMany
     {
-        return $this->belongsToMany(Outlet::class, 'crm_customer_outlets', 'crm_customer_id', 'outlet_id')
+        return $this->belongsToMany(Branch::class, 'crm_memberships', 'crm_customer_id', 'crm_branch_id')
             ->withPivot(['member_code', 'source', 'joined_on'])->withTimestamps();
     }
 
@@ -43,5 +42,15 @@ class Customer extends Model
     public function purchases(): HasMany
     {
         return $this->hasMany(Purchase::class, 'crm_customer_id');
+    }
+
+    public function communities(): BelongsToMany
+    {
+        return $this->belongsToMany(Community::class, 'crm_community_members', 'crm_customer_id', 'crm_community_id')->withPivot(['source', 'joined_at']);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class, 'crm_customer_id');
     }
 }

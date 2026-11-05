@@ -3,7 +3,7 @@
 @section('content')
 <form class="card bar" method="post" action="{{ route('core.crm.imports.store') }}" enctype="multipart/form-data">
   @csrf
-  <label class="f"><span>Outlet</span><select name="outlet_id" required><option value="">Pilih outlet</option>@foreach ($outlets as $o)<option value="{{ $o->id }}" @selected(old('outlet_id') == $o->id)>{{ $o->code }} {{ $o->name }}</option>@endforeach</select></label>
+  <label class="f"><span>Outlet</span><select name="crm_branch_id" required><option value="">Pilih outlet</option>@foreach ($outlets as $o)<option value="{{ $o->id }}" @selected(old('crm_branch_id') == $o->id)>{{ $o->code }} {{ $o->name }}</option>@endforeach</select></label>
   <label class="f"><span>Beri tag (opsional)</span><select name="tag_id"><option value="">—</option>@foreach ($tags as $t)<option value="{{ $t->id }}">{{ $t->name }}</option>@endforeach</select></label>
   <label class="f"><span>File Excel/CSV (maks. 20 MB)</span><input type="file" name="file" accept=".xlsx,.csv" required></label>
   <button class="btn">Impor</button>
@@ -18,7 +18,7 @@
   <tbody>
   @forelse ($imports as $i)
     <tr>
-      <td>{{ Fmt::dt($i->created_at) }}</td><td>{{ $i->outlet->code }}</td><td>{{ $i->file_name }}</td><td>{{ $i->user?->name ?? '—' }}</td>
+      <td>{{ Fmt::dt($i->created_at) }}</td><td>{{ $i->branch->code }}</td><td>{{ $i->file_name }}</td><td>{{ $i->user?->name ?? '—' }}</td>
       <td class="n">{{ $i->created_count }}</td><td class="n">{{ $i->merged_count }}</td><td class="n">@if($i->error_count)<span class="b warn">{{ $i->error_count }}</span>@else 0 @endif</td>
       <td><a class="btn alt sm" href="{{ route('core.crm.imports.show', $i) }}">Ringkasan</a></td>
     </tr>

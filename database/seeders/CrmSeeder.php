@@ -3,6 +3,10 @@
 namespace Database\Seeders;
 
 use App\Domain\Crm\CustomerDirectory;
+use App\Models\BusinessUnit;
+use App\Models\Crm\Branch;
+use App\Models\Crm\Community;
+use App\Models\Crm\Customer;
 use App\Models\Crm\Segment;
 use App\Models\Crm\Tag;
 use App\Models\Outlet;
@@ -13,10 +17,12 @@ class CrmSeeder extends Seeder
 {
     public function run(CustomerDirectory $directory): void
     {
-        $outlets = Outlet::whereIn('code', ['SLO', 'LBK'])->pluck('id', 'code');
+        Branch::syncFromOutlets();
+        $outlets = Branch::whereIn('outlet_id', Outlet::whereIn('code', ['SLO', 'LBK'])->select('id'))->pluck('id', 'code');
         if ($outlets->isEmpty()) {
             return;
         }
+        $this->accurateCompanies();
         $tags = collect(['VIP', 'Reseller', 'Katering', 'Pecinta steak'])->mapWithKeys(fn ($n) => [$n => Tag::firstOrCreate(['name' => $n])->id]);
 
         $first = ['Budi', 'Sari', 'Andi', 'Dewi', 'Rudi', 'Maya', 'Agus', 'Rina', 'Hendra', 'Lusi', 'Tono', 'Wati', 'Joko', 'Nina', 'Eko', 'Fitri', 'Bayu', 'Intan', 'Yusuf', 'Lina'];
@@ -56,13 +62,35 @@ class CrmSeeder extends Seeder
             }
         }
 
+        foreach ([['Pecinta Steak Solo', 'STEAKSOLO', 'SLO', 6], ['Katering & Reseller Lombok', 'RESELLERLBK', 'LBK', 13]] as [$name, $kw, $code, $every]) {
+            $community = Community::firstOrCreate(['name' => $name], ['join_keyword' => $kw, 'crm_branch_id' => $outlets[$code] ?? null]);
+            $ids = Customer::orderBy('id')->pluck('id')->filter(fn ($id) => $id % $every === 0 || $id % 5 === 0)->values();
+            $community->members()->syncWithoutDetaching($ids->mapWithKeys(fn ($id) => [$id => ['source' => 'segment', 'joined_at' => now()]])->all());
+        }
+
         foreach ([
-            ['Win-back Solo', 'Member Solo yang lama tidak belanja, boleh dikirimi promo', ['outlet_ids' => [$outlets['SLO']], 'inactive_days' => 60, 'wa' => 'opted_in']],
+            ['Win-back Solo', 'Member Solo yang lama tidak belanja, boleh dikirimi promo', ['branch_ids' => [$outlets['SLO']], 'inactive_days' => 60, 'wa' => 'opted_in']],
             ['Ulang tahun bulan ini', 'Untuk ucapan dan voucher ulang tahun', ['birthday_month' => 'current', 'wa' => 'opted_in']],
             ['Pelanggan loyal', '≥ 5 transaksi dan aktif 60 hari terakhir', ['lifecycle' => 'loyal']],
             ['Belanja ≥ Rp5 juta', 'Kandidat VIP', ['min_total_spent' => 5000000]],
         ] as [$name, $desc, $rules]) {
             Segment::firstOrCreate(['name' => $name], ['description' => $desc, 'rules' => $rules]);
+        }
+    }
+
+    /** CV grup yang masih memakai Accurate Online + Rene POS/Raptor: masuk CRM lewat Accurate dan impor member. */
+    private function accurateCompanies(): void
+    {
+        foreach ([
+            ['MKS', 'CV Makasar Kulina', 'rene', 'Makassar'],
+            ['BPN', 'CV Balikpapan Kulina', 'rene', 'Balikpapan'],
+            ['SIL', 'CV Sarana Indoguna Lestari', 'raptor', 'Jakarta'],
+            ['JOG', 'CV Jogja Kulina Utama', 'rene', 'Yogyakarta'],
+            ['SMG', 'CV Semarang Kulina Utama', 'rene', 'Semarang'],
+            ['BDG', 'CV Bandung Kulina Utama', 'rene', 'Bandung'],
+        ] as [$code, $name, $pos, $city]) {
+            $bu = BusinessUnit::firstOrCreate(['code' => $code], ['name' => $name]);
+            Branch::firstOrCreate(['code' => $code.'-01'], ['business_unit_id' => $bu->id, 'name' => "Outlet {$city}", 'pos_system' => $pos, 'city' => $city]);
         }
     }
 }

@@ -20,14 +20,14 @@ final class SegmentQuery
         'never' => 'Belum pernah belanja',
     ];
 
-    public const RULE_KEYS = ['outlet_ids', 'tag_ids', 'wa', 'lifecycle', 'active_within_days', 'inactive_days', 'min_purchase_count', 'min_total_spent', 'birthday_month', 'city'];
+    public const RULE_KEYS = ['branch_ids', 'tag_ids', 'wa', 'lifecycle', 'active_within_days', 'inactive_days', 'min_purchase_count', 'min_total_spent', 'birthday_month', 'city'];
 
     public static function apply(Builder $q, array $rules): Builder
     {
         $today = now()->startOfDay();
 
-        if ($ids = array_filter(array_map('intval', (array) ($rules['outlet_ids'] ?? [])))) {
-            $q->whereHas('memberships', fn ($m) => $m->whereIn('outlet_id', $ids));
+        if ($ids = array_filter(array_map('intval', (array) ($rules['branch_ids'] ?? [])))) {
+            $q->whereHas('memberships', fn ($m) => $m->whereIn('crm_branch_id', $ids));
         }
         if ($ids = array_filter(array_map('intval', (array) ($rules['tag_ids'] ?? [])))) {
             $q->whereHas('tags', fn ($t) => $t->whereIn('crm_tags.id', $ids));
@@ -109,8 +109,8 @@ final class SegmentQuery
     public static function describe(array $rules, array $outlets = [], array $tags = []): string
     {
         $parts = [];
-        if (! empty($rules['outlet_ids'])) {
-            $parts[] = 'outlet '.implode('/', array_map(fn ($id) => $outlets[$id] ?? "#{$id}", (array) $rules['outlet_ids']));
+        if (! empty($rules['branch_ids'])) {
+            $parts[] = 'outlet '.implode('/', array_map(fn ($id) => $outlets[$id] ?? "#{$id}", (array) $rules['branch_ids']));
         }
         if (! empty($rules['tag_ids'])) {
             $parts[] = 'tag '.implode('/', array_map(fn ($id) => $tags[$id] ?? "#{$id}", (array) $rules['tag_ids']));

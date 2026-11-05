@@ -127,11 +127,44 @@ Route::prefix('core')->name('core.')->group(function () {
             Route::put('segments/{segment}', [Core\Crm\SegmentController::class, 'update'])->name('segments.update');
             Route::delete('segments/{segment}', [Core\Crm\SegmentController::class, 'destroy'])->name('segments.destroy');
 
+            Route::get('inbox', [Core\Crm\InboxController::class, 'index'])->name('inbox.index');
+            Route::get('inbox/{conversation}', [Core\Crm\InboxController::class, 'show'])->name('inbox.show');
+            Route::post('inbox/{conversation}/reply', [Core\Crm\InboxController::class, 'reply'])->name('inbox.reply');
+            Route::post('inbox/{conversation}/template', [Core\Crm\InboxController::class, 'template'])->name('inbox.template');
+            Route::put('inbox/{conversation}', [Core\Crm\InboxController::class, 'update'])->name('inbox.update');
+            Route::post('customers/{customer}/chat', [Core\Crm\InboxController::class, 'start'])->name('inbox.start');
+
+            Route::get('communities', [Core\Crm\CommunityController::class, 'index'])->name('communities.index');
+            Route::post('communities', [Core\Crm\CommunityController::class, 'store'])->name('communities.store');
+            Route::get('communities/{community}', [Core\Crm\CommunityController::class, 'show'])->name('communities.show');
+            Route::put('communities/{community}', [Core\Crm\CommunityController::class, 'update'])->name('communities.update');
+            Route::post('communities/{community}/members', [Core\Crm\CommunityController::class, 'addMembers'])->name('communities.members.store');
+            Route::delete('communities/{community}/members/{customer}', [Core\Crm\CommunityController::class, 'removeMember'])->name('communities.members.destroy');
+
+            Route::get('campaigns', [Core\Crm\CampaignController::class, 'index'])->name('campaigns.index');
+            Route::get('campaigns/create', [Core\Crm\CampaignController::class, 'create'])->name('campaigns.create');
+            Route::post('campaigns', [Core\Crm\CampaignController::class, 'store'])->name('campaigns.store');
+            Route::get('campaigns/{campaign}', [Core\Crm\CampaignController::class, 'show'])->name('campaigns.show');
+            Route::post('campaigns/{campaign}/launch', [Core\Crm\CampaignController::class, 'launch'])->name('campaigns.launch');
+            Route::post('campaigns/{campaign}/cancel', [Core\Crm\CampaignController::class, 'cancel'])->name('campaigns.cancel');
+
+            Route::get('whatsapp', [Core\Crm\WhatsAppController::class, 'index'])->name('whatsapp.index');
+            Route::post('whatsapp', [Core\Crm\WhatsAppController::class, 'store'])->name('whatsapp.store');
+            Route::put('whatsapp/{channel}', [Core\Crm\WhatsAppController::class, 'update'])->name('whatsapp.update');
+            Route::post('whatsapp/{channel}/templates', [Core\Crm\WhatsAppController::class, 'syncTemplates'])->middleware('throttle:6,1')->name('whatsapp.templates');
+
+            Route::get('branches', [Core\Crm\BranchController::class, 'index'])->name('branches.index');
+            Route::post('branches', [Core\Crm\BranchController::class, 'store'])->name('branches.store');
+            Route::post('branches/{branch}/toggle', [Core\Crm\BranchController::class, 'toggle'])->name('branches.toggle');
+            Route::post('companies', [Core\Crm\BranchController::class, 'storeCompany'])->name('companies.store');
+
             Route::get('accurate', [Core\Crm\AccurateController::class, 'index'])->name('accurate.index');
             Route::put('accurate/{company}', [Core\Crm\AccurateController::class, 'update'])->name('accurate.update');
             Route::post('accurate/{company}/test', [Core\Crm\AccurateController::class, 'test'])->name('accurate.test');
             Route::post('accurate/{company}/sync', [Core\Crm\AccurateController::class, 'sync'])->middleware('throttle:6,1')->name('accurate.sync');
         });
+
+        Route::get('panduan-migrasi-pos', [Core\MigrationGuideController::class, 'show'])->middleware('core:dashboard')->name('migration-guide');
 
         Route::get('audit', [Core\AuditController::class, 'index'])->middleware('core:audit')->name('audit');
     });
