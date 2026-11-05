@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Core\Crm;
 
 use App\Domain\Audit\Audit;
+use App\Domain\Crm\AiAssistant;
 use App\Domain\Crm\Messenger;
 use App\Http\Controllers\Controller;
 use App\Models\Crm\Branch;
@@ -32,7 +33,7 @@ class WhatsAppController extends Controller
     {
         $channel = WaChannel::create($this->validated($request));
         $this->defaultOnly($channel);
-        Audit::record('crm.wa_channel.created', $channel, $request->user()->id, after: $channel->only(['name', 'phone_number_id', 'waba_id']));
+        Audit::record('crm.wa_channel.created', $channel, $request->user()->id, after: $channel->only(['name', 'phone_number_id', 'waba_id', 'ai_mode']));
 
         return back()->with('ok', "Nomor {$channel->name} ditambahkan. Klik Sinkron template untuk mengambil template dari Meta.");
     }
@@ -45,7 +46,7 @@ class WhatsAppController extends Controller
         }
         $channel->update($data);
         $this->defaultOnly($channel);
-        Audit::record('crm.wa_channel.updated', $channel, $request->user()->id, after: $channel->only(['name', 'phone_number_id', 'waba_id']));
+        Audit::record('crm.wa_channel.updated', $channel, $request->user()->id, after: $channel->only(['name', 'phone_number_id', 'waba_id', 'ai_mode']));
 
         return back()->with('ok', 'Pengaturan nomor disimpan.');
     }
@@ -67,9 +68,11 @@ class WhatsAppController extends Controller
             'access_token' => [$channel ? 'nullable' : 'required', 'string', 'max:1000'],
             'crm_branch_id' => ['nullable', 'exists:crm_branches,id'],
             'send_per_minute' => ['required', 'integer', 'min:1', 'max:1000'],
+            'ai_mode' => ['nullable', Rule::in(array_keys(AiAssistant::MODES))],
             'is_default' => ['boolean'],
         ]);
         $data['is_default'] = (bool) ($data['is_default'] ?? false);
+        $data['ai_mode'] = $data['ai_mode'] ?? 'off';
 
         return $data;
     }

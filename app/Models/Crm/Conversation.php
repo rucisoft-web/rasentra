@@ -15,7 +15,7 @@ class Conversation extends Model
 
     protected function casts(): array
     {
-        return ['last_message_at' => 'datetime', 'last_inbound_at' => 'datetime'];
+        return ['last_message_at' => 'datetime', 'last_inbound_at' => 'datetime', 'ai_suggested_at' => 'datetime', 'lead_scored_at' => 'datetime', 'ai_handoff' => 'boolean', 'ai_confidence' => 'float', 'lead_value' => 'decimal:2'];
     }
 
     public function customer(): BelongsTo

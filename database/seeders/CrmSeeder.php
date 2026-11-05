@@ -7,6 +7,7 @@ use App\Models\BusinessUnit;
 use App\Models\Crm\Branch;
 use App\Models\Crm\Community;
 use App\Models\Crm\Customer;
+use App\Models\Crm\KbArticle;
 use App\Models\Crm\Segment;
 use App\Models\Crm\Tag;
 use App\Models\Crm\Workflow;
@@ -76,6 +77,16 @@ class CrmSeeder extends Seeder
             ['Belanja ≥ Rp5 juta', 'Kandidat VIP', ['min_total_spent' => 5000000]],
         ] as [$name, $desc, $rules]) {
             Segment::firstOrCreate(['name' => $name], ['description' => $desc, 'rules' => $rules]);
+        }
+
+        // Contoh knowledge base AI: ganti isinya dengan informasi resmi sebelum asisten AI diaktifkan.
+        foreach ([
+            ['Jam buka outlet', 'jam, buka, tutup, operasional, libur', 'CONTOH, mohon disesuaikan: outlet buka setiap hari pukul 10.00 sampai 21.00 waktu setempat. Pada hari raya jam buka bisa berubah dan diumumkan lewat WhatsApp komunitas.'],
+            ['Cara pesan dan pengiriman', 'pesan, order, antar, kirim, ongkir, delivery', 'CONTOH, mohon disesuaikan: pesanan bisa lewat chat WhatsApp ini dengan menyebut produk, jumlah, alamat dan jam antar. Pengiriman dalam kota memakai kurir instan dengan ongkos sesuai aplikasi. Daging dikirim dalam kemasan dingin.'],
+            ['Katering dan acara', 'katering, catering, acara, pax, prasmanan, nasi box', 'CONTOH, mohon disesuaikan: katering melayani acara mulai 30 porsi dan dipesan paling lambat 3 hari sebelumnya. Penawaran harga dibuat oleh tim penjualan setelah jumlah porsi, tanggal dan menu diketahui.'],
+            ['Reseller dan pembelian grosir', 'reseller, grosir, agen, partai, restoran, hotel', 'CONTOH, mohon disesuaikan: harga khusus tersedia untuk reseller, restoran dan hotel dengan pembelian rutin. Tim penjualan akan menghubungi untuk mengirim daftar harga grosir dan syarat pembayaran.'],
+        ] as [$title, $keywords, $body]) {
+            KbArticle::firstOrCreate(['title' => $title], ['keywords' => $keywords, 'body' => $body, 'is_active' => true]);
         }
 
         // Contoh workflow (nonaktif): staf CRM tinggal memilih template yang sudah disetujui Meta lalu mengaktifkan.
