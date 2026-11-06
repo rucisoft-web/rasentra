@@ -23,7 +23,7 @@ use Illuminate\View\View;
 class SapMappingController extends Controller
 {
     public const TYPES = ['product' => 'Produk → ItemCode', 'outlet' => 'Outlet → Gudang', 'payment_method' => 'Metode bayar → Akun', 'customer' => 'Customer',
-        'account' => 'Penyesuaian stok → Akun (waste, count)'];
+        'account' => 'Akun: penyesuaian stok (waste, count), ongkir (delivery_fee, delivery_payable)'];
 
     public const METHODS = ['cash', 'qris', 'edc', 'edc_manual', 'voucher', 'points'];
 

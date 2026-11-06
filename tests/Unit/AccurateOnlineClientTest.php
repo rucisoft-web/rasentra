@@ -60,4 +60,24 @@ class AccurateOnlineClientTest extends TestCase
         Http::assertSent(fn ($req) => $req->data()['bankNo'] === '110101'
             && $req->data()['detailInvoice[0].invoiceNo'] === AccurateOnlineClient::number('Invoices', 'order:abc'));
     }
+
+    public function test_journal_is_posted_as_journal_voucher(): void
+    {
+        Http::fake(['zeus.accurate.id/accurate/api/journal-voucher/save.do' => Http::response(['s' => true, 'r' => ['id' => 77]])]);
+
+        $this->client()->create('JournalEntries', [
+            'ReferenceDate' => '2026-11-05', 'Memo' => 'Ongkir SLO-1', 'DocTotal' => '12000.00', 'U_POS_SRC' => 'delivery:d1',
+            'JournalEntryLines' => [
+                ['AccountCode' => '6110001', 'Debit' => '12000.00', 'Credit' => '0.00'],
+                ['AccountCode' => '1110004', 'Debit' => '0.00', 'Credit' => '12000.00'],
+            ],
+        ]);
+
+        Http::assertSent(function ($req) {
+            $d = $req->data();
+
+            return $d['detailJournalVoucher[0].amountType'] === 'DEBIT' && $d['detailJournalVoucher[1].amountType'] === 'CREDIT'
+                && $d['detailJournalVoucher[1].accountNo'] === '1110004' && $d['number'] === AccurateOnlineClient::number('JournalEntries', 'delivery:d1');
+        });
+    }
 }

@@ -11,6 +11,7 @@ Route::prefix('v1/sync')->middleware(['device', 'throttle:600,1'])->controller(S
     Route::get('snapshot', 'snapshot');
     Route::post('ack', 'ack');
     Route::post('heartbeat', 'heartbeat');
+    Route::get('member-balance', 'memberBalance');
 });
 
 // Rasentra CRM: webhook WhatsApp Business Cloud API (diverifikasi dengan App Secret Meta).

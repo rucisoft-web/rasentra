@@ -4,11 +4,14 @@ namespace App\Domain\Membership;
 
 use App\Domain\Audit\Audit;
 use App\Domain\Settings\Settings;
+use App\Domain\Sync\CentralClient;
 use App\Domain\Sync\Outbox;
+use App\Models\IntegrationException;
 use App\Models\Member;
 use App\Models\MemberPointEntry;
 use App\Models\MemberTier;
 use App\Models\Order;
+use App\Models\SalesReturn;
 use App\Models\User;
 use App\Support\Decimal;
 use App\Support\DomainException;
@@ -130,9 +133,46 @@ final class MembershipService
         if ($points->isLessThan($min)) {
             throw new DomainException('points_below_min', "Minimal penukaran {$min} poin.", 422);
         }
-        if ($points->plus($already)->isGreaterThan(Decimal::of($member->points_balance))) {
-            throw new DomainException('points_insufficient', 'Poin member tidak cukup. Saldo '.Decimal::money($member->points_balance).' poin.', 422);
+        [$available, $offline] = $this->availablePoints($member, $order->outlet_id);
+        if ($points->plus($already)->isGreaterThan($available)) {
+            if ($offline) {
+                throw new DomainException('points_offline_limit', 'Rasentra Central tidak terjangkau. Saat offline penukaran dibatasi '.Decimal::money($available).' poin per member agar poin tidak terpakai ganda di outlet lain.', 422);
+            }
+            throw new DomainException('points_insufficient', 'Poin member tidak cukup. Saldo '.Decimal::money($available).' poin.', 422);
         }
+    }
+
+    /**
+     * Saldo yang boleh ditukar di outlet ini. Saldo lokal bisa tertinggal bila member baru saja
+     * menukar poin di outlet lain, jadi Rasentra Lokal menanyakan saldo resmi ke Central dan
+     * memakai yang lebih kecil. Bila Central tidak terjangkau, penukaran dibatasi
+     * member.offline_redeem_max poin supaya risiko penukaran ganda kecil dan terukur.
+     *
+     * @return array{0: BigDecimal, 1: bool} [saldo yang boleh dipakai, dibatasi karena offline]
+     */
+    public function availablePoints(Member $member, int $outletId): array
+    {
+        $local = Decimal::of($member->points_balance);
+        if (config('rasentra.profile') === 'central' || blank(config('rasentra.central.url'))) {
+            return [$local, false];
+        }
+        try {
+            $res = app(CentralClient::class)->request(3)->get('member-balance', ['phone' => $member->phone]);
+            if ($res->successful()) {
+                $central = $res->json('points_balance');
+                if ($central === null) {
+                    return [$local, false]; // member belum sampai di Central: hanya poin outlet ini
+                }
+                $central = Decimal::of($central);
+
+                return [$central->isLessThan($local) ? $central : $local, false];
+            }
+        } catch (\Throwable) {
+            // jatuh ke batas offline
+        }
+        $cap = Decimal::of((string) $this->settings->get('member.offline_redeem_max', $outletId));
+
+        return $cap->isLessThan($local) ? [$cap, true] : [$local, false];
     }
 
     /**
@@ -194,6 +234,76 @@ final class MembershipService
             ['member_id' => $member->id, 'phone' => $member->phone, 'entries' => $rows], $date);
     }
 
+    /**
+     * Dipanggil di dalam transaksi retur: poin yang dulu didapat dari struk ini ditarik pro-rata
+     * nilai retur, dan bila uang dikembalikan sebagai poin, poinnya dikreditkan lagi. Mutasinya
+     * dikirim ke Central lewat outbox seperti mutasi transaksi biasa.
+     */
+    public function reverseForReturn(Order $order, SalesReturn $return, User $actor): void
+    {
+        if (! $order->crm_customer_id) {
+            return;
+        }
+        $member = Member::lockForUpdate()->find($order->crm_customer_id);
+        if ($member === null) {
+            return;
+        }
+        $outletId = $order->outlet_id;
+        $earned = Decimal::of($order->points_earned ?? 0);
+        $reversed = Decimal::sum(MemberPointEntry::where('order_id', $order->id)->where('type', 'reverse')->pluck('points'))->negated();
+        $orderNet = Decimal::of($order->net_amount);
+        $returnNet = Decimal::of($return->net_amount);
+        $redeemAmount = Decimal::sum($order->payments()->where('method', 'points')->where('status', 'succeeded')->pluck('amount'));
+        $earnBase = $orderNet->minus($redeemAmount);
+
+        $entries = [];
+        if ($earned->isPositive() && $orderNet->isPositive()) {
+            $claw = $earned->multipliedBy($returnNet)->dividedBy($orderNet, 0, RoundingMode::Up);
+            $left = $earned->minus($reversed);
+            $claw = $claw->isGreaterThan($left) ? $left : $claw;
+            if ($claw->isPositive()) {
+                $spend = $earnBase->multipliedBy($returnNet)->dividedBy($orderNet, 2, RoundingMode::Down);
+                $entries[] = ['type' => 'reverse', 'points' => Decimal::money($claw->negated()), 'order_amount' => Decimal::money($spend), 'note' => 'Retur '.$return->doc_no.' atas '.$order->doc_no];
+            }
+        }
+        if ($return->refund_method === 'points') {
+            $back = $this->pointsFor((string) $return->net_amount, $outletId)->toScale(0, RoundingMode::Down);
+            if ($back->isPositive()) {
+                $entries[] = ['type' => 'refund', 'points' => Decimal::money($back), 'order_amount' => Decimal::money($returnNet), 'note' => 'Pengembalian poin '.$return->doc_no];
+            }
+        }
+        if ($entries === []) {
+            return;
+        }
+
+        $date = $return->business_date->toDateString();
+        $rows = [];
+        $balance = Decimal::of($member->points_balance);
+        $spend = Decimal::of($member->member_spend);
+        foreach ($entries as $e) {
+            $rows[] = MemberPointEntry::create($e + [
+                'id' => (string) Str::uuid7(),
+                'crm_customer_id' => $member->id,
+                'outlet_id' => $outletId,
+                'order_id' => $order->id,
+                'business_date' => $date,
+                'created_by' => $actor->id,
+            ])->toArray();
+            $balance = $balance->plus($e['points']);
+            if ($e['type'] === 'reverse') {
+                $spend = $spend->minus($e['order_amount']);
+            }
+        }
+        // Poin yang sudah terpakai tidak bisa ditarik lagi; saldo berhenti di nol dan selisihnya tercatat di ledger.
+        $member->update([
+            'points_balance' => Decimal::money($balance->isNegative() ? Decimal::of(0) : $balance),
+            'member_spend' => Decimal::money($spend->isNegative() ? Decimal::of(0) : $spend),
+        ]);
+
+        Outbox::record($outletId, 'member', (string) $member->id, 1, 'member.points',
+            ['member_id' => $member->id, 'phone' => $member->phone, 'entries' => $rows], $date);
+    }
+
     /** Central: terapkan mutasi poin sekali saja, perbarui saldo dan tier. */
     public function applyAtCentral(array $entries, ?int $memberId = null, ?string $phone = null): ?Member
     {
@@ -210,7 +320,19 @@ final class MembershipService
             $member->points_balance = Decimal::money(Decimal::of($member->points_balance)->plus($e['points']));
             if ($e['type'] === 'earn') {
                 $member->member_spend = Decimal::money(Decimal::of($member->member_spend)->plus($e['order_amount']));
+            } elseif ($e['type'] === 'reverse') {
+                $spend = Decimal::of($member->member_spend)->minus($e['order_amount']);
+                $member->member_spend = Decimal::money($spend->isNegative() ? Decimal::of(0) : $spend);
             }
+        }
+        // Saldo minus berarti poin yang sama ditukar di lebih dari satu outlet sebelum tersinkron
+        // (mis. salah satu outlet offline), atau poin hasil belanja yang diretur sudah terpakai.
+        // Ditampilkan di antrean pengecualian agar pusat menindaklanjuti (koreksi atau tagih).
+        if (Decimal::of($member->points_balance)->isNegative()) {
+            IntegrationException::updateOrCreate(
+                ['kind' => 'points_negative', 'source_type' => 'member', 'source_id' => (string) $member->id, 'status' => 'open'],
+                ['message' => "Saldo poin member {$member->code} ({$member->name}) minus ".Decimal::money($member->points_balance).'. Periksa penukaran ganda antar-outlet lalu koreksi lewat penyesuaian poin.'],
+            );
         }
         $member->member_tier_id = $this->tierFor((string) $member->member_spend)?->id ?? $member->member_tier_id;
         $member->save();

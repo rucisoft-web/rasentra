@@ -17,7 +17,7 @@ use RuntimeException;
  * Klien Accurate Online untuk CV yang membukukan di Accurate. Bentuk dokumen dari posting
  * Rasentra Central (Invoices, IncomingPayments, CreditNotes, InventoryGenExits/Entries)
  * diterjemahkan ke Faktur Penjualan, Penerimaan Penjualan, Retur Penjualan dan Penyesuaian
- * Persediaan Accurate. Mapping item, gudang, pelanggan dan akun kas/bank tetap memakai
+ * Persediaan Accurate, serta jurnal (JournalEntries) menjadi Bukti Jurnal. Mapping item, gudang, pelanggan dan akun kas/bank tetap memakai
  * tabel mapping yang sama (kunci = kode database CV), jadi monitoring dan retry di Core sama.
  *
  * Nomor dokumen Accurate diturunkan dari referensi sumber POS, sehingga pemeriksaan
@@ -35,10 +35,11 @@ final class AccurateOnlineClient implements SapClient
         'CreditNotes' => 'sales-return',
         'InventoryGenExits' => 'item-adjustment',
         'InventoryGenEntries' => 'item-adjustment',
+        'JournalEntries' => 'journal-voucher',
     ];
 
     private const PREFIX = [
-        'Invoices' => 'RSI', 'IncomingPayments' => 'RSR', 'CreditNotes' => 'RRT', 'InventoryGenExits' => 'RAO', 'InventoryGenEntries' => 'RAI',
+        'Invoices' => 'RSI', 'IncomingPayments' => 'RSR', 'CreditNotes' => 'RRT', 'InventoryGenExits' => 'RAO', 'InventoryGenEntries' => 'RAI', 'JournalEntries' => 'RJV',
     ];
 
     private ?array $credentials = null;
@@ -77,6 +78,7 @@ final class AccurateOnlineClient implements SapClient
             'IncomingPayments' => $this->receipt($payload, $ref),
             'CreditNotes' => $this->salesReturn($payload, $ref),
             'InventoryGenExits', 'InventoryGenEntries' => $this->adjustment($object, $payload, $ref),
+            'JournalEntries' => $this->journal($payload, $ref),
             default => throw new RuntimeException("Dokumen {$object} belum didukung untuk Accurate Online."),
         };
 
@@ -180,6 +182,22 @@ final class AccurateOnlineClient implements SapClient
                 'warehouseName' => $l['WarehouseCode'] ?? null,
             ], fn ($v) => $v !== null), $p['DocumentLines']),
         ], fn ($v) => $v !== null);
+    }
+
+    /** Jurnal umum (bukti jurnal) Accurate, mis. biaya ongkos kirim. */
+    private function journal(array $p, string $ref): array
+    {
+        return [
+            'transDate' => $this->date($p['ReferenceDate']),
+            'number' => self::number('JournalEntries', $ref),
+            'description' => $p['Memo'] ?? $ref,
+            'detailJournalVoucher' => array_map(fn ($l) => [
+                'accountNo' => $l['AccountCode'],
+                'amount' => Decimal::of($l['Debit'])->isPositive() ? $l['Debit'] : $l['Credit'],
+                'amountType' => Decimal::of($l['Debit'])->isPositive() ? 'DEBIT' : 'CREDIT',
+                'memo' => $l['LineMemo'] ?? null,
+            ], $p['JournalEntryLines']),
+        ];
     }
 
     private function discount(array $line): ?string

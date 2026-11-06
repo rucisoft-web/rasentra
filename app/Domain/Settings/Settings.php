@@ -21,10 +21,12 @@ final class Settings
         'member.earn_per_amount' => ['Membership', 'Belanja per 1 poin (Rp)', 'money', 10000, 'Setiap kelipatan nominal ini memberi 1 poin sebelum pengali tier.'],
         'member.point_value' => ['Membership', 'Nilai tukar 1 poin (Rp)', 'money', 100, 'Nilai rupiah satu poin saat dipakai membayar.'],
         'member.min_redeem' => ['Membership', 'Minimal poin sekali tukar', 'int', 100, ''],
+        'member.offline_redeem_max' => ['Membership', 'Batas tukar poin saat Central offline', 'int', 200, 'Saat outlet tidak terhubung ke Central, penukaran per member dibatasi sebanyak ini agar poin tidak terpakai ganda di outlet lain. Isi 0 untuk menolak penukaran saat offline.'],
         'self_order.enabled' => ['Self ordering', 'Pesan mandiri lewat QR meja', 'bool', true, ''],
         'self_order.auto_send_kitchen' => ['Self ordering', 'Langsung kirim ke dapur setelah diterima pelayan', 'bool', true, ''],
         'delivery.default_fee' => ['Delivery', 'Ongkos kurir internal bawaan (Rp)', 'money', 10000, ''],
         'delivery.providers' => ['Delivery', 'Mitra pengiriman (pisahkan koma)', 'text', 'internal,gofood,grabfood,shopeefood', ''],
+        'delivery.post_fee' => ['Delivery', 'Posting ongkos kirim ke akuntansi', 'bool', true, 'Pengiriman yang selesai dengan ongkos > 0 dibukukan sebagai jurnal biaya pengiriman di SAP B1 / Accurate milik CV.'],
         'staff.late_grace_minutes' => ['Staf & shift', 'Toleransi terlambat (menit)', 'int', 10, 'Absen masuk setelah jam mulai + toleransi dihitung terlambat.'],
     ];
 

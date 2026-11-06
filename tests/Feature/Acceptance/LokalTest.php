@@ -140,7 +140,13 @@ class LokalTest extends AcceptanceTestCase
             ->assertSee('HRG-2026-10')->assertSee('UJI-SAPI-2KG');
         $this->actingAs($this->head)->get(route('lokal.index'))->assertOk()->assertSee('Terhubung');
 
-        // Database uji berada di memori, jadi backup menolak dengan pesan yang jelas.
-        $this->actingAs($this->head)->post(route('lokal.backup'))->assertSessionHas('error', fn ($m) => str_contains($m, 'Backup gagal'));
+        $res = $this->actingAs($this->head)->post(route('lokal.backup'));
+        if (config('database.default') === 'sqlite' && config('database.connections.sqlite.database') === ':memory:') {
+            // Database uji berada di memori, jadi backup menolak dengan pesan yang jelas.
+            $res->assertSessionHas('error', fn ($m) => str_contains($m, 'Backup gagal'));
+        } else {
+            // Database sungguhan (mis. MySQL): backup berhasil dan tercatat, atau gagal dengan pesan yang jelas.
+            $this->assertTrue(session()->has('ok') || str_contains((string) session('error'), 'Backup gagal'));
+        }
     }
 }

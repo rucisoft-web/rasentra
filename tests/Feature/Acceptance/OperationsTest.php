@@ -3,11 +3,15 @@
 namespace Tests\Feature\Acceptance;
 
 use App\Domain\Access\Permissions;
+use App\Domain\Integration\Sap\FakeSapClient;
+use App\Domain\Integration\Sap\SapClient;
+use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Membership\MembershipService;
 use App\Domain\Operations\DeliveryService;
 use App\Domain\Operations\StaffService;
 use App\Domain\Sales\Approval;
 use App\Domain\Sales\PaymentService;
+use App\Domain\Sales\ReturnService;
 use App\Domain\Sales\TableService;
 use App\Domain\Settings\Settings;
 use App\Domain\Sync\PublicationApplier;
@@ -16,21 +20,27 @@ use App\Models\BusinessUnit;
 use App\Models\Crm\AccurateConnection;
 use App\Models\Delivery;
 use App\Models\DiningTable;
+use App\Models\IntegrationException;
 use App\Models\KitchenTicket;
 use App\Models\Member;
 use App\Models\MemberPointEntry;
 use App\Models\MemberTier;
 use App\Models\OutboxEvent;
+use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\PublicationVersion;
 use App\Models\Role;
+use App\Models\SapDocument;
+use App\Models\SapMapping;
 use App\Models\Setting;
 use App\Models\ShiftTemplate;
 use App\Models\StaffRoster;
 use App\Models\User;
 use App\Models\Visit;
 use Database\Seeders\OperationsSeeder;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Fitur operasional grup: membership & poin, self ordering QR, delivery order, roster & absensi,
@@ -265,5 +275,83 @@ class OperationsTest extends AcceptanceTestCase
         AccurateConnection::create(['business_unit_id' => $bu->id, 'api_token' => 'crm-tok', 'signature_secret' => 'crm-sec']);
         $creds = $bu->fresh()->accurateCredentials();
         $this->assertSame(['crm-tok', 'crm-sec'], [$creds['token'], $creds['secret']]);
+    }
+
+    public function test_return_takes_back_points_earned_on_the_returned_part(): void
+    {
+        $member = $this->members()->enroll(['name' => 'Retur', 'phone' => '081299990010'], $this->outlet->id, $this->cashier);
+        $order = $this->newOrder();
+        $this->orders()->addSku($order, Product::where('code', '0200201')->first(), '3');
+        $this->members()->attach($order->fresh(), $member);
+        $order = $this->payAndFinalize($order);
+        $this->assertSame('9.00', (string) $member->fresh()->points_balance);
+
+        $line = $order->lines()->where('status', 'active')->firstOrFail();
+        $return = app(ReturnService::class)->create($order->fresh(), $this->cashier, [['order_line_id' => $line->id, 'quantity' => '1']], 'Salah beli', ['method' => 'cash'], $this->approval);
+
+        // 1 dari 3 barang diretur: ceil(9 × 32.000 / 96.000) = 3 poin ditarik.
+        $this->assertSame('6.00', (string) $member->fresh()->points_balance);
+        $entry = MemberPointEntry::where('order_id', $order->id)->where('type', 'reverse')->firstOrFail();
+        $this->assertSame('-3.00', (string) $entry->points);
+        $this->assertStringContainsString($return->doc_no, $entry->note);
+        $event = OutboxEvent::where('event_type', 'member.points')->latest('id')->first();
+        $this->assertSame('reverse', $event->payload['entries'][0]['type']);
+    }
+
+    public function test_central_flags_negative_points_after_double_redeem(): void
+    {
+        Member::create(['id' => 78, 'phone' => '6281200000078', 'name' => 'Dobel', 'code' => 'MDOBEL', 'is_member' => true, 'points_balance' => 150]);
+        $redeem = fn ($id) => ['id' => $id, 'outlet_id' => $this->outlet->id, 'order_id' => null, 'type' => 'redeem', 'points' => '-150.00', 'order_amount' => '15000.00', 'business_date' => now()->toDateString()];
+        $this->members()->applyAtCentral([$redeem('019a0000-0000-7000-8000-0000000000a1')], 78);
+        $this->assertSame(0, IntegrationException::where('kind', 'points_negative')->count());
+        $this->members()->applyAtCentral([$redeem('019a0000-0000-7000-8000-0000000000a2')], 78);
+        $this->assertSame(1, IntegrationException::where(['kind' => 'points_negative', 'source_id' => '78', 'status' => 'open'])->count());
+    }
+
+    public function test_points_redeem_checks_central_balance_and_is_capped_offline(): void
+    {
+        config(['rasentra.central.url' => 'https://central.test', 'rasentra.central.token' => 't']);
+        $member = $this->members()->enroll(['name' => 'Dua Outlet', 'phone' => '081299990011'], $this->outlet->id);
+        $member->update(['points_balance' => 500]);
+        $order = $this->newOrder();
+        $this->orders()->addSku($order, Product::where('code', '0200201')->first(), '1');
+        $this->members()->attach($order->fresh(), $member);
+        $payments = app(PaymentService::class);
+
+        // Central mencatat saldo 100 (poin sudah ditukar di outlet lain): yang lebih kecil dipakai.
+        Http::fake(['central.test/api/v1/sync/member-balance*' => Http::response(['points_balance' => '100.00'])]);
+        $this->assertDomainError('points_insufficient', fn () => $payments->add($order->fresh(), 'points', '15000'));
+        $payments->add($order->fresh(), 'points', '10000');
+        $order = $this->newOrder();
+        $this->orders()->addSku($order, Product::where('code', '0200201')->first(), '1');
+        $this->members()->attach($order->fresh(), $member);
+
+        // Central tidak terjangkau: penukaran dibatasi member.offline_redeem_max (200 poin).
+        Http::fake(fn () => throw new ConnectionException('down'));
+        $this->assertDomainError('points_offline_limit', fn () => $payments->add($order->fresh(), 'points', '30000'));
+        $payments->add($order->fresh(), 'points', '20000');
+    }
+
+    public function test_delivered_fee_is_posted_as_journal_once(): void
+    {
+        $fake = new FakeSapClient;
+        $this->app->instance(SapClient::class, $fake);
+        $sap = app(SapPostingService::class);
+        $companyDb = Outlet::sapCompanyDb($this->outlet->id);
+        $delivery = ['id' => '019a0000-0000-7000-8000-0000000000d1', 'outlet_id' => $this->outlet->id, 'doc_no' => 'SLO-1', 'provider' => 'internal',
+            'courier_name' => 'Kurir', 'fee' => '12000.00', 'status' => 'on_the_way', 'business_date' => '2026-11-05', 'delivered_at' => null];
+
+        $this->assertSame('not_required', $sap->postDeliveryFee($delivery)['status']);
+        $delivery = ['status' => 'delivered', 'delivered_at' => '2026-11-05T10:00:00Z'] + $delivery;
+        $this->assertSame('failed', $sap->postDeliveryFee($delivery)['status']);
+        $this->assertTrue(IntegrationException::where(['source_type' => 'delivery', 'kind' => 'missing_mapping'])->exists());
+
+        SapMapping::create(['company_db' => $companyDb, 'entity_type' => 'account', 'entity_key' => 'delivery_fee', 'sap_code' => '6110001']);
+        SapMapping::create(['company_db' => $companyDb, 'entity_type' => 'account', 'entity_key' => 'delivery_payable', 'sap_code' => '1110004']);
+        $this->assertSame('posted', $sap->postDeliveryFee($delivery)['status']);
+        $this->assertSame('posted', $sap->postDeliveryFee($delivery)['status']);
+        $this->assertCount(1, $fake->documents['JournalEntries']);
+        $doc = SapDocument::where(['source_type' => 'delivery', 'sap_object' => 'JournalEntries'])->firstOrFail();
+        $this->assertSame(['6110001', '12000.00'], [$doc->request_payload['JournalEntryLines'][0]['AccountCode'], $doc->request_payload['JournalEntryLines'][0]['Debit']]);
     }
 }

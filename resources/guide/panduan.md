@@ -581,6 +581,10 @@ Bagian ini menjelaskan fitur yang diatur kantor pusat lalu dijalankan sama di se
 
 Poin dihitung saat transaksi selesai: setiap kelipatan belanja (bawaan Rp10.000) memberi 1 poin dikali pengali tier. Bagian yang dibayar dengan poin tidak menghasilkan poin. Saldo resmi ada di Rasentra Central dan diperbarui ke semua outlet setelah transaksi terkirim.
 
+Sebelum menerima pembayaran poin, POS menanyakan saldo resmi ke Central dan memakai saldo yang lebih kecil, sehingga poin yang baru ditukar di outlet lain tidak bisa dipakai lagi. Bila Central sedang tidak terjangkau, penukaran dibatasi (bawaan 200 poin per transaksi, diatur di **Pengaturan umum → Batas tukar poin saat Central offline**). Bila tetap terjadi saldo minus, pusat melihatnya di antrean pengecualian sebagai **points_negative** dan mengoreksinya lewat penyesuaian poin.
+
+Saat struk diretur, poin yang dulu didapat dari struk itu ditarik sebanding nilai retur. Bila pengembalian dipilih sebagai **Poin member**, nilai retur dikreditkan kembali sebagai poin.
+
 ### 10.2 Pesanan mandiri dari QR meja (pelayan dan kasir resto)
 
 1. Tamu memindai QR di meja, memilih menu dari HP dan menekan **Kirim pesanan**. Tidak perlu aplikasi atau login.
@@ -598,6 +602,8 @@ Harga final, promo dan pembayaran tetap di kasir. QR yang hilang atau difoto ora
 4. Kurir menekan **Berangkat** saat keluar dan **Terkirim** saat sampai. Bila gagal, isi alasan lalu **Gagal**; pesanan bisa dikirim ulang.
 
 Setiap perubahan status dikirim ke pusat, sehingga ketepatan waktu kirim semua outlet terlihat di laporan Delivery order.
+
+Pengiriman yang **Terkirim** dengan ongkir di atas nol dibukukan oleh Central sebagai jurnal di SAP B1 atau Accurate milik CV: debit akun biaya pengiriman, kredit akun kas/hutang kurir. Isi di **Mapping SAP → Akun** kunci `delivery_fee` (akun biaya) dan `delivery_payable` (atau `delivery_payable:gofood` dan seterusnya per mitra). Tanpa mapping, pengiriman masuk antrean pengecualian. Pusat bisa mematikannya di **Pengaturan umum → Posting ongkos kirim ke akuntansi**.
 
 ### 10.4 Roster dan absensi staf (kepala outlet dan semua staf)
 
