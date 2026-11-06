@@ -4,6 +4,7 @@ namespace App\Domain\Sync;
 
 use App\Domain\Core\SalesProjector;
 use App\Domain\Core\StockProjector;
+use App\Domain\Operations\OperationsProjector;
 use App\Models\InboxEvent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ final class InboxReceiver
         private readonly SalesProjector $sales,
         private readonly DayReconciler $days,
         private readonly StockProjector $stock,
+        private readonly OperationsProjector $operations,
     ) {}
 
     public const REQUIRED = ['event_id', 'source_id', 'outlet_id', 'entity_type', 'entity_id', 'entity_version', 'event_type', 'payload', 'checksum'];
@@ -73,6 +75,7 @@ final class InboxReceiver
                 $this->sales->project($e);
                 $this->stock->project($e);
                 $this->days->handle($e);
+                $this->operations->project($e);
             }));
         } catch (UniqueConstraintViolationException) {
             // Dua worker mengirim event sama bersamaan: yang kalah membaca ack milik pemenang.

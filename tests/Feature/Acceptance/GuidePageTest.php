@@ -11,7 +11,7 @@ class GuidePageTest extends TestCase
 {
     public function test_landing_links_to_the_role_guide(): void
     {
-        $this->get('/')->assertOk()->assertSee('Panduan Peran')->assertSee(route('panduan'));
+        $this->get('/')->assertOk()->assertSee('Panduan Pengguna')->assertSee(route('panduan'))->assertSee('Langkah Implementasi')->assertSee(route('implementasi'));
     }
 
     public function test_guide_shows_every_role_with_screenshots_and_architecture(): void
@@ -35,7 +35,7 @@ class GuidePageTest extends TestCase
 
     public function test_features_page_opens_with_architecture_and_lists_every_app(): void
     {
-        $this->get('/')->assertOk()->assertSee('Fitur Aplikasi')->assertSee(route('fitur'));
+        $this->get('/')->assertOk()->assertSee('Fitur Utama')->assertSee(route('fitur'));
 
         $page = $this->get('/fitur')->assertOk()
             ->assertSee('assets/guide/arsitektur-sistem.jpg')
@@ -53,5 +53,12 @@ class GuidePageTest extends TestCase
         foreach ($m[1] as $file) {
             $this->assertFileExists(public_path('assets/guide/'.$file));
         }
+    }
+
+    public function test_implementation_page_lists_the_rollout_steps(): void
+    {
+        $this->get('/implementasi')->assertOk()
+            ->assertSee('Langkah-langkah Implementasi Rasentra')
+            ->assertSee('Accurate Online');
     }
 }

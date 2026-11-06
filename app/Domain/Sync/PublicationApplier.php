@@ -50,6 +50,9 @@ final class PublicationApplier
                     $this->upsert($parentTable, $row);
                 }
             }
+            if ($type === 'member') {
+                $this->adoptProvisionalMember($payload);
+            }
             $this->upsert($table, $payload);
 
             foreach (self::CHILDREN[$type] ?? [] as $key => [$childTable, $foreignKey]) {
@@ -68,6 +71,22 @@ final class PublicationApplier
                 );
             }
         });
+    }
+
+    /**
+     * Member yang didaftarkan di outlet memakai id sementara sampai Central menerbitkan id
+     * resminya. Baris sementara dengan nomor telepon yang sama diganti, dan transaksi yang
+     * merujuknya dialihkan ke id resmi.
+     */
+    private function adoptProvisionalMember(array $payload): void
+    {
+        $old = $this->db()->table('crm_customers')->where('phone', $payload['phone'])->where('id', '!=', $payload['id'])->value('id');
+        if ($old === null) {
+            return;
+        }
+        $this->db()->table('orders')->where('crm_customer_id', $old)->update(['crm_customer_id' => $payload['id']]);
+        $this->db()->table('member_point_ledger')->where('crm_customer_id', $old)->update(['crm_customer_id' => $payload['id']]);
+        $this->db()->table('crm_customers')->where('id', $old)->delete();
     }
 
     public function cursor(): int

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Access\Permissions;
 use App\Domain\Cash\ShiftService;
 use App\Domain\Catalog\PriceResolver;
 use App\Domain\CookingService\CookingService;
@@ -11,6 +12,7 @@ use App\Domain\Sales\OrderService;
 use App\Domain\Sales\PaymentService;
 use App\Domain\Sales\ReturnService;
 use App\Domain\Sales\TableService;
+use App\Domain\Settings\Settings;
 use App\Models\CookingFeeRule;
 use App\Models\CookingJob;
 use App\Models\DiningTable;
@@ -64,7 +66,15 @@ class PosController extends Controller
                 ->where('effective_from', '<=', now())->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>', now()))
                 ->get(['method', 'basis', 'rate', 'minimum_fee'])->unique('method')->values() : [],
             'approvers' => User::where('outlet_id', $outlet->id)->where('is_active', true)
-                ->whereIn('role', Approval::APPROVER_ROLES)->where('id', '!=', $user->id)->get(['id', 'name']),
+                ->whereIn('role', Approval::approverRoles())->where('id', '!=', $user->id)->get(['id', 'name']),
+            // Diatur di Rasentra Central: metode bayar per outlet dan aturan member.
+            'payment_methods' => PosMemberController::forOutlet($outlet->id),
+            'member' => [
+                'enabled' => app(Settings::class)->get('member.enabled', $outlet->id),
+                'point_value' => app(Settings::class)->get('member.point_value', $outlet->id),
+                'can_enroll' => Permissions::allows($user, 'member.enroll'),
+                'can_redeem' => Permissions::allows($user, 'member.redeem'),
+            ],
         ]);
     }
 
@@ -433,7 +443,8 @@ class PosController extends Controller
 
         return [
             'order' => $order->only(['id', 'doc_no', 'channel', 'status', 'payment_status', 'gross_amount', 'discount_amount', 'net_amount', 'finalized_at',
-                'customer_name', 'customer_phone', 'delivery_address', 'promised_at', 'fulfilment_note']) + [
+                'customer_name', 'customer_phone', 'delivery_address', 'promised_at', 'fulfilment_note',
+                'crm_customer_id', 'customer_code', 'points_earned', 'points_redeemed']) + [
                     'table' => $order->visit_id ? DiningTable::whereKey(Visit::whereKey($order->visit_id)->value('dining_table_id'))->value('code') : null,
                 ],
             'lines' => $order->lines->map(fn (OrderLine $l) => [

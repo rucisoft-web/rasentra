@@ -4,6 +4,7 @@ namespace App\Domain\Sales;
 
 use App\Domain\Audit\Audit;
 use App\Domain\Inventory\StockLedger;
+use App\Domain\Membership\MembershipService;
 use App\Domain\Sync\Outbox;
 use App\Models\Location;
 use App\Models\Order;
@@ -121,6 +122,8 @@ final class ReturnService
                 ]);
                 $line->update(['returned_quantity' => Decimal::qty(Decimal::of($line->returned_quantity)->plus($l['qty']))]);
             }
+
+            app(MembershipService::class)->reverseForReturn($order, $return, $cashier);
 
             Outbox::record($return->outlet_id, 'sales_return', $return->id, 1, 'order.returned', $this->payload($return->fresh('lines'), $order), $today);
             Audit::record('order.returned', $return, $cashier->id, approverId: $approver->id, reason: $reason, outletId: $return->outlet_id, amount: $return->net_amount,

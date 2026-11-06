@@ -3,8 +3,10 @@
 namespace App\Domain\Sales;
 
 use App\Domain\Audit\Audit;
+use App\Domain\Membership\MembershipService;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Support\Decimal;
 use App\Support\DomainException;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +21,22 @@ final class PaymentService
 
     public function add(Order $order, string $method, string $amount, array $data = []): Payment
     {
-        if (! in_array($method, self::METHODS, true)) {
+        $configured = PaymentMethod::where('code', $method)->first();
+        if ($configured === null && ! in_array($method, self::METHODS, true)) {
             throw new DomainException('payment_method_invalid', 'Metode pembayaran tidak dikenal.');
         }
+        // Metode bayar diatur pusat (Rasentra Core → Metode pembayaran) dan bisa dibatasi per outlet.
+        if ($configured && (! $configured->is_active || ($configured->outlet_ids && ! in_array((int) $order->outlet_id, array_map('intval', $configured->outlet_ids), true)))) {
+            throw new DomainException('payment_method_disabled', "Metode {$configured->name} tidak aktif di outlet ini.");
+        }
+        if ($configured?->requires_reference && blank($data['provider_ref'] ?? null) && $configured->type === 'manual') {
+            throw new DomainException('payment_reference_required', "Isi nomor referensi untuk {$configured->name}.", 422);
+        }
+        if ($method === 'points') {
+            app(MembershipService::class)->assertRedeemable($order, $amount);
+        }
 
-        return DB::transaction(function () use ($order, $method, $amount, $data) {
+        return DB::transaction(function () use ($order, $method, $amount, $data, $configured) {
             $order = Order::lockForUpdate()->findOrFail($order->id);
             if (! $order->isEditable()) {
                 throw DomainException::conflict('order_not_editable', 'Pesanan sudah final.');
@@ -50,7 +63,8 @@ final class PaymentService
             }
 
             // Tunai dan EDC manual langsung berhasil (dengan bukti); QRIS/EDC terintegrasi menunggu provider.
-            $status = in_array($method, ['cash', 'edc_manual', 'voucher', 'points'], true) ? 'succeeded' : 'pending';
+            $status = in_array($method, ['cash', 'edc_manual', 'voucher', 'points'], true)
+                || ($configured && $configured->type !== 'integrated' && ! in_array($method, ['qris', 'edc'], true)) ? 'succeeded' : 'pending';
 
             return $order->payments()->create([
                 'method' => $method,

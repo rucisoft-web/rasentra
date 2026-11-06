@@ -2,6 +2,7 @@
 
 namespace App\Domain\Sales;
 
+use App\Domain\Access\Permissions;
 use App\Models\User;
 use App\Support\Decimal;
 use App\Support\DomainException;
@@ -14,7 +15,13 @@ use Illuminate\Support\Facades\Hash;
  */
 final class Approval
 {
+    /** Bawaan; matriks izin "pos.approve" di Rasentra Core yang menentukan. */
     public const APPROVER_ROLES = ['outlet_head', 'admin'];
+
+    public static function approverRoles(): array
+    {
+        return Permissions::rolesWith('pos.approve');
+    }
 
     public static function verify(?array $approval, int $requesterId, int $outletId, string|int $amount = 0): User
     {
@@ -26,7 +33,7 @@ final class Approval
 
         if ($approver === null
             || ! $approver->is_active
-            || ! in_array($approver->role, self::APPROVER_ROLES, true)
+            || ! Permissions::allows($approver, 'pos.approve')
             || ($approver->role !== 'admin' && (int) $approver->outlet_id !== $outletId)
             || $approver->pin_hash === null
             || ! Hash::check((string) $approval['pin'], $approver->pin_hash)) {

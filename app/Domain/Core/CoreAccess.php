@@ -2,6 +2,7 @@
 
 namespace App\Domain\Core;
 
+use App\Domain\Access\Permissions;
 use App\Models\User;
 
 /**
@@ -15,12 +16,14 @@ final class CoreAccess
         'admin' => 'Admin pusat',
         'hq_merch' => 'Merchandising pusat',
         'hq_finance' => 'Finance pusat',
+        'hq_crm' => 'CRM & customer service pusat',
     ];
 
     private const AREAS = [
         'admin' => ['*'],
         'hq_merch' => ['dashboard', 'catalog', 'promotions', 'recipes', 'reports'],
         'hq_finance' => ['dashboard', 'monitoring', 'reports', 'audit'],
+        'hq_crm' => ['dashboard', 'crm'],
     ];
 
     public static function isCoreUser(?User $user): bool
@@ -32,6 +35,11 @@ final class CoreAccess
     {
         if (! self::isCoreUser($user)) {
             return false;
+        }
+        // Matriks di Rasentra Core → Peran & izin menimpa bawaan di bawah.
+        $override = Permissions::centralOverride($user->role, $area);
+        if ($override !== null) {
+            return $override;
         }
         $areas = self::AREAS[$user->role];
 

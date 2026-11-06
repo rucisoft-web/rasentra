@@ -2,6 +2,11 @@
 
 use App\Domain\Core\SalesProjector;
 use App\Domain\Core\StockProjector;
+use App\Domain\Crm\AiAssistant;
+use App\Domain\Crm\CampaignService;
+use App\Domain\Crm\WorkflowEngine;
+use App\Domain\Integration\Accurate\AccurateSync;
+use App\Domain\Integration\Ai\AiException;
 use App\Domain\Integration\Sap\SapHealth;
 use App\Domain\Integration\Sap\SapPostingService;
 use App\Domain\Integration\Xml\NmexmlImporter;
@@ -11,11 +16,14 @@ use App\Domain\Sync\DayCloser;
 use App\Domain\Sync\DayReconciler;
 use App\Domain\Sync\HeartbeatSender;
 use App\Jobs\DispatchOutbox;
+use App\Models\Crm\AccurateConnection;
+use App\Models\Crm\Conversation;
 use App\Models\DailyReconciliation;
 use App\Models\Outlet;
 use App\Support\SystemState;
 use Database\Seeders\CoreSeeder;
 use Database\Seeders\LombokSeeder;
+use Database\Seeders\OperationsSeeder;
 use Database\Seeders\OutletSeeder;
 use Database\Seeders\SoloSeeder;
 use Illuminate\Support\Carbon;
@@ -38,6 +46,10 @@ Schedule::command('rasentra:backup')->dailyAt('02:00')->timezone(config('rasentr
 Schedule::command('rasentra:post-sap')->everyMinute()->withoutOverlapping()->when($central);
 Schedule::command('rasentra:sap-check')->everyFifteenMinutes()->when($central);
 Schedule::command('rasentra:reconcile')->hourly()->when($central);
+Schedule::command('rasentra:crm-campaigns')->everyMinute()->withoutOverlapping()->when($central);
+Schedule::command('rasentra:crm-workflows')->everyMinute()->withoutOverlapping()->when($central);
+Schedule::command('rasentra:crm-ai-leads')->hourlyAt(40)->withoutOverlapping()->when($central);
+Schedule::command('rasentra:crm-accurate-sync')->hourlyAt(20)->withoutOverlapping()->when($central);
 
 // Server demo: data contoh dibangun ulang setiap hari agar tamu berikutnya mulai dari kondisi bersih.
 Schedule::command('rasentra:demo-reset --force')->dailyAt(config('rasentra.demo.reset_at'))
@@ -117,6 +129,54 @@ Artisan::command('rasentra:rebuild-sales', function (SalesProjector $projector, 
     $this->info('Proyeksi penyesuaian stok dibangun ulang dari '.$stock->rebuild().' event inbox.');
 })->purpose('Bangun ulang tabel laporan penjualan dan stok Rasentra Core dari inbox');
 
+Artisan::command('rasentra:crm-campaigns', function (CampaignService $campaigns) {
+    $s = $campaigns->dispatch();
+    $this->line("mulai {$s['started']}, terkirim {$s['sent']}, gagal {$s['failed']}, dilewati {$s['skipped']}, selesai {$s['finished']}");
+})->purpose('Rasentra CRM: kirim kampanye WhatsApp terjadwal secara bertahap');
+
+Artisan::command('rasentra:crm-workflows', function (WorkflowEngine $engine) {
+    $s = $engine->tick();
+    $this->line("dilanjutkan {$s['resumed']}, dimulai {$s['started']}");
+})->purpose('Rasentra CRM: lanjutkan workflow yang menunggu dan jalankan pemicu harian (ulang tahun, tidak belanja)');
+
+Artisan::command('rasentra:crm-ai-leads {--limit=40}', function (AiAssistant $ai) {
+    // Percakapan dengan pesan baru sejak analisis terakhir (mis. mode "suggest" yang belum dibuka CS).
+    $done = 0;
+    $failed = 0;
+    Conversation::with('channel')
+        ->whereHas('channel', fn ($q) => $q->whereIn('ai_mode', ['suggest', 'auto']))
+        ->whereNotNull('last_inbound_at')
+        ->where(fn ($q) => $q->whereNull('lead_scored_at')->orWhereColumn('lead_scored_at', '<', 'last_inbound_at'))
+        ->orderByDesc('last_inbound_at')->limit((int) $this->option('limit'))->get()
+        ->each(function (Conversation $c) use ($ai, &$done, &$failed) {
+            if (! $ai->enabledFor($c)) {
+                return;
+            }
+            try {
+                $ai->analyze($c);
+                $done++;
+            } catch (AiException $e) {
+                $failed++;
+                $this->warn("#{$c->id}: {$e->getMessage()}");
+            }
+        });
+    $this->line("dianalisis {$done}, gagal {$failed}");
+})->purpose('Rasentra CRM: skor lead AI untuk percakapan WhatsApp yang belum dianalisis');
+
+Artisan::command('rasentra:crm-accurate-sync', function (AccurateSync $sync) {
+    foreach (AccurateConnection::with('businessUnit')->get() as $conn) {
+        if (! AccurateSync::configured($conn)) {
+            continue;
+        }
+        try {
+            $s = $sync->sync($conn);
+            $this->info("{$conn->businessUnit?->code}: {$s['customers']} pelanggan, {$s['invoices']} faktur baru");
+        } catch (Throwable $e) {
+            $this->error("{$conn->businessUnit?->code}: {$e->getMessage()}");
+        }
+    }
+})->purpose('Rasentra CRM: tarik pelanggan dan faktur penjualan dari Accurate Online');
+
 Artisan::command('rasentra:backup', function (Backup $backup) {
     $result = $backup->run();
     $this->info("Backup {$result['file']} ({$result['bytes']} byte) di storage/app/backups.");
@@ -132,7 +192,7 @@ Artisan::command('rasentra:demo-reset {--force : Jalankan tanpa konfirmasi}', fu
         return 1;
     }
     $this->call('migrate:fresh', ['--force' => true]);
-    foreach ([OutletSeeder::class, SoloSeeder::class, LombokSeeder::class, CoreSeeder::class] as $seeder) {
+    foreach ([OutletSeeder::class, SoloSeeder::class, LombokSeeder::class, CoreSeeder::class, OperationsSeeder::class] as $seeder) {
         $this->call('db:seed', ['--class' => $seeder, '--force' => true]);
     }
     $this->info('Data contoh demo siap.');

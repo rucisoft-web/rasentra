@@ -2,6 +2,9 @@
 
 namespace App\Domain\Integration\Sap;
 
+use App\Domain\Integration\Accurate\AccurateOnlineClient;
+use App\Models\BusinessUnit;
+
 /**
  * Memilih klien SAP per database perusahaan (sap_solo, sap_lombok, ...). Di luar profil
  * central, atau bila instance belum dikonfigurasi, dipakai klien bawaan dari container
@@ -18,6 +21,16 @@ final class SapClientFactory
     {
         if ($this->fixed !== null) {
             return $this->fixed;
+        }
+
+        // Perusahaan yang membukukan di Accurate Online memakai penerjemah dokumen ke API Accurate.
+        $company = BusinessUnit::where('sap_company_db', $companyDb)->first();
+        if ($company?->usesAccurate()) {
+            if (config('rasentra.profile') !== 'central' || ! $company->hasAccurateCredentials()) {
+                return app(SapClient::class);
+            }
+
+            return $this->clients[$companyDb] ??= new AccurateOnlineClient($company);
         }
 
         $config = self::config($companyDb);

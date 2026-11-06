@@ -220,7 +220,7 @@ final class StockAdjustmentService
     /** Kepala outlet memutuskan sendiri; petugas gudang butuh PIN kepala outlet. */
     private function approver(User $user, ?array $approval, int $outletId): User
     {
-        if (in_array($user->role, Approval::APPROVER_ROLES, true) && ((int) $user->outlet_id === $outletId || $user->role === 'admin')) {
+        if (in_array($user->role, Approval::approverRoles(), true) && ((int) $user->outlet_id === $outletId || $user->role === 'admin')) {
             return $user;
         }
 

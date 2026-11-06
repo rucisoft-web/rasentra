@@ -17,6 +17,14 @@ use Illuminate\Support\Facades\Date;
  */
 class KitchenBoardTest extends AcceptanceTestCase
 {
+    protected function setUp(): void
+    {
+        // Data contoh (versi harga dan resep) berlaku mulai "kemarin" saat seeder jalan; bekukan
+        // jam sebelum seeding agar skenario bertanggal 29 Okt 2026 tidak bergantung tanggal hari ini.
+        Date::setTestNow('2026-10-29 08:00:00');
+        parent::setUp();
+    }
+
     private function chef(): User
     {
         return User::where('email', 'chef@uji.test')->firstOrFail();

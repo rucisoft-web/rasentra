@@ -2,6 +2,7 @@
 
 namespace App\Domain\Integration\Sap;
 
+use App\Domain\Settings\Settings;
 use App\Models\InboxEvent;
 use App\Models\IntegrationException;
 use App\Models\Outlet;
@@ -23,7 +24,7 @@ use Throwable;
 final class SapPostingService
 {
     /** Event inbox yang menghasilkan dokumen SAP. */
-    public const EVENTS = ['order.finalized', 'order.returned', 'stock.adjusted'];
+    public const EVENTS = ['order.finalized', 'order.returned', 'stock.adjusted', 'delivery.updated'];
 
     public function __construct(private readonly SapClientFactory $clients) {}
 
@@ -52,6 +53,7 @@ final class SapPostingService
         return match ($event->event_type) {
             'order.returned' => $this->postReturn($event->payload),
             'stock.adjusted' => $this->postStockAdjustment($event->payload),
+            'delivery.updated' => $this->postDeliveryFee($event->payload),
             default => $this->postSale($event->payload),
         };
     }
@@ -174,6 +176,51 @@ final class SapPostingService
     }
 
     /** Posting penjualan (payload event order.finalized): A/R Invoice lalu Incoming Payment. */
+    /**
+     * Ongkos kirim pengiriman yang sudah terkirim dibukukan sebagai jurnal: debit akun biaya
+     * pengiriman (mapping akun "delivery_fee"), kredit akun kas/hutang kurir atau mitra
+     * ("delivery_payable:{mitra}" bila ada, selain itu "delivery_payable"). Status lain tidak
+     * membentuk dokumen. Satu jurnal per pengiriman, jadi status yang dikirim ulang tidak menggandakan.
+     */
+    public function postDeliveryFee(array $delivery): array
+    {
+        $fee = Decimal::of($delivery['fee'] ?? 0);
+        if (($delivery['status'] ?? null) !== 'delivered' || ! $fee->isPositive()
+            || ! app(Settings::class)->get('delivery.post_fee', (int) $delivery['outlet_id'])) {
+            return ['status' => 'not_required'];
+        }
+        $companyDb = Outlet::sapCompanyDb((int) $delivery['outlet_id']);
+        $account = fn (string $key) => $companyDb ? SapMapping::where(['company_db' => $companyDb, 'entity_type' => 'account', 'entity_key' => $key])->value('sap_code') : null;
+        $provider = (string) ($delivery['provider'] ?? 'internal');
+        $expense = $account('delivery_fee');
+        $payable = $account('delivery_payable:'.$provider) ?? $account('delivery_payable');
+        if (! $companyDb || ! $expense || ! $payable) {
+            $missing = array_filter([! $companyDb ? 'company:sap_company_db' : null, ! $expense ? 'account:delivery_fee' : null, ! $payable ? 'account:delivery_payable' : null]);
+            IntegrationException::updateOrCreate(
+                ['kind' => 'missing_mapping', 'source_type' => 'delivery', 'source_id' => (string) $delivery['id'], 'status' => 'open'],
+                ['message' => 'Mapping akun ongkos kirim belum ada: '.implode(', ', $missing)],
+            );
+
+            return ['status' => 'failed', 'missing' => array_values($missing)];
+        }
+
+        $date = substr((string) ($delivery['delivered_at'] ?? $delivery['business_date']), 0, 10);
+        $memo = 'Ongkir '.($delivery['doc_no'] ?? '').' · '.$provider.(filled($delivery['courier_name'] ?? null) ? ' · '.$delivery['courier_name'] : '');
+        $amount = Decimal::money($fee);
+        $doc = $this->post($companyDb, 'delivery', (string) $delivery['id'], 'JournalEntries', [
+            'ReferenceDate' => $date,
+            'Memo' => mb_substr($memo, 0, 50),
+            'Reference' => $delivery['doc_no'] ?? null,
+            'DocTotal' => $amount,
+            'JournalEntryLines' => [
+                ['AccountCode' => $expense, 'Debit' => $amount, 'Credit' => '0.00', 'LineMemo' => mb_substr($memo, 0, 50)],
+                ['AccountCode' => $payable, 'Debit' => '0.00', 'Credit' => $amount, 'LineMemo' => mb_substr($memo, 0, 50)],
+            ],
+        ]);
+
+        return ['status' => $doc->status];
+    }
+
     public function postSale(array $order): array
     {
         $companyDb = Outlet::sapCompanyDb((int) $order['outlet_id']);

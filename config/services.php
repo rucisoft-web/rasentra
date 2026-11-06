@@ -31,6 +31,21 @@ return [
     // SAP Business One Service Layer (SAP B1 versi SQL Server). Hanya diisi pada profil central.
     // Setiap CV di Indoguna Group punya instance/database SAP sendiri; nilai di "companies"
     // menimpa nilai bawaan untuk database tersebut, sehingga dua instance bisa berbeda server.
+    // Rasentra CRM: WhatsApp Business Cloud API. Token per nomor diatur di konsol CRM; nilai di
+    // sini milik aplikasi Meta (verifikasi webhook dan tanda tangan X-Hub-Signature-256).
+    // Rasentra CRM tahap 4: Claude API untuk asisten chat, knowledge base dan skor lead.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('CRM_AI_MODEL', 'claude-opus-5-5'),
+        'effort' => env('CRM_AI_EFFORT', 'medium'),
+    ],
+
+    'whatsapp' => [
+        'graph_version' => env('WHATSAPP_GRAPH_VERSION', 'v23.0'),
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+    ],
+
     'sap' => [
         'url' => env('SAP_SL_URL'),
         'username' => env('SAP_USERNAME'),

@@ -42,7 +42,7 @@ class InventoryController extends Controller
         return view('inventory.app', [
             'outlet' => Outlet::find($outletId),
             'locations' => Location::where('outlet_id', $outletId)->where('is_active', true)->orderBy('code')->get(['code', 'name']),
-            'approvers' => User::where('outlet_id', $outletId)->where('is_active', true)->whereIn('role', Approval::APPROVER_ROLES)
+            'approvers' => User::where('outlet_id', $outletId)->where('is_active', true)->whereIn('role', Approval::approverRoles())
                 ->where('id', '!=', $request->user()->id)->orderBy('name')->get(['id', 'name']),
         ]);
     }

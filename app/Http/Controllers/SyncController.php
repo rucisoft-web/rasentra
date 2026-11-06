@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Membership\MembershipService;
 use App\Domain\Sync\InboxReceiver;
 use App\Domain\Sync\Publications;
 use App\Models\Device;
+use App\Models\Member;
 use App\Models\Outlet;
 use App\Models\OutletSyncState;
 use App\Models\PromotionTarget;
@@ -151,5 +153,14 @@ class SyncController extends Controller
     private function isOutletServer(Device $device): bool
     {
         return $device->app === 'outlet_server';
+    }
+
+    /** Saldo poin resmi satu member, dipakai Rasentra Lokal sebelum menerima pembayaran poin. */
+    public function memberBalance(Request $request): JsonResponse
+    {
+        $phone = MembershipService::normalizePhone((string) $request->query('phone', ''));
+        $member = Member::where('phone', $phone)->where('is_member', true)->first();
+
+        return response()->json(['points_balance' => $member ? (string) $member->points_balance : null]);
     }
 }

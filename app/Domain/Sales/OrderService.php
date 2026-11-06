@@ -6,6 +6,7 @@ use App\Domain\Audit\Audit;
 use App\Domain\Catalog\PriceResolver;
 use App\Domain\Inventory\StockLedger;
 use App\Domain\Kitchen\KitchenService;
+use App\Domain\Membership\MembershipService;
 use App\Domain\Promotion\ActivePromotions;
 use App\Domain\Promotion\PromotionEngine;
 use App\Domain\Sync\Outbox;
@@ -337,6 +338,8 @@ final class OrderService
                 'version' => $order->version + 1,
             ]);
 
+            app(MembershipService::class)->settle($order, $actor);
+
             Outbox::record(
                 $order->outlet_id, 'order', $order->id, $order->version, 'order.finalized',
                 $this->payload($order->fresh(['lines.discountAllocations', 'payments'])),
@@ -454,6 +457,7 @@ final class OrderService
             'outlet_id' => $order->outlet_id,
             'channel' => $order->channel,
             'customer' => $order->customer_name ? ['name' => $order->customer_name, 'phone' => $order->customer_phone] : null,
+            'member' => $order->crm_customer_id ? ['id' => $order->crm_customer_id, 'code' => $order->customer_code, 'points_earned' => (string) $order->points_earned, 'points_redeemed' => (string) $order->points_redeemed] : null,
             'business_date' => $order->business_date->toDateString(),
             'gross_amount' => (string) $order->gross_amount,
             'discount_amount' => (string) $order->discount_amount,

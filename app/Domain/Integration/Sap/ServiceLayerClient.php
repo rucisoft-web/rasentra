@@ -17,6 +17,12 @@ final class ServiceLayerClient implements SapClient
     public function findBySourceRef(string $object, string $sourceRef): ?array
     {
         $ref = str_replace("'", "''", $sourceRef);
+        if ($object === 'JournalEntries') {
+            // Jurnal memakai JdtNum/Number, bukan DocEntry/DocNum.
+            $row = $this->http()->get($this->url($object), ['$filter' => "U_POS_SRC eq '{$ref}'", '$select' => 'JdtNum,Number'])->throw()->json('value.0');
+
+            return $row ? ['DocEntry' => (int) $row['JdtNum'], 'DocNum' => (int) ($row['Number'] ?? $row['JdtNum'])] : null;
+        }
         $rows = $this->http()->get($this->url($object), ['$filter' => "U_POS_SRC eq '{$ref}'", '$select' => 'DocEntry,DocNum,DocTotal'])
             ->throw()->json('value', []);
 
@@ -25,7 +31,13 @@ final class ServiceLayerClient implements SapClient
 
     public function create(string $object, array $payload): array
     {
+        if ($object === 'JournalEntries') {
+            unset($payload['DocTotal']); // bukan field jurnal SAP
+        }
         $response = $this->http()->post($this->url($object), $payload)->throw()->json();
+        if ($object === 'JournalEntries') {
+            return ['DocEntry' => (int) $response['JdtNum'], 'DocNum' => (int) ($response['Number'] ?? $response['JdtNum'])];
+        }
 
         return ['DocEntry' => (int) $response['DocEntry'], 'DocNum' => (int) $response['DocNum']];
     }

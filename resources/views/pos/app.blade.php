@@ -47,6 +47,7 @@
           <button data-channel="delivery">Delivery</button>
         </div>
         <button class="customer-chip" data-action="customer" id="customer" hidden></button>
+        <button class="customer-chip" data-action="member" id="member-chip" hidden>+ Member</button>
       </div>
       <button class="btn ghost" data-action="new">Baru</button>
     </div>
